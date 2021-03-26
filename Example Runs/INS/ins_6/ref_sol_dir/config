@@ -1,0 +1,9 @@
+[REFERENCE SOLUTIONS]
+u = [(2.0/0.2^2)*y*(0.2 - y), 0.0]
+
+[METRICS]
+L2_norm = u
+L1_norm = u
+Linfinity_norm = u
+divergence = u
+facet_jumps = u, p

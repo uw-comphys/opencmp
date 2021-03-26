@@ -1,0 +1,10 @@
+[VERTICES]
+
+[CENTROIDS]
+
+[DIRICHLET]
+u = all -> [0.0, 0.0]
+
+[NEUMANN]
+
+[ROBIN]

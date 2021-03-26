@@ -1,0 +1,10 @@
+[REFERENCE SOLUTIONS]
+u = [-cos(x)*sin(y)*exp(-2*t), sin(x)*cos(y)*exp(-2*t)]
+p = -0.25*(cos(2*x) + cos(2*y))*exp(-4*t)
+
+[METRICS]
+l2_norm = u, p
+l1_norm = u, p
+linfinity_norm = u, p
+divergence = u
+facet_jumps = u, p

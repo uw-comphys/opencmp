@@ -1,0 +1,3 @@
+[INS]
+u = all -> [-cos(x)*sin(y), sin(x)*cos(y)]
+p = all -> -0.25*(cos(2*x) + cos(2*y))

@@ -1,0 +1,12 @@
+[DIRICHLET]
+u = wall   ->  [0.0, 0.0]
+p = inlet  ->  10.0
+    outlet ->  5.0
+
+[NEUMANN]
+
+[ROBIN]
+
+[STRESS]
+
+[NO_BACKFLOW]

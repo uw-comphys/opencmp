@@ -1,0 +1,5 @@
+[REFERENCE SOLUTIONS]
+u = [5.0/(2.0*0.001)*(0.2*y - y^2), 0.0]
+
+[METRICS]
+L2_norm = u

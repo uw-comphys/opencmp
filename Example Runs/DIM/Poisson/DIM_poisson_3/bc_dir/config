@@ -1,0 +1,9 @@
+[DIRICHLET]
+u = top    ->  sin(pi * x) * cos(pi * y)
+    bottom ->  sin(pi * x) * cos(pi * y)
+    right  ->  sin(pi * x) * cos(pi * y)
+    left   ->  sin(pi * x) * cos(pi * y)
+
+[NEUMANN]
+
+[ROBIN]

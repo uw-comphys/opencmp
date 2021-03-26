@@ -1,0 +1,44 @@
+[MESH]
+filename = mesh_files/large_square_4bcs.vol 
+
+[DIM]
+diffuse_interface_method = False
+
+[FINITE ELEMENT SPACE]
+elements = HDiv, L2
+interpolant_order = 3
+
+[DG]
+DG = True
+interior_penalty_coefficient = 10
+
+[SOLVER]
+solver = default
+preconditioner = multigrid
+linearization_method = Oseen
+nonlinear_tolerance = 1e-6
+nonlinear_max_iterations = 3
+
+[TRANSIENT]
+transient = True
+scheme = adaptive two step
+time_range = 0.0, 0.5
+dt = 0.001
+dt_tolerance = 1e-4
+dt_range = 1e-8, 0.01
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtk
+save_frequency = 0.1, time
+subdivision = 3
+
+[ERROR ANALYSIS]
+check_error = True
+error_average = p
+
+[OTHER]
+num_threads = 6
+model = INS
+run_dir = Example Runs/INS/ins_8
+messaging_level = 1

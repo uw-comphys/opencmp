@@ -1,0 +1,4 @@
+[REFERENCE SOLUTIONS]
+u = sin(pi * x) * cos(pi * y)
+
+[METRICS]

@@ -1,0 +1,5 @@
+[REFERENCE SOLUTIONS]
+
+[METRICS]
+divergence = u
+facet_jumps = u, p

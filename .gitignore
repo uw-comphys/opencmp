@@ -1,2 +1,17 @@
 .hg/*
 .hgignore
+/*\.pyc
+/__pycache__
+/*\.ipynb_checkpoints
+/*\.vtk
+/*\.vtu
+/*\.pvd
+/*\.sol
+/*\.xml
+/*\.iml
+/*\.ini
+/*\.pytest_cache
+.mypy_cache/*
+.idea/*
+jupyter/*
+.dmypy.json

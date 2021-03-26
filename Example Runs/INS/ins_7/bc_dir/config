@@ -1,0 +1,5 @@
+[DIRICHLET]
+u = top    -> [-cos(x)*sin(y)*exp(-2*t), sin(x)*cos(y)*exp(-2*t)]
+    left   -> [-cos(x)*sin(y)*exp(-2*t), sin(x)*cos(y)*exp(-2*t)]
+    bottom -> [-cos(x)*sin(y)*exp(-2*t), sin(x)*cos(y)*exp(-2*t)]
+    right  -> [-cos(x)*sin(y)*exp(-2*t), sin(x)*cos(y)*exp(-2*t)]
