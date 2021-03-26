@@ -1,0 +1,11 @@
+[VERTICES]
+top_1    = <2.0, 0.0>, <-2.0, 0.0>
+bottom_1 = <-2.0, 0.0>, <2.0, 0.0>
+
+[CENTROIDS]
+top_1    = None
+bottom_1 = None
+
+[DIM BOUNDARY CONDITIONS]
+multiple_bcs = True
+remainder = False   

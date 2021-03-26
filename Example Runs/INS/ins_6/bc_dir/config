@@ -1,0 +1,13 @@
+[DIRICHLET]
+u = wall   ->  [0.0, 0.0]
+    inlet  ->  [(2.0/0.2^2)*y*(0.2 - y), 0.0]
+
+[NEUMANN]
+
+[ROBIN]
+
+[STRESS]
+stress = outlet -> [0.0, 0.0]
+
+[NO_BACKFLOW]
+no_backflow = outlet -> 1.0

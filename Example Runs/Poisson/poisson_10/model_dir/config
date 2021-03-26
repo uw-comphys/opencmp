@@ -1,0 +1,5 @@
+[PARAMETERS]
+diffusion_coefficient = 1.0
+
+[FUNCTIONS]
+source = all -> 0.0

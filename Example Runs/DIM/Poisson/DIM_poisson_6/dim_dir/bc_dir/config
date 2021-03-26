@@ -1,0 +1,15 @@
+[VERTICES]
+top    = <1.0, 0.0>, <-1.0, 0.0>
+bottom = <-1.0, 0.0>, <1.0, 0.0>
+
+[CENTROIDS]
+top    = <0.0, 0.0>
+bottom = None
+
+[DIRICHLET]
+u = top    ->  sin(pi * x) * cos(pi * y)
+    bottom ->  sin(pi * x) * cos(pi * y)
+
+[NEUMANN]
+
+[ROBIN]

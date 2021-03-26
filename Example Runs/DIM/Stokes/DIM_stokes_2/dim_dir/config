@@ -1,0 +1,8 @@
+[DIM]
+
+[DIM BOUNDARY CONDITIONS]
+multiple_bcs = False
+
+[PHASE FIELDS]
+load_method = file
+phi_filename = Example Runs/DIM/Stokes/DIM_stokes_2/dim_dir/phi.sol

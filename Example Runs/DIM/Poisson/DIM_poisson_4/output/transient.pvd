@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1"
+byte_order="LittleEndian"
+compressor="vtkZLibDataCompressor">
+<Collection>
+<DataSet timestep="0.000000e+00" group="" part="0" file="poisson_0.0.vtu"/>
+</Collection>
+</VTKFile><?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1"
+byte_order="LittleEndian"
+compressor="vtkZLibDataCompressor">
+<Collection>
+<DataSet timestep="0.000000e+00" group="" part="0" file="poisson_0.0.vtu"/>
+</Collection>
+</VTKFile><?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1"
+byte_order="LittleEndian"
+compressor="vtkZLibDataCompressor">
+<Collection>
+<DataSet timestep="0.000000e+00" group="" part="0" file="poisson_0.0.vtu"/>
+</Collection>
+</VTKFile><?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1"
+byte_order="LittleEndian"
+compressor="vtkZLibDataCompressor">
+<Collection>
+<DataSet timestep="0.000000e+00" group="" part="0" file="poisson_0.0.vtu"/>
+</Collection>
+</VTKFile><?xml version="1.0"?>
+<VTKFile type="Collection" version="0.1"
+byte_order="LittleEndian"
+compressor="vtkZLibDataCompressor">
+<Collection>
+<DataSet timestep="0.000000e+00" group="" part="0" file="poisson_0.0.vtu"/>
+</Collection>
+</VTKFile>

@@ -1,0 +1,16 @@
+[DIM]
+mesh_dimension = 2
+num_mesh_elements = 59, 59
+mesh_scale = 3, 3
+mesh_offset = 1.5, 1.5
+interface_width_parameter = 0.1
+
+[DIM BOUNDARY CONDITIONS]
+multiple_bcs = True
+remainder = False
+
+[PHASE FIELDS]
+load_method = generate
+stl_filename = mesh_files/circle_nd.stl
+invert_phi = True
+save_to_file = True
