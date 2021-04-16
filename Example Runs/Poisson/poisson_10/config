@@ -1,0 +1,36 @@
+[MESH]
+filename = mesh_files/unit_square_coarse.vol
+
+[DIM]
+diffuse_interface_method = False
+
+[FINITE ELEMENT SPACE]
+elements = u -> H1
+interpolant_order = 3
+
+[DG]
+DG = True
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = default
+preconditioner = default
+
+[TRANSIENT]
+transient = True
+scheme = adaptive two step
+time_range = 0.0, 1.0
+dt = 0.001
+dt_tolerance = relative -> 1e-4
+dt_range = 1e-8, 0.01
+
+[VISUALIZATION]
+save_to_file = False
+
+[ERROR ANALYSIS]
+check_error = True
+
+[OTHER]
+num_threads = 6
+model = Poisson
+run_dir = Example Runs/Poisson/poisson_10

@@ -1,0 +1,10 @@
+[TEST LOAD CONFIG]
+test_1 = a -> 3*4
+	 b -> mesh.vol
+	 c -> u + p
+	 	
+test_2 = a -> 3*4 b -> mesh.vol c -> u + p
+
+test_3 = a - 3*4
+         b = mesh.vol
+         c . u + p

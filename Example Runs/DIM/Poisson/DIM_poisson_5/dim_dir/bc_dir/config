@@ -1,0 +1,10 @@
+[VERTICES]
+
+[CENTROIDS]
+
+[DIRICHLET]
+u = all ->  sin(pi * x) * cos(pi * y)
+
+[NEUMANN]
+
+[ROBIN]

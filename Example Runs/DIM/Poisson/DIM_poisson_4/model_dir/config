@@ -1,0 +1,5 @@
+[PARAMETERS]
+diffusion_coefficient = all -> 1.0
+
+[FUNCTIONS]
+source = all -> 2.0*pi^2*sin(pi*x)*cos(pi*y)

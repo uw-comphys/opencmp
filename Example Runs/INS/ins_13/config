@@ -1,0 +1,43 @@
+[MESH]
+filename = mesh_files/channel_w_cyl.vol 
+curved_elements = True
+
+[DIM]
+diffuse_interface_method = False
+
+[FINITE ELEMENT SPACE]
+elements = u -> VectorH1
+           p -> H1
+interpolant_order = 3
+
+[DG]
+DG = False
+
+[SOLVER]
+solver = default
+preconditioner = default
+linearization_method = IMEX
+
+[TRANSIENT]
+transient = True
+scheme = adaptive IMEX
+time_range = 0.0, 1.0
+dt = 1e-3
+dt_range = 1e-12, 0.01
+dt_tolerance = relative -> 5e-4
+               absolute -> 1e-6
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtu
+save_frequency = 0.05, time
+subdivision = 3
+
+[ERROR ANALYSIS]
+check_error = False
+check_error_every_timestep = True
+
+[OTHER]
+num_threads = 6
+model = INS
+run_dir = Example Runs/INS/ins_13

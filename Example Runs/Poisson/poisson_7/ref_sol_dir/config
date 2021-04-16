@@ -1,0 +1,5 @@
+[REFERENCE SOLUTIONS]
+u = 0.0
+
+[METRICS]
+L2_norm = u 

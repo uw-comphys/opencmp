@@ -1,0 +1,10 @@
+[REFERENCE SOLUTIONS]
+u = [5.0/(2.0*0.001)*(0.2*y - y^2), 0.0]
+p = 5.0*(1.0 - x) + 5.0
+
+[METRICS]
+L2_norm = u, p
+L1_norm = u, p
+Linfinity_norm = u, p
+divergence = u
+;facet_jumps = u, p
