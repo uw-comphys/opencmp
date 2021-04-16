@@ -1,0 +1,5 @@
+[PARAMETERS]
+kinematic_viscosity = all -> 0.001
+
+[FUNCTIONS]
+source = all -> [0.0, 0.0]

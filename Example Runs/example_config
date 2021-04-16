@@ -1,0 +1,213 @@
+########################################################################################################
+#                                                                                                      #
+# OpenCMP Configuration File:                                                                          #
+# An example config file explaining all of the possible parameters.                                    #
+#                                                                                                      #
+########################################################################################################
+
+[MESH]
+filename = path/to/file                    # The path to the mesh file. This can be a .vol file or a .msh file.
+curved_elements = True/False               # Whether mesh elements should be curved to approximate the domain boundaries.
+
+
+[DIM]
+diffuse_interface_method = True/False      # Whether to use the diffuse interface method.
+dim_dir = path/to/directory                # The path to the directory containing the DIM config file.
+
+
+[FINITE ELEMENT SPACE]
+elements = var -> name                     # The type of finite element (name) to use for each variable (var).
+           var -> name
+           ...
+interpolant_order = integer                # The highest interpolant order to use for the finite element space.
+no_constrained_dofs = True/False           # If True, Dirichlet BCs are only weakly imposed. This should only be used with HDiv spaces and tangential Dirichlet BCs.
+
+
+[DG]
+DG = True/False                            # Whether to use discontinuous Galerkin.
+interior_penalty_coefficient = float       # Coefficient for the interior penalty method (C in C*n^2/h).
+
+
+[SOLVER]
+solver = name                              # Type of solver to use (direct, CG, MinRes, GMRes, or Richardson).
+preconditioner = name                      # Type of preconditioner to use (local, direct, multigrid, h1amg, or bddc).
+solver_tolerance = float                   # Stopping tolerance for the residual error in an iterative solve.
+solver_max_iterations = integer            # Maximum number of iterations for an iterative solve.
+linearization_method = name                # How to linearize a nonlinear model (Oseen or IMEX).
+nonlinear_tolerance = relative -> float    # Tolerance between subsequent iterations for the nonlinear solver. 
+                      absolute -> float
+nonlinear_max_iterations = integer         # Maximum number of iterations for the nonlinear solver.
+
+
+[TRANSIENT]
+transient = True/False                     # Whether the solve is transient or stationary.
+scheme = name                              # The time integration scheme to use (implicit euler, explicit euler, crank nicolson, adaptive two step, adaptive three step, euler IMEX, CNLF, SBDF, or adaptive IMEX).
+time_range = float, float                  # The simulation's time range.
+dt = float                                 # The time step.
+dt_tolerance = relative -> float           # Error tolerance for adaptive time-stepping.
+               absolute -> float
+dt_range = float, float                    # Min and max allowable values for dt in adaptive time-stepping.
+maximum_rejected_solves = int              # Maximum number of consecutive rejected solves before the simulation will quit.
+
+
+[ERROR ANALYSIS]
+check_error = True/False                   # Whether to compute the error of the final result against an exact solution.
+convergence_test = h -> var, var.../False  # Whether to run a convergence test (h or p refinement) and which variable(s) to run the convergence test on.
+                   p -> var, var.../False        
+num_refinements = integer                  # The number of refinement steps in the convergence test(s).
+error_average = var, var...                # Which variables should be normalized to zero mean before computing error.
+
+
+[VISUALIZATION]
+save_to_file = True/False                  # Whether to save results for later visualization.
+save_type = sol/vtu                        # The file format to save to (sol, vtk, or vtu).
+save_frequency = float, numit/time         # How often to save, either after a set number of iterations or time.         
+subdivision = integer                      # The refinement level of the save if saving to a vtu file.
+
+
+[OTHER]
+num_threads = integer                      # The number of threads to run the simulation on.
+model = name                               # The name of the model being solved.
+run_dir = path/to/directory                # The path to the directory containing the config file and other run files.
+messaging_level = integer                  # The level of messaging from the solver.
+
+
+########################################################################################################
+#                                                                                                      #
+# OpenCMP BC Configuration File:                                                                       #
+# An example BC config file.                                                                           #
+#                                                                                                      #
+########################################################################################################
+
+[VERTICES]                                 # Only used for DIM when there are multiple diffuse interface BCs.
+marker = mask                              # marker is the label for the BC.
+                                           # mask is a path to a gridfunction mask, a path to the .stl vertices, or a list of vertices.
+
+[CENTROIDS]                                # Only used for DIM when there are multiple diffuse interface BCs.
+marker = coordinate                        # marker is the label for the BC.
+                                           # coordinate is the coordinate to use as the centroid.
+
+[BC NAME]                                  # DIRICHLET/NEUMANN/ROBIN/STRESS/PINNED as appropriate for the model.
+var = marker -> BC                         # var is the variable of interest (ex: dirichlet BC for velocity, var = u).
+                                           # marker is the mesh marker for the BC. 
+                                           # BC can be a numerical value, function, or path to a saved file.
+
+########################################################################################################
+#                                                                                                      #
+# OpenCMP IC Configuration File:                                                                       #
+# An example IC config file.                                                                           #
+#                                                                                                      #
+########################################################################################################
+
+[MODEL NAME]                               # There could be multiple headers if one model needs to be run to initialize another.
+var = material -> IC                       # var is the variable of interest or all.
+                                           # material is the mesh material or all (If constructing an IC in pieces specify multiple mesh materials).
+                                           # IC can be a numerical value, function, or path to a saved file.
+
+
+########################################################################################################
+#                                                                                                      #
+# OpenCMP Reference Solution Configuration File:                                                       #
+# An example reference solution config file.                                                           #
+#                                                                                                      #
+########################################################################################################
+
+[REFERENCE SOLUTIONS]                      # Known solutions to compute error against.
+var = ref_sol                              # var is the variable of interest or all.
+                                           # ref_sol can be a numerical value, function, or path to a saved file.
+
+[METRICS]                                  # Which error metrics to compute.
+metric = var, var...                       # metric can be L1_norm, L2_norm, Linfinity_norm, divergence, or facet_jumps.
+                                           # Provide a list of variables that the metric should be computed for.
+
+########################################################################################################
+#                                                                                                      #
+# OpenCMP Model Function Configuration File:                                                           #
+# An example model functions/parameters config file.                                                   #
+#                                                                                                      #
+########################################################################################################
+
+[PARAMETERS]                               # Any required model parameters (ex: kinematic viscosity).
+name = var -> param                        # name is the name of the parameter.
+       var -> param                        # var is the variable associated with the parameter or all.
+       ...                                 # param can be a numerical value or function.
+
+[FUNCTIONS]                                # Any required model functions (ex: the source term).
+name = var -> func                         # name is the name of the model function.
+       var -> func                         # var is the variable associated with the function for all.
+       ...                                 # func can be a numerical value or function.
+                                      
+
+########################################################################################################
+#                                                                                                      #
+# OpenCMP Diffuse Interface Method Configuration File:                                                 #
+# An example DIM config file.                                                                          #
+#                                                                                                      #
+########################################################################################################
+
+[DIM]
+mesh_dimension = 2/3                       # The dimension of the simulation.
+num_mesh_elements = x -> integer           # The number of mesh elements along each dimension (length must match mesh_dimension).
+                    y -> integer
+                    [z -> integer]
+num_phi_mesh_elements = x -> integer       # Similar to num_mesh_elements but used if the phase field should be constructed on a finer mesh than the simulation mesh.
+                        y -> integer
+                        [z -> integer]
+mesh_scale = x -> integer                  # The absolute extend of the mesh in each dimension (length must match mesh_dimension).
+             y -> integer
+             [z -> integer]
+mesh_offset = x -> integer                 # Centers the mesh in each dimension (length must match mesh_dimension).
+              y -> integer
+              [z -> integer]
+interface_width_parameter = float          # The diffuseness of the diffuse interface.
+mnum = float                               # Highly optional.
+close = True/False                         # Highly optional.
+
+
+[DIM BOUNDARY CONDITIONS]
+multiple_bcs = True/False                  # If True, there are multiple BCs on the diffuse interface.
+remainder = True/False                     # If True, a final diffuse interface BC should be made from the leftovers of all other boundary regions.
+overlap_interface_parameter = float        # The diffuseness of the borders between diffuse interface boundary regions.
+
+
+[PHASE FIELDS]
+load_method = name                         # file if loading from file, generate if generating from a .stl file, combine if generating from multiple .stl files.
+stl_filename = path/to/file or dict        # The path to the .stl file (or multiple .stl files, see below).
+phi_filename = path/to/file                # The path to the .sol file containing the phase field.
+invert_phi = True/False                    # If True, the phase field is inverted.
+save_to_file = True/False                  # If True, the phase field, mesh, and BC masks are saved to file after being generated.
+
+
+[RIGID BODY MOTION]
+rotation_speed = float                     # How fast the phase field rotates (rad/s).
+center_of_rotation = coordinate            # The coordinates the phase field rotates around.
+translation_vector = coordinate            # Vector dictating the translation of the phase field (length units/s).
+
+
+########################################################################################################
+#                                                                                                      #
+# OpenCMP DIM Combining Phase Fields Configuration File:                                               #
+# An example DIM config file when phase fields must be generated and combined.                         #
+#                                                                                                      #
+########################################################################################################
+
+
+# In the main DIM config file under [PHASE FIELDS]
+stl_filename = name -> path/to/file        # name is the name of the config function for the phase field.
+                                           # path/to/file is the path to the .stl file for the phase field.
+                                                 
+
+# In each phase field config file.
+[DIM BOUNDARY CONDITIONS]
+multiple_bcs = True/False                  # If True, this phase field has multiple BCs.
+remainder = True/False                     # If True, a final diffuse interface BC should be made from the leftovers of all other boundary regions.
+overlap_interface_parameter = float        # The diffuseness of the borders between diffuse interface boundary regions.
+
+
+[VERTICES]
+marker = mask                              # marker is the label for the BC.
+                                           # mask is a path to a gridfunction mask, a path to the .stl vertices, or a list of vertices.
+
+[CENTROIDS]
+marker = coordinate                        # marker is the label for the BC.
+                                           # coordinate is the coordinate to use as the centroid.

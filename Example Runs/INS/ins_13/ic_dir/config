@@ -1,0 +1,5 @@
+[STOKES]
+all = all -> None
+
+[INS]
+all = all -> output/sol/stokes_0.0.sol

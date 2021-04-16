@@ -1,0 +1,15 @@
+[VERTICES]
+top    = Example Runs/DIM/Poisson/DIM_poisson_2/dim_dir/bc_dir/top_mask.sol
+bottom = Example Runs/DIM/Poisson/DIM_poisson_2/dim_dir/bc_dir/bottom_mask.sol
+
+[CENTROIDS]
+top    = <0.0, 0.0>
+bottom = None
+
+[DIRICHLET]
+u = top    ->  sin(pi * x) * cos(pi * y)
+    bottom ->  sin(pi * x) * cos(pi * y)
+
+[NEUMANN]
+
+[ROBIN]

@@ -1,0 +1,19 @@
+[DIM]
+mesh_dimension = 2
+num_mesh_elements = x -> 39
+                    y -> 39
+mesh_scale = x -> 4
+             y -> 4
+mesh_offset = x -> 1
+              y -> 1.5
+interface_width_parameter = 0.1
+
+[DIM BOUNDARY CONDITIONS]
+multiple_bcs = True
+remainder = False
+
+[PHASE FIELDS]
+load_method = combine
+stl_filename = dim_1 -> mesh_files/offset_circle_1.stl
+               dim_2 -> mesh_files/offset_circle_2.stl
+save_to_file = False

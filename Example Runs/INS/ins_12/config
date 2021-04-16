@@ -1,0 +1,40 @@
+[MESH]
+filename = mesh_files/channel_w_cyl.vol 
+curved_elements = True
+
+[DIM]
+diffuse_interface_method = False
+
+[FINITE ELEMENT SPACE]
+elements = u -> HDiv
+           p -> L2
+interpolant_order = 3
+
+[DG]
+DG = True
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = default
+preconditioner = default
+linearization_method = IMEX
+
+[TRANSIENT]
+transient = True
+scheme = SBDF
+time_range = 0.0, 1.0
+dt = 5e-4
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtu
+save_frequency = 0.1, time
+subdivision = 3
+
+[ERROR ANALYSIS]
+check_error = False
+
+[OTHER]
+num_threads = 6
+model = INS
+run_dir = Example Runs/INS/ins_12

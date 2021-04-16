@@ -1,0 +1,32 @@
+[MESH]
+filename = Example Runs/DIM/Poisson/DIM_poisson_2/dim_dir/mesh.vol
+
+[DIM]
+diffuse_interface_method = True
+dim_dir = Example Runs/DIM/Poisson/DIM_poisson_2/dim_dir
+
+[FINITE ELEMENT SPACE]
+elements = u -> H1
+interpolant_order = 3
+
+[DG]
+DG = False
+
+[SOLVER]
+solver = default
+preconditioner = default
+
+[TRANSIENT]
+transient = False
+
+[ERROR ANALYSIS]
+check_error = True
+
+[OTHER]
+num_threads = 6
+model = Poisson
+run_dir = Example Runs/DIM/Poisson/DIM_poisson_2
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtu
