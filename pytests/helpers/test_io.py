@@ -1,38 +1,35 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-import pytest
-from pytest import CaptureFixture
+from pytest import CaptureFixture, fixture
 from config_functions import ConfigParser
 import helpers.io as io
 from ngsolve import Mesh
 
 
-@pytest.fixture
+@fixture
 def empty_config() -> ConfigParser:
     """
-    Function to return a config parser initialized with an empty config file
+    Function to return a config parser initialized with an empty config file.
 
-    Returns
-        ~: Config parser initialized with empty config file
+    Returns:
+        Config parser initialized with empty config file.
     """
-    return ConfigParser('tests/helpers/mesh/config_blank')
+    return ConfigParser('pytests/helpers/mesh/config_blank')
 
 
 class TestCreateAndLoadGridfunctionFromFile:
@@ -50,10 +47,10 @@ class TestLoadMesh:
         Test with filename having an invalid type.
 
         Args:
-            empty_config: Config parser initialized with empty config file
+            empty_config: Config parser initialized with empty config file.
         """
         # Add required options to empty config file
-        empty_config['MESH'] = {'filename': 'tests/helpers/mesh/config_blank'}
+        empty_config['MESH'] = {'filename': 'pytests/helpers/mesh/config_blank'}
 
         try:
             io.load_mesh(empty_config)
@@ -66,7 +63,7 @@ class TestLoadMesh:
         Test with no filename in the config file.
 
         Args:
-            empty_config: Config parser initialized with empty config file
+            empty_config: Config parser initialized with empty config file.
         """
         try:
             io.load_mesh(empty_config)
@@ -79,7 +76,7 @@ class TestLoadMesh:
         Test with a filename for a file that doesn't exist.
 
         Args:
-            empty_config: Config parser initialized with empty config file
+            empty_config: Config parser initialized with empty config file.
         """
         # Add required options to empty config file
         empty_config['MESH'] = {'filename': 'mesh_files/channel_1bcs.vol'}
@@ -95,7 +92,7 @@ class TestLoadMesh:
         Test with a valid .vol type mesh.
 
         Args:
-            empty_config: Config parser initialized with empty config file
+            empty_config: Config parser initialized with empty config file.
         """
         # Add required options to empty config file
         empty_config['MESH'] = {'filename': 'mesh_files/channel_3bcs.vol'}
@@ -117,7 +114,7 @@ class TestLoadMesh:
         Test with a valid .msh type mesh.
 
         Args:
-            empty_config: Config parser initialized with empty config file
+            empty_config: Config parser initialized with empty config file.
         """
         # Add required options to empty config file
         empty_config['MESH'] = {'filename': 'mesh_files/square.msh'}
@@ -137,7 +134,7 @@ class TestLoadMesh:
         Test with a valid .vol mesh which is supposed to have curved elements.
 
         Args:
-            empty_config: Config parser initialized with empty config file
+            empty_config: Config parser initialized with empty config file.
         """
         # Test curve = 1
         empty_config['MESH'] = {'filename': 'mesh_files/channel_3bcs.vol',
@@ -166,7 +163,7 @@ class TestLoadMesh:
         Test with a valid .msh mesh which is supposed to have curved elements.
 
         Args:
-            empty_config: Config parser initialized with empty config file
+            empty_config: Config parser initialized with empty config file.
         """
         # Test curve = 1
         empty_config['MESH'] = {'filename': 'mesh_files/square.msh',

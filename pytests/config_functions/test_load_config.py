@@ -1,35 +1,48 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 import pytest
 from config_functions.load_config import parse_str, convert_str_to_dict, load_coefficientfunction_into_gridfunction
 import pyparsing
 import ngsolve as ngs
+from ngsolve import Mesh, FESpace
 from netgen.geom2d import unit_square
 from netgen.csg import CSGeometry, OrthoBrick, Pnt
 import math
 import netgen
+from typing import Tuple, Dict, List
 
 
 @pytest.fixture()
-def presets_convert_str_to_dict():
-    config_filename = 'tests/example_config'
+def presets_convert_str_to_dict() -> Tuple[str, Dict, Dict, Dict, List[str]]:
+    """
+    Function to construct the presets for testing convert_str_to_dict.
+
+    Returns:
+        Tuple[str, Dict, Dict, Dict, List[str]]:
+            - config_filename: Path to the example config file.
+            - correct_dict: Dictionary containing the parameters expected from the example config file.
+            - correct_re_parse_dict: Dictionary containing the parameters from the example config file that need to be
+                re-parsed.
+            - new_variables: Dictionary containing the model variables for the example config file.
+            - filetypes: List of filetypes to parse as file paths from the example config file.
+    """
+
+    config_filename = 'pytests/config_functions/example_config'
     correct_dict = {'a': 12, 'b': 'mesh.vol', 'c': 1}
     correct_re_parse_dict = {'c': 'u+p'}
     new_variables = {'u': 0, 'p': 1}
@@ -38,7 +51,22 @@ def presets_convert_str_to_dict():
     return config_filename, correct_dict, correct_re_parse_dict, new_variables, filetypes
 
 @pytest.fixture()
-def presets_load_coefficientfunction_into_gridfunction():
+def presets_load_coefficientfunction_into_gridfunction() -> Tuple[Mesh, FESpace, FESpace, FESpace, Mesh, FESpace,
+                                                                  FESpace, FESpace]:
+    """
+    Function to construct the presets for load_coefficientfunction_into_gridfunction.
+
+    Returns:
+        Tuple[Mesh, FESpace, FESpace, FESpace, Mesh, FESpace, FESpace, FESpace]:
+            - mesh_2d: A 2D mesh.
+            - fes_scalar_2d: A scalar finite element space for the 2D mesh.
+            - fes_vector_2d: A vector finite element space for the 2D mesh.
+            - fes_mixed_2d: A combined scalar and vector finite element space for the 2D mesh.
+            - mesh_3d: A 3D mesh.
+            - fes_scalar_3d: A scalar finite element space for the 3D mesh.
+            - fes_vector_3d: A vector finite element space for the 3D mesh.
+            - fes_mixed_3d: A combined scalar and vector finite element space for the 3D mesh.
+    """
     # 2D
     mesh_2d = ngs.Mesh(unit_square.GenerateMesh(maxh=0.1))
     fes_scalar_2d = ngs.H1(mesh_2d, order=2)

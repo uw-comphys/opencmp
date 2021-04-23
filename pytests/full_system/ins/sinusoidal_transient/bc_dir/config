@@ -1,0 +1,5 @@
+[DIRICHLET]
+u = top    -> [0.0, -sin(x)*exp(-2*t)]
+    bottom -> [0.0, sin(x)*exp(-2*t)]
+    right  -> [sin(y)*exp(-2*t), 0.0]
+    left   -> [-sin(y)*exp(-2*t), 0.0]

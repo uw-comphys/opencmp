@@ -1,23 +1,21 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-import pytest
+from pytest import fixture
 from helpers.math import tanh, sig, H_t, H_s
 from numpy import isclose
 from ngsolve import Parameter, CoefficientFunction, Mesh
@@ -26,17 +24,17 @@ from config_functions.expanded_config_parser import ConfigParser
 from helpers.io import load_mesh
 
 
-@pytest.fixture
+@fixture
 def simple_mesh() -> Mesh:
     """
-    Function to return a small simple mesh file
+    Function to return a small simple mesh file.
 
-    Returns
-        ~: The mesh
+    Returns:
+        The mesh.
     """
 
     # Create config parser
-    c = ConfigParser('tests/helpers/mesh/config_blank')
+    c = ConfigParser('pytests/helpers/mesh/config_blank')
     c['MESH'] = {'filename': 'mesh_files/unit_square_coarse.vol'}
 
     # Load the mesh
@@ -48,16 +46,17 @@ def simple_mesh() -> Mesh:
 def _val_from_coeff(c: CoefficientFunction, mesh: Mesh) -> Tuple[float]:
     """
     Helper function to evaluate a coefficient function and return values as a tuple.
-    If coefficient function is a scalar, a tuple of length 1 is returned.
-    Otherwise a tuple containing each vector element, in order, is returned.
 
-    NOTE: It is assumed that the coefficient function does not vary in space.
+    | If coefficient function is a scalar, a tuple of length 1 is returned. Otherwise a tuple containing each vector
+    | element, in order, is returned.
+    |
+    | NOTE: It is assumed that the coefficient function does not vary in space.
 
     Args:
-         c: The coefficient function to evaluate
+         c: The coefficient function to evaluate.
 
-    Return:
-        ~: Tuple containing the values of the coefficient function
+    Returns:
+        Tuple containing the values of the coefficient function.
     """
     val = c(mesh(0, 0))
 
@@ -70,7 +69,7 @@ def _val_from_coeff(c: CoefficientFunction, mesh: Mesh) -> Tuple[float]:
 
 class TestTanh:
     """
-    Test the implementation of the hyperbolic tangent implementation
+    Test the implementation of the hyperbolic tangent implementation.
     """
     def test_0(self, simple_mesh: Mesh):
         num_val   = tanh(0)
@@ -128,7 +127,7 @@ class TestSig:
 
 class TestHT:
     """
-    Test the tanh-based approximated Heaviside function
+    Test the tanh-based approximated Heaviside function.
     """
     def test_neg_inf_num(self, simple_mesh: Mesh):
         num_val   = H_t(-1e30)
@@ -200,7 +199,7 @@ class TestHT:
 
 class TestHS:
     """
-    Test the sigmoid-based approximated Heaviside function
+    Test the sigmoid-based approximated Heaviside function.
     """
     def test_neg_inf_num(self, simple_mesh: Mesh):
         num_val   = H_s(-1e30)
