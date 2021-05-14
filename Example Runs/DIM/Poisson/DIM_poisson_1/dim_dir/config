@@ -1,7 +1,7 @@
 [DIM]
 mesh_dimension = 2
-num_mesh_elements = x -> 39
-                    y -> 39
+num_mesh_elements = x -> 59
+                    y -> 59
 mesh_scale = x -> 3
              y -> 3
 mesh_offset = x -> 1.5

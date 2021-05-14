@@ -1,0 +1,24 @@
+[DIRICHLET]
+u = top    -> [0.0, 0.0]
+    bottom -> [0.0, 0.0]
+    left   -> [0.0, 0.0]
+# NOTE: using exp instead of step change to avoid strange oscilation behaviour.
+a = right -> exp(-t*10)
+b = right -> 1 - exp(-t*10)
+c = right -> 0.5*exp(-t*10)
+    left  -> 1 - 0.5*exp(-t*10)
+
+[NEUMANN]
+a = top    -> 0
+    bottom -> 0
+    left   -> 0
+b = top    -> 0
+    bottom -> 0
+    left   -> 0
+c = top    -> 0
+    bottom -> 0
+
+[STRESS]
+stress = right -> [0.0, 0.0]
+
+[TOTAL_FLUX]

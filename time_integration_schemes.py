@@ -1,67 +1,60 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 import ngsolve as ngs
+from ngsolve import GridFunction, BilinearForm, LinearForm, Parameter
 from models import Model
-from typing import List
-from ngsolve.comp import ProxyFunction
+from typing import List, Tuple
 from ngsolve import dx
-from typing import Tuple
 
 
-def explicit_euler(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V: List[ProxyFunction],
-                   dt: List[ngs.Parameter]) -> Tuple[ngs.BilinearForm, ngs.LinearForm]:
+def explicit_euler(model: Model, gfu_0: List[GridFunction], dt: List[Parameter]) -> Tuple[BilinearForm, LinearForm]:
     """
     Explicit Euler time integration scheme.
 
-    Function to constructs the final bilinear and linear forms for the time integration scheme by adding the
-    necessary time-dependent terms to the model's stationary terms.
-    The returned bilinear and linear forms have NOT been assembled.
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
 
     Args:
         model: The model to solve.
         gfu_0: List of the solutions of previous time steps ordered from most recent to oldest.
-        U: List of trial functions for the model.
-        V: List of test (weighting) functions.
         dt: List of timestep sizes ordered from most recent to oldest.
 
     Returns:
-        a: The final bilinear form (as a ngs.BilinearForm but not assembled).
-        L: The final linear form (as a ngs.LinearForm but not assembled).
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
     """
+    U, V = model.get_trial_and_test_functions()
 
-    # Separate out the various components of each gridfunction solution to a previous timestep.
-    # gfu_lst = [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
-    gfu_lst = []
-    for i in range(len(gfu_0)):
-        if (len(gfu_0[i].components) > 0):
-            gfu_lst.append([gfu_0[i].components[j] for j in range(len(gfu_0[i].components))])
-        else:
-            gfu_lst.append([gfu_0[i]])
+    gfu_lst = _split_gfu(gfu_0)
+
+    # All the terms use the same dt.
+    tmp_dt = dt[0]
 
     # Construct the bilinear form
     a = ngs.BilinearForm(model.fes)
+    a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
 
     # Construct the linear form
     L = ngs.LinearForm(model.fes)
-    L += model.construct_linear(V, gfu_lst[0], dt[0])
-    L += -1.0 * model.construct_bilinear(gfu_lst[0], V, dt[0], True)
+    L += -1.0 * model.construct_bilinear_time_ODE(gfu_lst[1], V, tmp_dt, 1)[0]
+    L += model.construct_linear(V, gfu_lst[1], tmp_dt, 1)[0]
 
     a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'explicit euler')
 
@@ -76,43 +69,42 @@ def explicit_euler(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFun
     return a, L
 
 
-def implicit_euler(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V: List[ProxyFunction],
-                   dt: List[ngs.Parameter]) -> Tuple[ngs.BilinearForm, ngs.LinearForm]:
+def implicit_euler(model: Model, gfu_0: List[GridFunction], dt: List[Parameter], step: int = 0) \
+        -> Tuple[BilinearForm, LinearForm]:
     """
     Implicit Euler time integration scheme.
 
-    This function constructs the final bilinear and linear forms for the time integration scheme by adding the
-    necessary time-dependent terms to the model's stationary terms.
-    The returned bilinear and linear forms have NOT been assembled.
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
 
     Args:
         model: The model to solve.
         gfu_0: List of the solutions of previous time steps ordered from most recent to oldest.
-        U: List of trial functions for the model.
-        V: List of test (weighting) functions.
         dt: List of timestep sizes ordered from most recent to oldest.
+        step: Used for adaptive_three_step to ensure the correct boundary condition and model function values are used
+            when the half steps are taken.
 
     Returns:
-        a: The final bilinear form (as a ngs.BilinearForm but not assembled).
-        L: The final linear form (as a ngs.LinearForm but not assembled).
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
     """
+    U, V = model.get_trial_and_test_functions()
 
-    # Separate out the various components of each gridfunction solution to a previous timestep.
-    # gfu_lst = [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
-    gfu_lst = []
-    for i in range(len(gfu_0)):
-        if (len(gfu_0[i].components) > 0):
-            gfu_lst.append([gfu_0[i].components[j] for j in range(len(gfu_0[i].components))])
-        else:
-            gfu_lst.append([gfu_0[i]])
+    gfu_lst = _split_gfu(gfu_0)
+
+    # All the terms use the same dt.
+    tmp_dt = dt[step]
 
     # Construct the bilinear form
     a = ngs.BilinearForm(model.fes)
-    a += model.construct_bilinear(U, V, dt[0])
+    a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, step)[0]
+    a += model.construct_bilinear_time_ODE(U, V, tmp_dt, step)[0]
 
     # Construct the linear form
     L = ngs.LinearForm(model.fes)
-    L += model.construct_linear(V, gfu_lst[0], dt[0])
+    L += model.construct_linear(V, None, tmp_dt, step)[0]
 
     a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'implicit euler')
 
@@ -127,44 +119,90 @@ def implicit_euler(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFun
     return a, L
 
 
-def crank_nicolson(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V: List[ProxyFunction],
-                   dt: List[ngs.Parameter]) -> Tuple[ngs.BilinearForm, ngs.LinearForm]:
+def euler_IMEX(model: Model, gfu_0: List[GridFunction], dt: List[Parameter]) -> Tuple[BilinearForm, LinearForm]:
     """
-    Crank Nicolson (trapezoidal rule) time integration scheme.
+    First order IMEX time integration scheme.
 
-    This function constructs the final bilinear and linear forms for the time integration scheme by adding the
-    necessary time-dependent terms to the model's stationary terms.
-    The returned bilinear and linear forms have NOT been assembled.
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
 
     Args:
         model: The model to solve.
         gfu_0: List of the solutions of previous time steps ordered from most recent to oldest.
-        U: List of trial functions for the model.
-        V: List of test (weighting) functions.
         dt: List of timestep sizes ordered from most recent to oldest.
 
     Returns:
-        a: The final bilinear form (as a ngs.BilinearForm but not assembled).
-        L: The final linear form (as a ngs.LinearForm but not assembled).
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
     """
 
-    # Separate out the various components of each gridfunction solution to a previous timestep.
-    # gfu_lst = [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
-    gfu_lst = []
-    for i in range(len(gfu_0)):
-        if (len(gfu_0[i].components) > 0):
-            gfu_lst.append([gfu_0[i].components[j] for j in range(len(gfu_0[i].components))])
-        else:
-            gfu_lst.append([gfu_0[i]])
+    U, V = model.get_trial_and_test_functions()
+
+    gfu_lst = _split_gfu(gfu_0)
+
+    # All the terms use the same dt.
+    tmp_dt = dt[0]
 
     # Construct the bilinear form
     a = ngs.BilinearForm(model.fes)
-    a += 0.5 * model.construct_bilinear(U, V, dt[0])
+    a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
+    a += model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)[0]
 
     # Construct the linear form
     L = ngs.LinearForm(model.fes)
-    L += model.construct_linear(V, gfu_lst[0], dt[0])
-    L += -0.5 * model.construct_bilinear(gfu_lst[0], V, dt[0], True)
+    L += model.construct_linear(V, None, tmp_dt, 0)[0]
+    L += model.construct_imex_explicit(V, gfu_lst[1], tmp_dt, 0)[0]
+
+    a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'implicit euler')
+
+    # When adding the time discretization term, multiply by the phase field if using the diffuse interface method.
+    if model.DIM:
+        a_dt *= model.DIM_solver.phi_gfu
+        L_dt *= model.DIM_solver.phi_gfu
+
+    a += a_dt * dx
+    L += L_dt * dx
+
+    return a, L
+
+
+def crank_nicolson(model: Model, gfu_0: List[GridFunction], dt: List[Parameter]) -> Tuple[BilinearForm, LinearForm]:
+    """
+    Crank Nicolson (trapezoidal rule) time integration scheme.
+
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
+
+    Args:
+        model: The model to solve.
+        gfu_0: List of the solutions of previous time steps ordered from most recent to oldest.
+        dt: List of timestep sizes ordered from most recent to oldest.
+
+    Returns:
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
+    """
+    U, V = model.get_trial_and_test_functions()
+
+    gfu_lst = _split_gfu(gfu_0)
+
+    # All the terms use the same dt.
+    tmp_dt = dt[0]
+
+    # Construct the bilinear form
+    a = ngs.BilinearForm(model.fes)
+    a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
+    a += 0.5 * model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)[0]
+
+    # Construct the linear form
+    L = ngs.LinearForm(model.fes)
+    L += 0.5 * model.construct_linear(V, gfu_lst[0], tmp_dt, 0)[0]
+    L += -0.5 * model.construct_bilinear_time_ODE(gfu_lst[1], V, tmp_dt, 1)[0]
+    L += 0.5 * model.construct_linear(V, gfu_lst[1], tmp_dt, 1)[0]
 
     a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'crank nicolson')
 
@@ -179,44 +217,42 @@ def crank_nicolson(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFun
     return a, L
 
 
-def CNLF(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V: List[ProxyFunction],
-         dt: List[ngs.Parameter]) -> Tuple[ngs.BilinearForm, ngs.LinearForm]:
+def CNLF(model: Model, gfu_0: List[GridFunction], dt: List[Parameter]) -> Tuple[BilinearForm, LinearForm]:
     """
     Crank Nicolson Leap Frog IMEX time integration scheme.
 
-    This function constructs the final bilinear and linear forms for the time integration scheme by adding the
-    necessary time-dependent terms to the model's stationary terms.
-    The returned bilinear and linear forms have NOT been assembled.
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
 
     Args:
         model: The model to solve.
         gfu_0: List of the solutions of previous time steps ordered from most recent to oldest.
-        U: List of trial functions for the model.
-        V: List of test (weighting) functions.
         dt: List of timestep sizes ordered from most recent to oldest.
 
     Returns:
-        a: The final bilinear form (as a ngs.BilinearForm but not assembled).
-        L: The final linear form (as a ngs.LinearForm but not assembled).
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
     """
+    U, V = model.get_trial_and_test_functions()
 
-    # Separate out the various components of each gridfunction solution to a previous timestep.
-    # gfu_lst = [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
-    gfu_lst = []
-    for i in range(len(gfu_0)):
-        if (len(gfu_0[i].components) > 0):
-            gfu_lst.append([gfu_0[i].components[j] for j in range(len(gfu_0[i].components))])
-        else:
-            gfu_lst.append([gfu_0[i]])
+    gfu_lst = _split_gfu(gfu_0)
+
+    # All the terms use the same dt.
+    tmp_dt = dt[0]
 
     # Construct the bilinear form
     a = ngs.BilinearForm(model.fes)
-    a += model.construct_bilinear(U, V, dt[0])
+    a += 2.0 * model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
+    a += model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)[0]
 
     # Construct the linear form
     L = ngs.LinearForm(model.fes)
-    L += 2.0 * model.construct_linear(V, gfu_lst[0], dt[0])
-    L += -1.0 * model.construct_bilinear(gfu_lst[1], V, dt[0], True)
+    L += model.construct_linear(V, gfu_lst[0], tmp_dt, 0)[0]
+    L += -1.0 * model.construct_bilinear_time_ODE(gfu_lst[2], V, tmp_dt, 2)[0]
+    L += model.construct_linear(V, gfu_lst[2], tmp_dt, 2)[0]
+    L += model.construct_imex_explicit(V, gfu_lst[1], tmp_dt, 1)[0]
 
     a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'CNLF')
 
@@ -231,45 +267,42 @@ def CNLF(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V:
     return a, L
 
 
-def SBDF(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V: List[ProxyFunction],
-         dt: List[ngs.Parameter]) -> Tuple[ngs.BilinearForm, ngs.LinearForm]:
+def SBDF(model: Model, gfu_0: List[GridFunction], dt: List[Parameter]) -> Tuple[BilinearForm, LinearForm]:
     """
     Third order semi-implicit backwards differencing time integration scheme.
 
-    This function constructs the final bilinear and linear forms for the time integration scheme by adding the
-    necessary time-dependent terms to the model's stationary terms.
-    The returned bilinear and linear forms have NOT been assembled.
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
 
     Args:
         model: The model to solve.
         gfu_0: List of the solutions of previous time steps ordered from most recent to oldest.
-        U: List of trial functions for the model.
-        V: List of test (weighting) functions.
         dt: List of timestep sizes ordered from most recent to oldest.
 
     Returns:
-        a: The final bilinear form (as a ngs.BilinearForm but not assembled).
-        L: The final linear form (as a ngs.LinearForm but not assembled).
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
     """
+    U, V = model.get_trial_and_test_functions()
 
-    # Separate out the various components of each gridfunction solution to a previous timestep.
-    # gfu_lst = [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
-    gfu_lst = []
-    for i in range(len(gfu_0)):
-        if (len(gfu_0[i].components) > 0):
-            gfu_lst.append([gfu_0[i].components[j] for j in range(len(gfu_0[i].components))])
-        else:
-            gfu_lst.append([gfu_0[i]])
+    gfu_lst = _split_gfu(gfu_0)
+
+    # All the terms use the same dt.
+    tmp_dt = dt[0]
 
     # Construct the bilinear form
     a = ngs.BilinearForm(model.fes)
-    a += model.construct_bilinear(U, V, dt[0])
+    a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
+    a += model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)[0]
 
     # Construct the linear form
     L = ngs.LinearForm(model.fes)
-    L += 3.0 * model.construct_linear(V, gfu_lst[0], dt[0])
-    L += -3.0 * model.construct_linear(V, gfu_lst[1], dt[0])
-    L += model.construct_linear(V, gfu_lst[2], dt[0])
+    L += model.construct_linear(V, gfu_lst[0], tmp_dt, 0)[0]
+    L += 3.0 * model.construct_imex_explicit(V, gfu_lst[1], tmp_dt, 1)[0]
+    L += -3.0 * model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)[0]
+    L += model.construct_imex_explicit(V, gfu_lst[3], tmp_dt, 3)[0]
 
     a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'SBDF')
 
@@ -284,35 +317,33 @@ def SBDF(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V:
     return a, L
 
 
-def adaptive_IMEX_pred(model: Model, gfu_0: List[ngs.GridFunction], U: List[ProxyFunction], V: List[ProxyFunction],
-                       dt: List[ngs.Parameter]) -> Tuple[ngs.BilinearForm, ngs.LinearForm]:
+def adaptive_IMEX_pred(model: Model, gfu_0: List[GridFunction], dt: List[Parameter]) -> Tuple[BilinearForm, LinearForm]:
     """
     Predictor for the adaptive time-stepping IMEX time integration scheme.
 
-    This function constructs the final bilinear and linear forms for the time integration scheme by adding the
-    necessary time-dependent terms to the model's stationary terms.
-    The returned bilinear and linear forms have NOT been assembled.
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
 
     Args:
         model: The model to solve.
         gfu_0: List of the solutions of previous time steps ordered from most recent to oldest.
-        U: List of trial functions for the model.
-        V: List of test (weighting) functions.
         dt: List of timestep sizes ordered from most recent to oldest.
 
     Returns:
-        a: The final bilinear form (as a ngs.BilinearForm but not assembled).
-        L: The final linear form (as a ngs.LinearForm but not assembled).
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
     """
+    U, V = model.get_trial_and_test_functions()
 
-    # Separate out the various components of each gridfunction solution to a previous timestep.
-    # gfu_lst = [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
-    gfu_lst = []
-    for i in range(len(gfu_0)):
-        if (len(gfu_0[i].components) > 0):
-            gfu_lst.append([gfu_0[i].components[j] for j in range(len(gfu_0[i].components))])
-        else:
-            gfu_lst.append([gfu_0[i]])
+    gfu_lst = _split_gfu(gfu_0)
+
+    # Create list of the previous time-step's result
+    # NOTE: It is assumed that pressure is always the 2nd in the list
+    gfu_prev = [gfu_lst[0][i] for i in range(len(gfu_lst[0]))]
+    # Zero out pressure
+    gfu_prev[1] = 0.0
 
     # Operators specific to this time integration scheme.
     w = dt[0] / dt[1]
@@ -320,13 +351,18 @@ def adaptive_IMEX_pred(model: Model, gfu_0: List[ngs.GridFunction], U: List[Prox
     E_expr = (1.0 + w) * gfu_lst[0][0] - w * gfu_lst[1][0]
     E.Set(E_expr)
 
+    # All the terms use the same dt.
+    tmp_dt = dt[0]
+
     # Construct the bilinear form
     a = ngs.BilinearForm(model.fes)
-    a += model.construct_bilinear(U, V, dt[0])
+    a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
+    a += model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)[0]
 
     # Construct the linear form
     L = ngs.LinearForm(model.fes)
-    L += model.construct_linear(V, [gfu_lst[0][0], 0.0], dt[0])  # TODO: Why doesn't using E work? Numerical error?
+    L += model.construct_linear(V, gfu_lst[0], tmp_dt, 0)[0]  # TODO: Why doesn't using E work? Numerical error?
+    L += model.construct_imex_explicit(V, gfu_prev, tmp_dt, 0)[0]
 
     a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'crank nicolson')
 
@@ -339,3 +375,194 @@ def adaptive_IMEX_pred(model: Model, gfu_0: List[ngs.GridFunction], U: List[Prox
     L += L_dt * dx
 
     return a, L
+
+
+def RK_222(model: Model, gfu_0: List[GridFunction], dt: List[Parameter], step: int) -> Tuple[BilinearForm, LinearForm]:
+    """
+    Two-step second-order Runge Kutta IMEX time integration scheme.
+
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
+    
+    Args:
+        model: The model to solve.
+        gfu_0: List of the solutions of intermediate steps in reverse step order (ie: [step n+1 sol, step 2 sol, step 1
+            sol, step n sol]).
+        dt: List of current time step size.
+        step: Which step of the Runge Kutta scheme should be assembled.
+
+    Returns:
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
+    """
+
+    U, V = model.get_trial_and_test_functions()
+
+    gfu_lst = _split_gfu(gfu_0)
+
+    # Define scheme-specific constants. These might eventually become user-specified constants.
+    gamma = 0.5 * (2.0 - ngs.sqrt(2.0))
+    delta = 1.0 - 1.0 / (2.0 - ngs.sqrt(2.0))
+
+    if step == 1:
+        # All the terms use the same dt.
+        tmp_dt = dt[1]
+
+        # Construct the bilinear form
+        a = ngs.BilinearForm(model.fes)
+        a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 1)[0]
+        a += model.construct_bilinear_time_ODE(U, V, tmp_dt, 1)[0]
+
+        # Construct the linear form
+        L = ngs.LinearForm(model.fes)
+        L += model.construct_linear(V, None, tmp_dt, 1)[0]
+        L += model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)[0]
+    elif step == 2:
+        # All the terms use the same dt.
+        tmp_dt = dt[0]
+
+        # Construct the bilinear form
+        a = ngs.BilinearForm(model.fes)
+        a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
+        a += gamma * model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)[0]
+
+        # Construct the linear form
+        L = ngs.LinearForm(model.fes)
+        L += gamma * model.construct_linear(V, gfu_lst[0], tmp_dt, 0)[0]
+        L += -(1.0 - gamma) * model.construct_bilinear_time_ODE(gfu_lst[1], V, tmp_dt, 1)[0]
+        L += (1.0 - gamma) * model.construct_linear(V, gfu_lst[1], tmp_dt, 1)[0]
+        L += delta * model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)[0]
+        L += (1.0 - delta) * model.construct_imex_explicit(V, gfu_lst[1], tmp_dt, 1)[0]
+    else:
+        raise ValueError('RK 222 only has 2 steps.')
+
+    a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'RK 222')
+
+    # When adding the time discretization term, multiply by the phase field if using the diffuse interface method.
+    if model.DIM:
+        a_dt *= model.DIM_solver.phi_gfu
+        L_dt *= model.DIM_solver.phi_gfu
+
+    a += a_dt * dx
+    L += L_dt * dx
+
+    return a, L
+
+
+def RK_232(model: Model, gfu_0: List[GridFunction], dt: List[Parameter], step: int) -> Tuple[BilinearForm, LinearForm]:
+    """
+    Three-step second-order Runge Kutta IMEX time integration scheme.
+
+    This function constructs the final bilinear and linear forms for the time integration scheme by adding the necessary
+    time-dependent terms to the model's stationary terms. The returned bilinear and linear forms have NOT been
+    assembled.
+
+    Args:
+        model: The model to solve.
+        gfu_0: List of the solutions of intermediate steps in reverse step order (ie: [step n+1 sol, step 2 sol, step 1
+            sol, step n sol]).
+        dt: List of current time step size.
+        step: Which step of the Runge Kutta scheme should be assembled.
+
+    Returns:
+        Tuple[BilinearForm, LinearForm]:
+            - a: The final bilinear form (as a BilinearForm but not assembled).
+            - L: The final linear form (as a LinearForm but not assembled).
+    """
+
+    U, V = model.get_trial_and_test_functions()
+
+    gfu_lst = _split_gfu(gfu_0)
+
+    # Define scheme-specific constants. These might eventually become user-specified constants.
+    gamma = 0.5 * (2.0 - ngs.sqrt(2.0))
+    delta = -2.0 * ngs.sqrt(2.0) / 3.0
+
+    if step == 1:
+        # All the terms use the same dt.
+        tmp_dt = dt[2]
+
+        # Construct the bilinear form
+        a = ngs.BilinearForm(model.fes)
+        a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 2)[0]
+        a += model.construct_bilinear_time_ODE(U, V, tmp_dt, 2)[0]
+
+        # Construct the linear form
+        L = ngs.LinearForm(model.fes)
+        L += model.construct_linear(V, None, tmp_dt, 2)[0]
+        L += model.construct_imex_explicit(V, gfu_lst[3], tmp_dt, 3)[0]
+    elif step == 2:
+        # All the terms use the same dt.
+        tmp_dt = dt[1]
+
+        # Construct the bilinear form
+        a = ngs.BilinearForm(model.fes)
+        a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 1)[0]
+        a += gamma * model.construct_bilinear_time_ODE(U, V, tmp_dt, 1)[0]
+
+        # Construct the linear form
+        L = ngs.LinearForm(model.fes)
+        L += gamma * model.construct_linear(V, None, tmp_dt, 1)[0]
+        L += -(1.0 - gamma) * model.construct_bilinear_time_ODE(gfu_lst[2], V, tmp_dt, 2)[0]
+        L += (1.0 - gamma) * model.construct_linear(V, gfu_lst[2], tmp_dt, 2)[0]
+        L += delta * model.construct_imex_explicit(V, gfu_lst[3], tmp_dt, 3)[0]
+        L += (1.0 - delta) * model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)[0]
+    elif step == 3:
+        # All the terms use the same dt.
+        tmp_dt = dt[0]
+
+        # Construct the bilinear form
+        a = ngs.BilinearForm(model.fes)
+        a += model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)[0]
+        a += gamma * model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)[0]
+
+        # Construct the linear form
+        L = ngs.LinearForm(model.fes)
+        L += gamma * model.construct_linear(V, gfu_lst[0], tmp_dt, 0)[0]
+        L += -(1.0 - gamma) * model.construct_bilinear_time_ODE(gfu_lst[2], V, tmp_dt, 2)[0]
+        L += (1.0 - gamma) * model.construct_linear(V, gfu_lst[2], tmp_dt, 2)[0]
+        L += delta * model.construct_imex_explicit(V, gfu_lst[1], tmp_dt, 1)[0]
+        L += (1.0 - delta) * model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)[0]
+    else:
+        raise ValueError('RK 232 only has 3 steps.')
+
+    a_dt, L_dt = model.time_derivative_terms(gfu_lst, 'RK 232')
+
+    # When adding the time discretization term, multiply by the phase field if using the diffuse interface method.
+    if model.DIM:
+        a_dt *= model.DIM_solver.phi_gfu
+        L_dt *= model.DIM_solver.phi_gfu
+
+    a += a_dt * dx
+    L += L_dt * dx
+
+    return a, L
+
+
+def _split_gfu(gfu: List[GridFunction]) -> List[List[GridFunction]]:
+    """
+    Function to separate out the various components of each gridfunction solution to a previous timestep.
+
+    The first entry in gfu_lst is None so that its indexing matches the indexing for dt and the step argument in
+    the functions for constructing the weak form (ie: gfu_lst[1], dt[1] and step=1 all refer to values at time n).
+    The final result should be gfu_lst = [None, [component 0, component 1...] at t^n, [component 0, component 1...] 
+    at t^n-1, ...].
+
+    Args:
+        gfu: List of gridfunctions to split up
+
+    Returns:
+        gfu_lst: [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
+    """
+
+    gfu_lst: List[List[GridFunction]] = [None]
+
+    for i in range(len(gfu)):
+        if len(gfu[i].components) > 0:
+            gfu_lst.append([gfu[i].components[j] for j in range(len(gfu[i].components))])
+        else:
+            gfu_lst.append([gfu[i]])
+
+    return gfu_lst

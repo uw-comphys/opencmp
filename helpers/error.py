@@ -1,30 +1,34 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
-This file is part of OpenCMP.
+from typing import Union, TYPE_CHECKING
 
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
-
-from typing import Union
+# Sphinx runs into a circular import with `from models import Model`, so only 
+# import Model for type checking.
+if TYPE_CHECKING:
+    from models import Model
+else:
+    Model = None
 
 import ngsolve as ngs
 import numpy as np
 from ngsolve import CoefficientFunction, FESpace, GridFunction, Mesh
 
 from config_functions import ConfigParser
-from models import Model
 
 
 def mean_to_zero(gfu: GridFunction, fes: FESpace, mesh: Mesh) -> GridFunction:
@@ -37,7 +41,7 @@ def mean_to_zero(gfu: GridFunction, fes: FESpace, mesh: Mesh) -> GridFunction:
         mesh: The mesh the gridfunction is defined on.
 
     Returns:
-        gfu_biased: The modified gridfunction.
+        The modified gridfunction.
     """
 
     avg = mean(gfu, mesh)
@@ -55,7 +59,7 @@ def mean(gfu: Union[GridFunction, CoefficientFunction], mesh: Mesh) -> float:
         mesh: The mesh the gridfunction is defined on.
 
     Returns:
-        avg: The mean value of the gridfunction.
+        The mean value of the gridfunction.
     """
 
     avg = ngs.sqrt(ngs.Integrate(gfu ** 2, mesh))
@@ -86,7 +90,9 @@ def norm(norm_type: str, sol: GridFunction, ref_sol: Union[GridFunction, Coeffic
          mesh: Mesh, fes: FESpace, average: bool) -> float:
     """
     Function to calculate some norm between a solution and an "exact" solution.
-    Uses NGSolve's Integrate function.
+
+    Uses NGSolve's Integrate function. The "exact" solution can be a known exact solution or a reference solution
+    previously loaded from file.
 
     Args:
         norm_type: Which norm to calculate.
@@ -94,11 +100,11 @@ def norm(norm_type: str, sol: GridFunction, ref_sol: Union[GridFunction, Coeffic
         ref_sol: The "exact" solution to compare against.
         mesh: The mesh to compare the solutions on.
         fes: The finite element space that the solutions come from (or a component of it).
-        average: If true offset each solution by its average
-                 (use for variables like pressure that are only solved up to a constant).
+        average: If true offset each solution by its average (use for variables like pressure that are only
+            solved up to a constant).
 
     Returns:
-        err: The calculated error using the specified nrom.
+        The calculated error using the specified norm.
     """
 
     if average:
@@ -122,16 +128,17 @@ def norm(norm_type: str, sol: GridFunction, ref_sol: Union[GridFunction, Coeffic
 
 def _facet_jumps(sol: GridFunction, mesh: Mesh) -> float:
     """
-    Function to check how continuous the solution is across mesh facets. This
-    is mainly of interest when DG is used. Continuous Galerkin FEM solutions
-    will always be perfectly continuous across facets.
+    Function to check how continuous the solution is across mesh facets.
+
+    This is mainly of interest when DG is used. Continuous Galerkin FEM solutions will always be perfectly continuous
+    across facets.
 
     Args:
         sol: The solution GridFunction.
         mesh: The mesh that was solved on.
 
     Returns:
-        mag_jumps: The L2 norm of the facet jumps.
+        The L2 norm of the facet jumps.
     """
 
     mag_jumps = ngs.sqrt(ngs.Integrate((sol - sol.Other())**2 * ngs.dx(element_boundary=True), mesh))
@@ -141,15 +148,16 @@ def _facet_jumps(sol: GridFunction, mesh: Mesh) -> float:
 
 def _divergence(sol: GridFunction, mesh: Mesh) -> float:
     """
-    Function to calculate the divergence of a variable over the domain. Use with velocity to
-    confirm that conservation of mass is being satisfied.
+    Function to calculate the divergence of a variable over the domain.
+
+    Use with velocity to confirm that conservation of mass is being satisfied.
 
     Args:
         sol: The solution GridFunction.
         mesh: The mesh that was solved on.
 
     Returns:
-        div_u: The L2 norm of the divergence of the field.
+        The L2 norm of the divergence of the field.
     """
 
     div_var = ngs.sqrt(ngs.Integrate((ngs.div(sol)**2), mesh))
@@ -162,9 +170,9 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> None:
     Function to calculate L2 error and other error metrics and print them.
 
     Args:
-        config: Config file from which to grab
-        model: The solved model to calculate the error for
-        sol: Gridfunction that contains the current solution
+        config: Config file from which to grab.
+        model: The solved model to calculate the error for.
+        sol: Gridfunction that contains the current solution.
     """
 
     average_lst = config.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
@@ -175,7 +183,7 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> None:
             if metric.lower() in norm_lst:
                 # Calculate norms.
                 for var in var_lst:
-                    ref_sol = model.ref_sol['ref_sols'][var]
+                    ref_sol = model.ref_sol['ref_sols'][var][0] # Assuming the t^n+1 value of the reference solution should always be used.
                     average = var in average_lst
                     component = model.model_components[var]
                     if component is None:

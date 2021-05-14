@@ -15,4 +15,5 @@ jupyter/*
 .dmypy.json
 .hg/*
 .hgignore
-
+docs/_build/*
+/*\output/*

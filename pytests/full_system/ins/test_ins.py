@@ -58,7 +58,7 @@ def sinusoidal_transient() -> ConfigParser:
 class TestStationary:
     def test_pipe_flow_velocity_cg(self, capsys: CaptureFixture, pipe_velocity_flow: ConfigParser) -> None:
         # Run
-        automated_output_check(capsys, pipe_velocity_flow, [1e-12, 6e-13, 7e-12, 2e-12])
+        automated_output_check(capsys, pipe_velocity_flow, [2e-7, 5e-8, 1.5e-4, 3.5e-5])
 
     def test_pipe_flow_velocity_dg(self, capsys: CaptureFixture, pipe_velocity_flow: ConfigParser) -> None:
         # Change from CG to DG
@@ -66,7 +66,7 @@ class TestStationary:
         # Change elements
         pipe_velocity_flow['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
         # Run
-        automated_output_check(capsys, pipe_velocity_flow, [1e-12, 6e-13, 7e-12, 2e-12])
+        automated_output_check(capsys, pipe_velocity_flow, [2e-7, 5e-8, 4.5e-7, 2e-12])
 
 
 class TestTransient:
@@ -100,9 +100,45 @@ class TestTransient:
         # Change elements
         sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
         # Run
-        automated_output_check(capsys, sinusoidal_transient, [1e-4, 5e-11])
+        automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
 
-    def test_sinusoidal_imex_implicit_euler_cg(self, capsys: CaptureFixture,
+    def test_sinusoidal_oseen_adaptive_two_step_cg(self, capsys: CaptureFixture,
+                                                   sinusoidal_transient: ConfigParser) -> None:
+        # Change time discretization scheme
+        sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive two step'
+        # Run
+        automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
+
+    def test_sinusoidal_oseen_adaptive_two_step_dg(self, capsys: CaptureFixture,
+                                                   sinusoidal_transient: ConfigParser) -> None:
+        # Change time discretization scheme
+        sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive two step'
+        # Change from CG to DG
+        sinusoidal_transient['DG']['DG'] = 'True'
+        # Change elements
+        sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
+        # Run
+        automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
+
+    #def test_sinusoidal_oseen_adaptive_three_step_cg(self, capsys: CaptureFixture,
+    #                                                 sinusoidal_transient: ConfigParser) -> None:
+    #    # Change time discretization scheme
+    #    sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive three step'
+    #    # Run
+    #    automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
+    #
+    #def test_sinusoidal_oseen_adaptive_three_step_dg(self, capsys: CaptureFixture,
+    #                                                 sinusoidal_transient: ConfigParser) -> None:
+    #    # Change time discretization scheme
+    #    sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive three step'
+    #    # Change from CG to DG
+    #    sinusoidal_transient['DG']['DG'] = 'True'
+    #    # Change elements
+    #    sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
+    #    # Run
+    #    automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
+
+    def test_sinusoidal_imex_euler_cg(self, capsys: CaptureFixture,
                                                 sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
@@ -111,7 +147,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
-    def test_sinusoidal_imex_implicit_euler_dg(self, capsys: CaptureFixture,
+    def test_sinusoidal_imex_euler_dg(self, capsys: CaptureFixture,
                                                 sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
@@ -144,9 +180,9 @@ class TestTransient:
         # Change elements
         sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
         # Run
-        automated_output_check(capsys, sinusoidal_transient, [1e-4, 5e-11])
+        automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
 
-    def test_sinusoidal_sbdf_cnlf_cg(self, capsys: CaptureFixture,
+    def test_sinusoidal_imex_sbdf_cg(self, capsys: CaptureFixture,
                                                 sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
@@ -155,7 +191,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
-    def test_sinusoidal_sbdf_cnlf_dg(self, capsys: CaptureFixture,
+    def test_sinusoidal_imex_sbdf_dg(self, capsys: CaptureFixture,
                                                 sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'

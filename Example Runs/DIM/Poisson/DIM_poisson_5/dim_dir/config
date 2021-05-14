@@ -8,7 +8,7 @@ mesh_scale = x -> 3
              y -> 3
 mesh_offset = x -> 1.5
               y -> 1.5
-interface_width_parameter = 0.1
+interface_width_parameter = 0.05
 
 [DIM BOUNDARY CONDITIONS]
 multiple_bcs = False

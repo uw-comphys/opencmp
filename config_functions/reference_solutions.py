@@ -1,34 +1,33 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 from .base_config_functions import ConfigFunctions
 import ngsolve as ngs
-from typing import Dict, Union
+from ngsolve import Parameter, CoefficientFunction, GridFunction, FESpace
+from typing import Dict, Union, List
 
 
 class RefSolFunctions(ConfigFunctions):
     """
-    Class to hold the initial condition functions.
+    Class to hold the reference solutions.
     """
 
-    def __init__(self, config_rel_path: str, t_param: ngs.Parameter = ngs.Parameter(0.0),
-                 new_variables: Dict[str, Union[float, ngs.CoefficientFunction, ngs.GridFunction]] = {}) -> None:
+    def __init__(self, config_rel_path: str, t_param: List[Parameter] = [Parameter(0.0)],
+                 new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
         super().__init__(config_rel_path, t_param)
 
         # Load the reference solution dict from the reference solution configfile.
@@ -40,7 +39,8 @@ class RefSolFunctions(ConfigFunctions):
             ref_sols_re_parse = {}
 
         try:
-            metrics, metrics_re_parse = self.config.get_one_level_dict('METRICS', self.t_param, new_variables, all_str=True)
+            # Note that all of the metrics are time-independent since they are just names of error metrics.
+            metrics, metrics_re_parse = self.config.get_one_level_dict('METRICS', None, new_variables, all_str=True)
         except KeyError:
             # No options specified for other metrics.
             metrics = {}
@@ -49,9 +49,9 @@ class RefSolFunctions(ConfigFunctions):
         self.ref_sol_dict = {'ref_sols': ref_sols, 'metrics': metrics}
         self.ref_sol_re_parse_dict = {'ref_sols': ref_sols_re_parse, 'metrics': metrics_re_parse}
 
-    def set_ref_solution(self, fes: ngs.FESpace, model_components: Dict[str, int]):
+    def set_ref_solution(self, fes: FESpace, model_components: Dict[str, int]):
         """
-        Function to load the reference solutions from their configfile into a dict, including loading any saved
+        Function to load the reference solutions from their configfile into a dictionary, including loading any saved
         gridfunctions.
 
         Args:
@@ -59,7 +59,7 @@ class RefSolFunctions(ConfigFunctions):
             model_components: Maps between variable names and their component in the finite element space.
 
         Returns:
-            ref_sol_dict: Dict of reference solutions.
+            Dictionary of reference solutions.
         """
 
         # Turn 'all' into a separate reference solution for each variable. Assuming that anytime 'all' is used the
@@ -70,26 +70,29 @@ class RefSolFunctions(ConfigFunctions):
             for var in model_components.keys():
                 self.ref_sol_dict['ref_sols'][var] = val
 
-        for var, val in self.ref_sol_dict['ref_sols'].items():
-            if isinstance(val, str):
-                # Need to load a gridfunction from file.
+        for var, val_lst in self.ref_sol_dict['ref_sols'].items():
+            for i in range(len(val_lst)):
+                val = val_lst[i]
 
-                # Check that the file exists.
-                val = self._find_rel_path_for_file(val)
+                if isinstance(val, str):
+                    # Need to load a gridfunction from file.
 
-                component = model_components[var]
-                if component is None:
-                    # Solution for entire finite element space.
-                    gfu_val = ngs.GridFunction(fes)
-                    gfu_val.Load(val)
+                    # Check that the file exists.
+                    val = self._find_rel_path_for_file(val)
 
-                else:
-                    # Use a component of the finite element space.
-                    gfu_val = ngs.GridFunction(fes.components[component])
-                    gfu_val.Load(val)
+                    component = model_components[var]
+                    if component is None:
+                        # Solution for entire finite element space.
+                        gfu_val = ngs.GridFunction(fes)
+                        gfu_val.Load(val)
 
-                # Replace the value in the BC dictionary.
-                self.ref_sol_dict['ref_sols'][var] = gfu_val
+                    else:
+                        # Use a component of the finite element space.
+                        gfu_val = ngs.GridFunction(fes.components[component])
+                        gfu_val.Load(val)
+
+                    # Replace the value in the BC dictionary.
+                    self.ref_sol_dict['ref_sols'][var][i] = gfu_val
 
             else:
                 # Already parsed
@@ -97,16 +100,16 @@ class RefSolFunctions(ConfigFunctions):
 
         return self.ref_sol_dict
 
-    def update_ref_solutions(self, t_param: ngs.Parameter,
-                                   updated_variables: Dict[
-                                       str, Union[float, ngs.CoefficientFunction, ngs.GridFunction]]) \
+    def update_ref_solutions(self, t_param: List[Parameter],
+                             updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]]) \
             -> None:
         """
         Function to update the reference solutions with new values of the model_variables.
 
         Args:
-            t_param: The time parameter.
-            updated_variables: Dictionary containing the model variables and their updated values.
+            t_param: List of parameters representing the current time and previous time steps.
+            updated_variables: List of dictionaries containing any new model variables and their values at each time
+                step used in the time discretization scheme.
         """
 
         for k1, v1 in self.ref_sol_re_parse_dict.items():

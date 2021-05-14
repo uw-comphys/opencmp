@@ -1,21 +1,19 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 from config_functions import ConfigParser
 from ngsolve import GridFunction, Mesh, Parameter, VTKOutput
@@ -23,25 +21,25 @@ from models import get_model_class, Model
 from pathlib import Path
 from os import remove
 import meshio
-from typing import Union
+from typing import Optional, Union, cast
 from multiprocessing.pool import Pool
 from multiprocessing import cpu_count
 
 
-def sol_to_vtu(output_dir_path: str, config_file_path: str, model: Union[Model, None] = None,
+def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Model] = None,
                delete_sol_file: bool = False) -> None:
     """
     Function to take the output .sol files and convert them into .vtu for visualization.
 
     Args:
+        confgi: The loaded config parser used by the model
         output_dir_path: The path to the folder in which the .sol files are, and where the .vtu files will be saved.
         config_file_path: The path to the config file used by the model.
         model: The model that generated the .sol files.
         delete_sol_file: Bool to indicate whether or not to delete the original .sol files after converting to .vtu,
                          Default is False.
+
     """
-    # Create config parser
-    config = ConfigParser(config_file_path)
 
     # Being run outside of run.py, so have to create model
     if model is None:
@@ -112,7 +110,7 @@ def _sol_to_vtu(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
         mesh: The mesh on which the gfu was solved.
 
     Returns:
-        ~: A string containing the entry for the .pvd file for this .vtu file.
+        A string containing the entry for the .pvd file for this .vtu file.
     """
 
     # Get the timestep for this .sol file from its name

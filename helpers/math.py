@@ -1,21 +1,19 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 from typing import Union
 from ngsolve import CoefficientFunction, Parameter, exp, IfPos
@@ -23,14 +21,14 @@ from ngsolve import CoefficientFunction, Parameter, exp, IfPos
 
 def tanh(x: Union[int, float, Parameter, CoefficientFunction]) -> Union[float, CoefficientFunction]:
     """
-    Function that implements the hyperbolic tangent in a way that's compatible with NGSolve
-    Parameter and Coefficient objects.
+    Function that implements the hyperbolic tangent in a way that's compatible with NGSolve Parameter and Coefficient
+    objects.
 
     Args:
         x: The value to evaluate tanh at.
 
     Return:
-        ~: tanh(x)
+        tanh(x)
     """
 
     # Deal with some math overflow problems
@@ -47,14 +45,14 @@ def tanh(x: Union[int, float, Parameter, CoefficientFunction]) -> Union[float, C
 
 def sig(x: Union[int, float, Parameter, CoefficientFunction]) -> Union[float, CoefficientFunction]:
     """
-    Function that implements the sigmoid function in a way that's compatible with NGSolve
-    Parameter and Coefficient objects.
+    Function that implements the sigmoid function in a way that's compatible with NGSolve Parameter and Coefficient
+    objects.
 
     Args:
         x: The value to evaluate the sigmoid at
 
     Return:
-        ~: sig(x)
+        sig(x)
     """
 
     return 1 / (1 + exp(-x))
@@ -69,7 +67,7 @@ def H_t(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1)  -
         w: Length of time over which to go from 0.0001 to 0.9999
 
     Return:
-        ~: The evaluated value of the approximated Heaviside function
+        The evaluated value of the approximated Heaviside function
     """
 
     # Transition width must be positive
@@ -96,7 +94,7 @@ def H_s(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1) ->
         w: Length of time over which to go from 0.0001 to 0.9999
 
     Return:
-        ~: The evaluated value of the approximated Heaviside function
+        The evaluated value of the approximated Heaviside function
     """
 
     # Transition width must be positive

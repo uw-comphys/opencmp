@@ -66,16 +66,12 @@ class TestTransient:
         automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_implicit_euler_cg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-3'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'implicit euler'
         # Run
         automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_implicit_euler_dg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-3'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'implicit euler'
         # Change from CG to DG
@@ -84,16 +80,12 @@ class TestTransient:
         automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_crank_nicolson_cg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-2'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'crank nicolson'
         # Run
         automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_crank_nicolson_dg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-2'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'crank nicolson'
         # Change from CG to DG
@@ -102,16 +94,12 @@ class TestTransient:
         automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_2_step_adaptive_cg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-2'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'adaptive two step'
         # Run
         automated_output_check(capsys, square_coarse_transient, [1e-5])
 
     def test_2_step_adaptive_dg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-2'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'adaptive two step'
         # Change from CG to DG
@@ -120,16 +108,12 @@ class TestTransient:
         automated_output_check(capsys, square_coarse_transient, [1e-5])
 
     def test_3_step_adaptive_cg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-2'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'adaptive three step'
         # Run
         automated_output_check(capsys, square_coarse_transient, [1e-5])
 
     def test_3_step_adaptive_dg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
-        # Change time step
-        square_coarse_transient['TRANSIENT']['dt'] = '1e-2'
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'adaptive three step'
         # Change from CG to DG

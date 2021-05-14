@@ -1,26 +1,25 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 from .base_config_functions import ConfigFunctions
 from helpers.io import create_and_load_gridfunction_from_file
 import ngsolve as ngs
-from typing import Dict, Optional, Union
+from ngsolve import Parameter, CoefficientFunction, GridFunction, FESpace
+from typing import Dict, Optional, Union, List
 
 
 class ModelFunctions(ConfigFunctions):
@@ -28,8 +27,8 @@ class ModelFunctions(ConfigFunctions):
     Class to hold the model functions and parameters.
     """
 
-    def __init__(self, config_rel_path: str, t_param: ngs.Parameter = ngs.Parameter(0.0),
-                 new_variables: Dict[str, Optional[int]] = {}) -> None:
+    def __init__(self, config_rel_path: str, t_param: List[Parameter] = [Parameter(0.0)],
+                 new_variables: List[Dict[str, Optional[int]]] = [{}]) -> None:
         super().__init__(config_rel_path, t_param)
 
         # Load the model functions/parameters/components dict from the main config file.
@@ -45,7 +44,7 @@ class ModelFunctions(ConfigFunctions):
             self.model_functions_dict = {}
             self.model_functions_re_parse_dict = {}
 
-    def set_model_functions(self, fes: ngs.FESpace, model_components: Dict[str, int]) -> None:
+    def set_model_functions(self, fes: FESpace, model_components: Dict[str, int]) -> None:
         """
         Function to load saved model functions into gridfunctions.
 
@@ -56,7 +55,7 @@ class ModelFunctions(ConfigFunctions):
 
         for function, var_dict in self.model_functions_dict.items():
             # There may be multiple types of model functions.
-            for var, val in var_dict.items():
+            for var, val_lst in var_dict.items():
 
                 # Determine which component of the finite element space the model function is for.
                 if var == 'all':
@@ -64,28 +63,34 @@ class ModelFunctions(ConfigFunctions):
                 else:
                     component = model_components[var]
 
-                # If the model function is a gridfunction saved to a file it needs to be loaded.
-                if isinstance(val, str):
-                    # Check that the file exists.
-                    val = self._find_rel_path_for_file(val)
+                # If the model function is a gridfunction saved to a file it needs to be loaded. The re_parse dictionary
+                # does not need to be updated since the gridfunction must be a constant field, it can't possibly be a
+                # variable function of one of the model variables.
+                for i in range(len(val_lst)):
+                    val = val_lst[i]
 
-                    if component is None:
-                        # Loaded gridfunction should cover full finite element space.
-                        self.model_functions_dict[function][var] = [create_and_load_gridfunction_from_file(val, fes), False]
-                    else:
-                        # Loaded gridfunction is for one component of the finite element space.
-                        fes_tmp = fes.components[component]
-                        self.model_functions_dict[function][var] = [create_and_load_gridfunction_from_file(val, fes_tmp), False]
+                    if isinstance(val, str):
+                        # Check that the file exists.
+                        val = self._find_rel_path_for_file(val)
 
-    def update_model_functions(self, t_param: ngs.Parameter,
-                               updated_variables: Dict[str, Union[float, ngs.CoefficientFunction, ngs.GridFunction]]) \
+                        if component is None:
+                            # Loaded gridfunction should cover full finite element space.
+                            self.model_functions_dict[function][var][i] = create_and_load_gridfunction_from_file(val, fes, [self.run_dir, self.run_dir + '/model_dir'])
+                        else:
+                            # Loaded gridfunction is for one component of the finite element space.
+                            fes_tmp = fes.components[component]
+                            self.model_functions_dict[function][var][i] = create_and_load_gridfunction_from_file(val, fes_tmp, [self.run_dir, self.run_dir + '/model_dir'])
+
+    def update_model_functions(self, t_param: List[Parameter],
+                               updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]]) \
             -> None:
         """
         Function to update the model parameters/functions with new values of the model_variables.
 
         Args:
-            t_param: The time parameter.
-            updated_variables: Dictionary containing the model variables and their updated values.
+            t_param: List of parameters representing the current time and previous time steps.
+            updated_variables: List of dictionaries containing any new model variables and their values at each time
+                step used in the time discretization scheme.
         """
 
         for k1, v1 in self.model_parameters_re_parse_dict.items():

@@ -1,38 +1,35 @@
-"""
-Taken from the pyparsing examples (with modifications).
-
-Copyright 2003-2019 Paul McGuire
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
 ########################################################################################################################
-
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+# Taken from the pyparsing examples (with modifications).                                                              #
+#                                                                                                                      #
+# Copyright 2003-2019 Paul McGuire                                                                                     #
+#                                                                                                                      #
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE #
+# WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS   #
+# OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR  #
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.     #
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 import pyparsing as pp
 import math
 import ngsolve as ngs
+from ngsolve import Parameter, CoefficientFunction
 import operator
-from typing import List, Tuple, Union, Dict
+from typing import List, Tuple, Union, Dict, Any, Optional
 from helpers.math import tanh, sig, H_s
 
 
@@ -44,7 +41,7 @@ def parse_to_arith(expr_stack: List[Union[str, Tuple[str, int]]]):
         expr_stack: Empty list to parse the string into.
 
     Returns:
-        arith_expr: The parser.
+        The parser.
     """
 
     def push_first(token):
@@ -72,7 +69,7 @@ def parse_to_arith(expr_stack: List[Union[str, Tuple[str, int]]]):
         return token
 
     def insert_vec_tuple(token):
-        """ Turns a list into a tuple corresponding to a function operator and its arguments. """
+        """ Turns a list into a tuple corresponding to the 'vec' operator and the components of the vector. """
         num_args = len(token[0])
         token.insert(0, ('vec', num_args))
 
@@ -88,7 +85,7 @@ def parse_to_arith(expr_stack: List[Union[str, Tuple[str, int]]]):
 
     sci_notation = pp.Regex(r'[+-]?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?')  # Regex is the preferred way to do this.
 
-    func = pp.Word(pp.alphas, pp.alphas)
+    func = pp.Word(pp.alphas, pp.alphas + '_')
 
     plus, minus, mult, div = map(pp.Literal, '+-*/')
     l_par, r_par = map(pp.Suppress, '()')
@@ -120,19 +117,21 @@ def parse_to_arith(expr_stack: List[Union[str, Tuple[str, int]]]):
     return arith_expr
 
 
-def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], t_param: ngs.Parameter, new_variables: Dict):
+def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], t_param: Optional[Parameter], new_variables: Dict[str, Any]) \
+    -> Tuple[Union[str, float, CoefficientFunction], bool]:
     """
     Function to turn a list of strings corresponding to arithmetic operations into those operations as Python code.
 
     Args:
         stack: The list of strings.
-        t_param: NGSolve time parameter.
+        t_param: Parameter representing the current time.
         new_variables: A dictionary of any new model variables and their values.
 
     Returns:
-        val: The Python code.
-        variable_eval: Whether or not the expression contains any of the new model variables (would need to be re-parsed
-                       if their values change).
+        Tuple[Union[str, float, CoefficientFunction], bool]:
+            - val: The Python code.
+            - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
+                re-parsed if their values change).
     """
 
     # Map operator symbols to corresponding arithmetic operations.
@@ -193,9 +192,12 @@ def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], t_param: ngs.
     elif op in variables:
         return variables[op], variable_eval
 
-    elif op in new_variables:
+    elif op in new_variables.keys():
         variable_eval = True
-        return new_variables[op], variable_eval
+        if isinstance(new_variables[op], list):
+            return new_variables[op][0], variable_eval
+        else:
+            return new_variables[op], variable_eval
 
     elif op in funcs:
         # Note: args are pushed onto the stack in reverse order.
@@ -218,19 +220,22 @@ def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], t_param: ngs.
             return float(op), variable_eval
 
 
-def eval_item(string, t_param, new_variables: Dict):
+def eval_item(string: str, t_param: Optional[Parameter], new_variables: Dict[str, Any]) \
+        -> Tuple[Union[str, float, CoefficientFunction], Union[str,bool]]:
     """
     Parse a string containing a single expression (not a list of expressions).
 
     Args:
         string: The string of interest.
-        t_param: An optional NGSolve time parameter.
+        t_param: Parameter representing the current time.
         new_variables: A dictionary of any new model variables and their values.
 
     Returns:
-        val: The Python code.
-        variable_eval: Whether or not the expression contains any of the new model variables (would need to be re-parsed
-                       if their values change).
+        Tuple[Union[str, float, CoefficientFunction], Union[str, bool]]:
+            - val: The Python code.
+            - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
+                re-parsed if their values change). If variable_eval is True, the original string expression is returned
+                in its place.
     """
 
     expr_stack = []
@@ -243,20 +248,21 @@ def eval_item(string, t_param, new_variables: Dict):
         return val, variable_eval
 
 
-def eval_python(string: str, t_param: ngs.Parameter = ngs.Parameter(0.0), new_variables: Dict = {})\
-        -> Tuple[ngs.CoefficientFunction, Union[str, bool]]:
+def eval_python(string: str, t_param: Optional[Parameter] = None, new_variables: Dict[str, Any] = {})\
+        -> Tuple[Union[str, float, CoefficientFunction], Union[str, bool]]:
     """
     Parses a string into Python code.
 
     Args:
         string: The string of interest.
-        t_param: An optional NGSolve time parameter.
+        t_param: Parameter representing the current time.
         new_variables: A dictionary of any new model variables and their values.
 
     Returns:
-        val: The Python code.
-        variable_eval: Whether or not the expression contains any of the new model variables (would need to be re-parsed
-                       if their values change).
+        Tuple[Union[str, float, CoefficientFunction], Union[str, bool]]:
+            - val: The Python code.
+            - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
+                re-parsed if their values change).
     """
 
     # Remove whitespace in case the string ends up being parsed manually.

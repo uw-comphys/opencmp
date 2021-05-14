@@ -16,9 +16,9 @@ DG = False
 solver = default
 preconditioner = default
 linearization_method = Oseen
-nonlinear_tolerance = relative -> 1e-4
+nonlinear_tolerance = relative -> 1e-8
                       absolute -> 1e-8
-nonlinear_max_iterations = 20
+nonlinear_max_iterations = 200
 
 [TRANSIENT]
 transient = False

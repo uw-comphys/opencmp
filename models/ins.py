@@ -1,30 +1,28 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 import ngsolve as ngs
-from helpers.ngsolve_ import get_special_functions, construct_p_mat
+from helpers.ngsolve_ import get_special_functions
 from helpers.dg import avg, jump, grad_avg
 from models import Model
 from config_functions import ConfigParser
-from typing import Tuple, List, Optional, Union
-from ngsolve.comp import FESpace, ProxyFunction, GridFunction
-from ngsolve import Parameter
+from typing import List, Optional, Union
+from ngsolve.comp import ProxyFunction
+from ngsolve import Parameter, GridFunction, FESpace, BilinearForm, LinearForm, Preconditioner
 from helpers.error import norm, mean
 
 
@@ -33,7 +31,7 @@ class INS(Model):
     A single phase incompressible Navier-Stokes model.
     """
 
-    def __init__(self, config: ConfigParser, t_param: ngs.Parameter) -> None:
+    def __init__(self, config: ConfigParser, t_param: List[Parameter]) -> None:
         # Specify information about the model components
         # NOTE: These MUST be set before calling super(), since it's needed in superclass' __init__
         self.model_components               = {'u': 0,      'p': 1}
@@ -54,7 +52,7 @@ class INS(Model):
             raise TypeError('Don\'t recognize the linearization method.')
 
         if self.linearize == 'Oseen':
-            nonlinear_tolerance = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'], self.t_param)
+            nonlinear_tolerance = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'], None)
             self.abs_nonlinear_tolerance = nonlinear_tolerance['absolute']
             self.rel_nonlinear_tolerance = nonlinear_tolerance['relative']
             self.nonlinear_max_iters = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
@@ -70,6 +68,12 @@ class INS(Model):
         self.f = self.model_functions.model_functions_dict['source']['all']
 
     def _construct_fes(self) -> FESpace:
+        if not self.DG:
+            if self.element['u'] == 'HDiv' or self.element['u'] == 'RT':
+                print('We recommended that you NOT use HDIV spaces without DG due to numerical issues.')
+            if self.element['p'] == 'L2':
+                print('We recommended that you NOT use L2 spaces without DG due to numerical issues.')
+
         if self.element['u'] == 'RT':
             # Raviart-Thomas elements are a type of HDiv finite element.
             fes_u = ngs.HDiv(self.mesh, order=self.interp_ord, dirichlet=self.dirichlet_names.get('u', ''),
@@ -86,88 +90,140 @@ class INS(Model):
 
         return ngs.FESpace([fes_u, fes_p], dgjumps=self.DG)
 
-    def _construct_linearization_terms(self) -> Optional[List[ngs.GridFunction]]:
+    def _construct_linearization_terms(self) -> Optional[List[GridFunction]]:
         tmp = ngs.GridFunction(self.fes.components[0])
         tmp.vec.data = self.IC.components[0].vec
 
         return [tmp]
 
-    def construct_bilinear(self, U: List[ProxyFunction], V: List[ProxyFunction], dt: Parameter = ngs.Parameter(1.0),
-                           explicit_bilinear: bool = False) -> ngs.BilinearForm:
+    def update_linearization_terms(self, gfu: GridFunction) -> None:
+        if self.linearize == 'Oseen':
+            # Update the velocity linearization term.
+            comp_index = self.model_components['u']
+            self.W[comp_index].vec.data = gfu.components[comp_index].vec
+        else:
+            # Do nothing, no linearization term to update.
+            pass
+
+    def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
+                                    dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
         u, p = U
         v, q = V
 
-        if self.linearize == 'IMEX':
-            # Use an IMEX operator-splitting scheme to linearize the convection term.
-            if self.DIM:
-                # Use the diffuse interface method.
-                a = self._bilinear_IMEX_DIM(u, p, v, q, dt, explicit_bilinear)
-            else:
-                # Solve on a standard conformal mesh.
-                a = self._bilinear_IMEX_no_DIM(u, p, v, q, dt, explicit_bilinear)
-
-        elif self.linearize == 'Oseen':
-            # Solve the Oseen equations, a linearized form of INS.
-            if self.DIM:
-                # Use the diffuse interface method.
-                a = self._bilinear_Oseen_DIM(u, p, v, q, dt, explicit_bilinear)
-            else:
-                # Solve on a standard conformal mesh.
-                a = self._bilinear_Oseen_no_DIM(u, p, v, q, dt, explicit_bilinear)
-
-        return a
-
-    def construct_linear(self, V: List[ProxyFunction], gfu_0: List[Union[GridFunction, None]] = None,
-                         dt: Parameter = ngs.Parameter(1.0)) -> ngs.BilinearForm:
-        v, q = V
-
-        if self.linearize == 'IMEX':
-            # Use an IMEX operator-splitting scheme to linearize the convection term.
-            gfu_u, gfu_p = gfu_0
-
-            if self.DIM:
-                # Use the diffuse interface method.
-                L = self._linear_IMEX_DIM(v, gfu_u, dt)
-            else:
-                # Solve on a standard conformal mesh.
-                L = self._linear_IMEX_no_DIM(v, gfu_u, dt)
-
-        elif self.linearize == 'Oseen':
-            # Solve the Oseen equations, a linearized form of INS.
-            w = self.W[0]
-
-            if self.DIM:
-                # Use the diffuse interface method.
-                L = self._linear_Oseen_DIM(v, w, dt)
-            else:
-                # Solve on a standard conformal mesh.
-                L = self._linear_Oseen_no_DIM(v, w, dt)
-
-        return L
-
-    def get_trial_and_test_functions(self) -> Tuple[List[ProxyFunction], List[ProxyFunction]]:
-        # Define the test and trial functions.
-        u, p = self.fes.TrialFunction()
-        v, q = self.fes.TestFunction()
-
-        return [u, p], [v, q]
-
-    def single_iteration(self, a: ngs.BilinearForm, L: ngs.LinearForm, precond: ngs.Preconditioner,
-                         gfu: ngs.GridFunction) -> None:
+        comp_index = self.model_components['u']
 
         if self.linearize == 'Oseen':
-            self.construct_and_run_solver(a, L, precond, gfu)
-            component = self.model_components['u']
-            err = norm("l2_norm", self.W[0], gfu.components[0], self.mesh, self.fes.components[component], average=False)
-            gfu_norm = mean(gfu.components[0], self.mesh)
-            numit = 1
+            if time_step > 0:
+                # Using known values from a previous time step, so no need to iteratively solve for a wind.
+                w = U[comp_index]
+            else:
+                w = self.W[comp_index]
+        elif self.linearize == 'IMEX':
+            w = None
+        else:
+            raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
 
-            if self.verbose > 0:
-                print(numit, err)
+        if self.DIM:
+            # Use the diffuse interface method.
+            a = self._bilinear_time_ODE_DIM(u, v, w, dt, time_step)
+        else:
+            # Solve on a standard conformal mesh.
+            a = self._bilinear_time_ODE_no_DIM(u, v, w, dt, time_step)
 
-            while (err > self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) and (numit < self.nonlinear_max_iters):
-                self.W[0].vec.data = gfu.components[0].vec
-                self.apply_dirichlet_bcs_to(gfu)
+        return [a]
+
+    def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction],
+                                    dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
+        u, p = U
+        v, q = V
+
+        comp_index = self.model_components['u']
+
+        if self.linearize == 'Oseen':
+            if time_step > 0:
+                # Using known values from a previous time step, so no need to iteratively solve for a wind.
+                w = U[comp_index]
+            else:
+                w = self.W[comp_index]
+        elif self.linearize == 'IMEX':
+            w = None
+        else:
+            raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
+
+        if self.DIM:
+            # Use the diffuse interface method.
+            a = self._bilinear_time_coefficient_DIM(u, p, v, q, w, dt, time_step)
+        else:
+            # Solve on a standard conformal mesh.
+            a = self._bilinear_time_coefficient_no_DIM(u, p, v, q, w, dt, time_step)
+
+        return [a]
+
+    def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
+                         dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
+        v, q = V
+
+        comp_index = self.model_components['u']
+
+        if self.linearize == 'Oseen':
+            if time_step > 0 and gfu_0 is not None:
+                # Using known values from a previous time step, so no need to iteratively solve for a wind.
+                # Check for gfu_0 = None because adaptive_three_step requires a solve where w should be taken from W for
+                # a half step (time_step != 0).
+                w = gfu_0[comp_index]
+            else:
+                w = self.W[comp_index]
+        elif self.linearize == 'IMEX':
+            w = None
+        else:
+            raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
+
+        if self.DIM:
+            # Use the diffuse interface method.
+            L = self._linear_DIM(v, w, dt, time_step)
+        else:
+            # Solve on a standard conformal mesh.
+            L = self._linear_no_DIM(v, w, dt, time_step)
+
+        return [L]
+
+    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
+                                dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
+        # Note that the time_step argument is not used because the nonlinear term in INS (convection) does not include
+        # any boundary conditions or model parameters.
+
+        v, q = V
+
+        comp_index = self.model_components['u']
+
+        gfu_u = gfu_0[comp_index]
+
+        if self.DIM:
+            # Use the diffuse interface method.
+            L = self._imex_explicit_DIM(v, gfu_u, dt)
+        else:
+            # Solve on a standard conformal mesh.
+            L = self._imex_explicit_no_DIM(v, gfu_u, dt)
+
+        return [L]
+
+    def single_iteration(self, a: BilinearForm, L: LinearForm, precond: Preconditioner, gfu: GridFunction,
+                         time_step: int = 0) -> None:
+        if self.linearize == 'Oseen':
+            # The component index representing velocity
+            component = self.fes.components[self.model_components['u']]
+            comp_index = self.model_components['u']
+
+            # Number of linear iterations for this timestep
+            num_iteration = 1
+
+            # Boolean used to keep the while loop going
+            done_iterating = False
+
+            while not done_iterating:
+                self.W[comp_index].vec.data = gfu.components[comp_index].vec
+
+                self.apply_dirichlet_bcs_to(gfu, time_step=time_step)
 
                 a.Assemble()
                 L.Assemble()
@@ -175,48 +231,113 @@ class INS(Model):
 
                 self.construct_and_run_solver(a, L, precond, gfu)
 
-                err = norm("l2_norm", self.W[0], gfu.components[0], self.mesh, self.fes.components[component], average=False)
-                gfu_norm = mean(gfu.components[0], self.mesh)
-                numit += 1
+                err = norm("l2_norm", self.W[comp_index], gfu.components[comp_index], self.mesh, component, average=False)
+                gfu_norm = mean(gfu.components[comp_index], self.mesh)
+
+                num_iteration += 1
 
                 if self.verbose > 0:
-                    print(numit, err)
+                    print(num_iteration, err)
 
-            self.W[0].vec.data = gfu.components[0].vec
+                done_iterating = (err < self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) or (num_iteration > self.nonlinear_max_iters)
 
+            self.W[comp_index].vec.data = gfu.components[comp_index].vec
         elif self.linearize == 'IMEX':
             self.construct_and_run_solver(a, L, precond, gfu)
+        else:
+            raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
 
 ########################################################################################################################
 # BILINEAR AND LINEAR FORM HELPER FUNCTIONS
 ########################################################################################################################
 
-    def _bilinear_Oseen_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction, dt: Parameter,
-                            explicit_bilinear) -> ngs.BilinearForm:
+    def _bilinear_time_ODE_DIM(self, u: Union[ProxyFunction, GridFunction], v: ProxyFunction, w: GridFunction,
+                               dt: Parameter, time_step: int) -> BilinearForm:
         """
-        Bilinear form when the diffuse interface method is being used with Oseen linearization. Handles both CG and DG.
+        Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
+        This is the portion of the bilinear form for model variables with time derivatives.
         """
 
         # Define the special DG functions.
         n, _, alpha = get_special_functions(self.mesh, self.nu)
 
-        p_I = construct_p_mat(p, self.mesh.dim)
-
-        w = self.W[0]
-
+        # Domain integrals.
         a = dt * (
-            self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
-            - ngs.InnerProduct(ngs.OuterProduct(u, w), ngs.Grad(v))  # Convection term
+            self.kv[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
+            ) * self.DIM_solver.phi_gfu * ngs.dx
+
+        if self.linearize == 'Oseen':
+            # Linearized convection term.
+            a += -dt * ngs.InnerProduct(ngs.OuterProduct(u, w), ngs.Grad(v)) * self.DIM_solver.phi_gfu * ngs.dx
+
+        # Force u to zero where phi is zero.
+        a += dt * alpha * u * v * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
+
+        if self.DG:
+            if self.dirichlet_names.get('u', None) is not None:
+                # Penalty terms for conformal Dirichlet BCs
+                a += dt * (
+                    self.kv[time_step] * alpha * u * v  # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
+                    - self.kv[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))  # ∇u^ = ∇u
+                    - self.kv[time_step] * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, n))  # 1/2 of penalty for u=g on 𝚪_D
+                    ) * self._ds(self.dirichlet_names['u'])
+
+                if self.linearize == 'Oseen':
+                    # Additional 1/2 of uw^ (convection term)
+                    a += dt * v * (0.5 * w * n * u + 0.5 * ngs.Norm(w * n) * u) * self._ds(self.dirichlet_names['u'])
+
+        # Penalty term for DIM Dirichlet BCs. This is the Nitsche method.
+        for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
+            a += dt * (
+                self.kv[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, self.DIM_solver.grad_phi_gfu))
+                + self.kv[time_step] * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, self.DIM_solver.grad_phi_gfu))
+                + self.kv[time_step] * alpha * u * v * self.DIM_solver.mag_grad_phi_gfu
+                ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
+
+            if self.linearize == 'Oseen':
+                # Additional convection term penalty.
+                a += dt * (v * (0.5 * w * -self.DIM_solver.grad_phi_gfu * u + 0.5
+                                * ngs.Norm(w * -self.DIM_solver.grad_phi_gfu) * u)
+                    ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
+
+        if self.linearize == 'Oseen':
+            # Conformal stress BC needs a no-backflow component in the bilinear form.
+            for marker in self.BC.get('stress', {}).get('stress', {}):
+                if self.DG:
+                    a += dt * v * (ngs.IfPos(w * n, w * n, 0.0) * u) * self._ds(marker)
+                else:
+                    a += dt * v.Trace() * (ngs.IfPos(w * n, w * n, 0.0) * u.Trace()) * self._ds(marker)
+
+        # Conformal parallel flow BC
+        for marker in self.BC.get('parallel', {}).get('parallel', {}):
+            if self.DG:
+                a += dt * v * (u - n * ngs.InnerProduct(u, n)) * self._ds(marker)
+            else:
+                a += dt * v.Trace() * (u.Trace() - n * ngs.InnerProduct(u.Trace(), n)) * self._ds(marker)
+
+        # TODO: Add non-Dirichlet DIM BCs.
+
+        return a
+
+    def _bilinear_time_coefficient_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction,
+                                       w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
+        """
+        Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
+        This is the portion of the bilinear form for model variables without time derivatives.
+        """
+
+        # Define the special DG functions.
+        n, _, alpha = get_special_functions(self.mesh, self.nu)
+
+        # Domain integrals.
+        a = dt * (
             - ngs.div(u) * q  # Conservation of mass
             - ngs.div(v) * p  # Pressure
             - 1e-10 * p * q   # Stabilization term
             ) * self.DIM_solver.phi_gfu * ngs.dx
 
-        # Force u and grad(p) to zero where phi is zero.
-        a += dt * (
-            alpha * u * v # Removing the alpha penalty following discussion with James.
-            - p * (ngs.div(v))
-            ) * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
+        # Force grad(p) to zero where phi is zero.
+        a += -dt * p * (ngs.div(v)) * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
 
         if self.DG:
             avg_u = avg(u)
@@ -226,136 +347,80 @@ class INS(Model):
             jump_v = jump(v)
             avg_grad_v = grad_avg(v)
 
-            if not explicit_bilinear:
-                # Penalty for discontinuities
-                a += dt * (
-                    jump_v * (w * n * avg_u + 0.5 * ngs.Norm(w * n) * jump_u)  # Convection
-                    - self.kv * ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
-                    - self.kv * ngs.InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
-                    + self.kv * alpha * ngs.InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I
-                                                                          # from ∇u^
-                    ) * self.DIM_solver.phi_gfu * ngs.dx(skeleton=True)
-
-            if self.dirichlet_names.get('u', None) is not None:
-                # Penalty terms for conformal Dirichlet BCs
-                a += dt * (
-                    v * (0.5 * w * n * u + 0.5 * ngs.Norm(w * n) * u)  # 1/2 of uw^ (convection term)
-                    - self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))  # ∇u^ = ∇u
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, n))  # 1/2 of penalty for u=g on
-                    + self.kv * alpha * u * v  # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
-                    ) * self._ds(self.dirichlet_names['u'])
-
-        # Penalty term for DIM Dirichlet BCs. This is the Nitsche method.
-        for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
+            # Penalty for discontinuities
             a += dt * (
-                v * (0.5 * w * -self.DIM_solver.grad_phi_gfu * u + 0.5 * ngs.Norm(w * -self.DIM_solver.grad_phi_gfu) * u)
-                + self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, self.DIM_solver.grad_phi_gfu))
-                + self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, self.DIM_solver.grad_phi_gfu))
-                + self.kv * alpha * u * v * self.DIM_solver.mag_grad_phi_gfu
-                ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
+                self.kv[time_step] * alpha * ngs.InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I from ∇u^
+                - self.kv[time_step] * ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
+                - self.kv[time_step] * ngs.InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
+                ) * self.DIM_solver.phi_gfu * ngs.dx(skeleton=True)
 
-        # Conformal stress BC needs a no-backflow component in the bilinear form.
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            if self.DG:
-                a += dt * v * (ngs.IfPos(w * n, w * n, 0.0) * u) * self._ds(marker)
-            else:
-                a += dt * v.Trace() * (ngs.IfPos(w * n, w * n, 0.0) * u.Trace()) * self._ds(marker)
-
-        # Conformal parallel flow BC
-        for marker in self.BC.get('parallel', {}).get('parallel', {}):
-            if self.DG:
-                a += dt * v * (u - n * ngs.InnerProduct(u, n)) * self._ds(marker)
-            else:
-                a += dt * v.Trace() * (u.Trace() - n * ngs.InnerProduct(u.Trace(), n)) * self._ds(marker)
-
-        # TODO: Add non-Dirichlet DIM BCs.
+            if self.linearize == 'Oseen':
+                # Additional penalty for the convection term.
+                a += dt * jump_v * (w * n * avg_u + 0.5 * ngs.Norm(w * n) * jump_u) * self.DIM_solver.phi_gfu * ngs.dx(skeleton=True)
 
         return a
 
-    def _bilinear_IMEX_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction, dt: Parameter,
-                            explicit_bilinear) -> ngs.BilinearForm:
+    def _bilinear_time_ODE_no_DIM(self, u: Union[ProxyFunction, GridFunction], v: ProxyFunction, w: GridFunction,
+                                  dt: Parameter, time_step: int) -> BilinearForm:
         """
-        Bilinear form when the diffuse interface method is being used with IMEX linearization. Handles both CG and DG.
+        Bilinear form when the diffuse interface method is not being used. Handles both CG and DG.
+        This is the portion of the bilinear form for model variables with time derivatives.
         """
 
         # Define the special DG functions.
         n, _, alpha = get_special_functions(self.mesh, self.nu)
 
-        p_I = construct_p_mat(p, self.mesh.dim)
-
+        # Domain integrals.
         a = dt * (
-            self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
-            - ngs.div(u) * q  # Conservation of mass
-            - ngs.div(v) * p  # Pressure
-            - 1e-10 * p * q   # Stabilization term
-            ) * self.DIM_solver.phi_gfu * ngs.dx
+            self.kv[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
+            ) * ngs.dx
 
-        # Force u and grad(p) to zero where phi is zero.
-        a += dt * (
-            alpha * u * v # Removing the alpha penalty following discussion with James.
-            - p * (ngs.div(v))
-            ) * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
+        if self.linearize == 'Oseen':
+            # Linearized convection term.
+            a += -dt * ngs.InnerProduct(ngs.OuterProduct(u, w), ngs.Grad(v)) * ngs.dx
 
         if self.DG:
-            jump_u = jump(u)
-            avg_grad_u = grad_avg(u)
-
-            jump_v = jump(v)
-            avg_grad_v = grad_avg(v)
-
-            if not explicit_bilinear:
-                # Penalty for discontinuities
-                a += dt * (
-                    - self.kv * ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
-                    - self.kv * ngs.InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
-                    + self.kv * alpha * ngs.InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I
-                                                                          # from ∇u^
-                     ) * self.DIM_solver.phi_gfu * ngs.dx(skeleton=True)
-
+            # Penalty for dirichlet BCs
             if self.dirichlet_names.get('u', None) is not None:
-                # Penalty terms for conformal Dirichlet BCs
                 a += dt * (
-                    - self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))  # ∇u^ = ∇u
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, n))  # 1/2 of penalty for u=g on
-                    + self.kv * alpha * u * v  # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
+                    self.kv[time_step] * alpha * u * v  # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
+                    - self.kv[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))  # ∇u^ = ∇u
+                    - self.kv[time_step] * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, n))  # 1/2 of penalty for u=g on
                     ) * self._ds(self.dirichlet_names['u'])
 
-        # Penalty term for DIM Dirichlet BCs. This is the Nitsche method.
-        for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
-            a += dt * (
-                self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, self.DIM_solver.grad_phi_gfu))
-                + self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, self.DIM_solver.grad_phi_gfu))
-                + self.kv * alpha * u * v * self.DIM_solver.mag_grad_phi_gfu
-                ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
+                if self.linearize == 'Oseen':
+                    # Additional 1/2 of uw^ (convection term)
+                    a += dt * v * (0.5 * w * n * u + 0.5 * ngs.Norm(w * n) * u) * self._ds(self.dirichlet_names['u'])
 
-        # Conformal parallel flow BC
+        if self.linearize == 'Oseen':
+            # Stress needs a no-backflow component in the bilinear form.
+            for marker in self.BC.get('stress', {}).get('stress', {}):
+                if self.DG:
+                    a += dt * v * (ngs.IfPos(w * n, w * n, 0.0) * u) * self._ds(marker)
+                else:
+                    a += dt * v.Trace() * (ngs.IfPos(w * n, w * n, 0.0) * u.Trace()) * self._ds(marker)
+
+        # Parallel Flow BC
         for marker in self.BC.get('parallel', {}).get('parallel', {}):
             if self.DG:
                 a += dt * v * (u - n * ngs.InnerProduct(u, n)) * self._ds(marker)
             else:
                 a += dt * v.Trace() * (u.Trace() - n * ngs.InnerProduct(u.Trace(), n)) * self._ds(marker)
 
-        # TODO: Add non-Dirichlet DIM BCs.
-
         return a
 
-    def _bilinear_Oseen_no_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction,
-                               dt: Parameter, explicit_bilinear) -> ngs.BilinearForm:
+    def _bilinear_time_coefficient_no_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction,
+                                          w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
         """
-        Bilinear form when Oseen linearization is being used and the diffuse interface method is not being used.
-        Handles both CG and DG.
+        Bilinear form when the diffuse interface method is not being used. Handles both CG and DG.
+        This is the portion of the bilinear form for model variables without time derivatives.
         """
 
         # Define the special DG functions.
         n, _, alpha = get_special_functions(self.mesh, self.nu)
 
-        p_I = construct_p_mat(p, self.mesh.dim)
-
-        w = self.W[0]
-
+        # Domain integrals.
         a = dt * (
-            self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
-            - ngs.InnerProduct(ngs.OuterProduct(u, w), ngs.Grad(v))  # Convection term
             - ngs.div(u) * q  # Conservation of mass
             - ngs.div(v) * p  # Pressure
             - 1e-10 * p * q   # Stabilization term
@@ -369,128 +434,60 @@ class INS(Model):
             jump_v = jump(v)
             avg_grad_v = grad_avg(v)
 
-            if not explicit_bilinear:
-                # Penalty for discontinuities
-                a += dt * (
-                    jump_v * (w * n * avg_u + 0.5 * ngs.Norm(w * n) * jump_u)  # Convection
-                    - self.kv * ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
-                    - self.kv * ngs.InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
-                    + self.kv * alpha * ngs.InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I
-                                                                          # from ∇u^
-                    ) * ngs.dx(skeleton=True)
+            # Penalty for discontinuities
+            a += dt * (
+                self.kv[time_step] * alpha * ngs.InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I from ∇u^
+                - self.kv[time_step] * ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
+                - self.kv[time_step] * ngs.InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
+                ) * ngs.dx(skeleton=True)
 
-            # Penalty for dirichlet BCs
-            if self.dirichlet_names.get('u', None) is not None:
-                a += dt * (
-                    v * (0.5 * w * n * u + 0.5 * ngs.Norm(w * n) * u)  # 1/2 of uw^ (convection term)
-                    - self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))  # ∇u^ = ∇u
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, n))  # 1/2 of penalty for u=g on
-                    + self.kv * alpha * u * v                                          # 1/2 of penalty term for u=g
-                                                                                       # on 𝚪_D from ∇u^
-                    ) * self._ds(self.dirichlet_names['u'])
-
-        # Parallel Flow BC
-        for marker in self.BC.get('parallel', {}).get('parallel', {}):
-            if self.DG:
-                a += dt * v * (u - n * ngs.InnerProduct(u, n)) * self._ds(marker)
-            else:
-                a += dt * v.Trace() * (u.Trace() - n * ngs.InnerProduct(u.Trace(), n)) * self._ds(marker)
-
-        # Stress needs a no-backflow component in the bilinear form.
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            if self.DG:
-                a += dt * v * (ngs.IfPos(w * n, w * n, 0.0) * u) * self._ds(marker)
-            else:
-                a += dt * v.Trace() * (ngs.IfPos(w * n, w * n, 0.0) * u.Trace()) * self._ds(marker)
+            if self.linearize == 'Oseen':
+                # Additional penalty for the convection term.
+                a += dt * jump_v * (w * n * avg_u + 0.5 * ngs.Norm(w * n) * jump_u) * ngs.dx(skeleton=True)
 
         return a
 
-    def _bilinear_IMEX_no_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction,
-                              dt: Parameter, explicit_bilinear) -> ngs.BilinearForm:
+    def _linear_DIM(self, v: ProxyFunction, w: GridFunction, dt: Parameter, time_step: int) -> LinearForm:
         """
-        Bilinear form when IMEX linearization is being used and the diffuse interface method is not being used.
-        Handles both CG and DG.
+        Linear form when the diffuse interface method is being used. Handles both CG and DG.
         """
-
-        # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
-
-        p_I = construct_p_mat(p, self.mesh.dim)
-
-        a = dt * (
-            self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
-            - ngs.div(u) * q  # Conservation of mass
-            - ngs.div(v) * p  # Pressure
-            - 1e-10 * p * q   # Stabilization term
-            ) * ngs.dx
-
-        if self.DG:
-            jump_u = jump(u)
-            avg_grad_u = grad_avg(u)
-
-            jump_v = jump(v)
-            avg_grad_v = grad_avg(v)
-
-            if not explicit_bilinear:
-                # Penalty for discontinuities
-                a += dt * (
-                    - self.kv * ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
-                    - self.kv * ngs.InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
-                    + self.kv * alpha * ngs.InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I
-                                                                          # from ∇u^
-                    ) * ngs.dx(skeleton=True)
-
-            # Penalty for dirichlet BCs
-            if self.dirichlet_names.get('u', None) is not None:
-                a += dt * (
-                    - self.kv * ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))  # ∇u^ = ∇u
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, n))  # 1/2 of penalty for u=g on
-                    + self.kv * alpha * u * v                                          # 1/2 of penalty term for u=g
-                                                                                       # on 𝚪_D from ∇u^
-                    ) * self._ds(self.dirichlet_names['u'])
-
-        # Parallel Flow BC
-        for marker in self.BC.get('parallel', {}).get('parallel', {}):
-            if self.DG:
-                a += dt * v * (u - n * ngs.InnerProduct(u, n)) * self._ds(marker)
-            else:
-                a += dt * v.Trace() * (u.Trace() - n * ngs.InnerProduct(u.Trace(), n)) * self._ds(marker)
-
-        return a
-
-    def _linear_Oseen_DIM(self, v: ProxyFunction, w: GridFunction, dt: Parameter) -> ngs.LinearForm:
-        """
-        Linear form when the diffuse interface method is being used with Oseen linearization. Handles both CG and DG.
-        """
-
-        L = dt * v * self.f * self.DIM_solver.phi_gfu * ngs.dx
 
         # Define the special DG functions.
         n, h, alpha = get_special_functions(self.mesh, self.nu)
 
+        # Domain integrals.
+        L = dt * v * self.f[time_step] * self.DIM_solver.phi_gfu * ngs.dx
+
         if self.DG:
             # Conformal Dirichlet BCs for u.
             for marker in self.BC.get('dirichlet', {}).get('u', {}):
-                g = self.BC['dirichlet']['u'][marker]
+                g = self.BC['dirichlet']['u'][marker][time_step]
                 L += dt * (
-                    v * (-0.5 * w * n * g + 0.5 * ngs.Norm(w * n) * g)  # 1/2 of uw^ (convection)
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, n))  # 1/2 of penalty for u=g
-                    + self.kv * alpha * g * v  # 1/2 of penalty for u=g from ∇u^ on 𝚪_D
+                    self.kv[time_step] * alpha * g * v  # 1/2 of penalty for u=g from ∇u^ on 𝚪_D
+                    - self.kv[time_step] * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, n))  # 1/2 of penalty for u=g
                     ) * self._ds(marker)
+
+                if self.linearize == 'Oseen':
+                    # Additional 1/2 of uw^ (convection)
+                    L += dt * v * (-0.5 * w * n * g + 0.5 * ngs.Norm(w * n) * g) * self._ds(marker)
 
         # Penalty term for DIM Dirichlet BCs. This is the Nitsche method.
         for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
-            # Penalty terms for DIM Dirichlet BCs
-            g = self.DIM_BC['dirichlet']['u'][marker]
+            g = self.DIM_BC['dirichlet']['u'][marker][time_step]
             L += dt * (
-                v * (0.5 * w * self.DIM_solver.grad_phi_gfu * g + 0.5 * ngs.Norm(w * -self.DIM_solver.grad_phi_gfu) * g)
-                + self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, self.DIM_solver.grad_phi_gfu))
-                + self.kv * alpha * g * v * self.DIM_solver.mag_grad_phi_gfu
+                self.kv[time_step] * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, self.DIM_solver.grad_phi_gfu))
+                + self.kv[time_step] * alpha * g * v * self.DIM_solver.mag_grad_phi_gfu
             ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
 
+            if self.linearize == 'Oseen':
+                # Additional penalty for the convection term.
+                L += dt * v * (0.5 * w * self.DIM_solver.grad_phi_gfu * g + 0.5
+                               * ngs.Norm(w * -self.DIM_solver.grad_phi_gfu) * g) \
+                     * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
+
         # Conformal stress BC
         for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker]
+            h = self.BC['stress']['stress'][marker][time_step]
             if self.DG:
                 L += dt * v * h * self._ds(marker)
             else:
@@ -500,73 +497,44 @@ class INS(Model):
 
         return L
 
-    def _linear_IMEX_DIM(self, v: ProxyFunction, gfu_u: GridFunction, dt: Parameter) -> ngs.LinearForm:
+    def _imex_explicit_DIM(self, v: ProxyFunction, gfu_u: GridFunction, dt: Parameter) -> LinearForm:
         """
-        Linear form when the diffuse interface method is being used with IMEX linearization. Handles both CG and DG.
-        """
-
-        L = dt * (
-            v * self.f - ngs.InnerProduct(ngs.Grad(gfu_u) * gfu_u, v)
-            ) * self.DIM_solver.phi_gfu * ngs.dx
-
-        # Define the special DG functions.
-        n, h, alpha = get_special_functions(self.mesh, self.nu)
-
-        if self.DG:
-            # Conformal Dirichlet BCs for u.
-            for marker in self.BC.get('dirichlet', {}).get('u', {}):
-                g = self.BC['dirichlet']['u'][marker]
-                L += dt * (
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, n))  # 1/2 of penalty for u=g
-                    + self.kv * alpha * g * v  # 1/2 of penalty for u=g from ∇u^ on 𝚪_D
-                    ) * self._ds(marker)
-
-        # Penalty term for DIM Dirichlet BCs. This is the Nitsche method.
-        for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
-            # Penalty terms for DIM Dirichlet BCs
-            g = self.DIM_BC['dirichlet']['u'][marker]
-            L += dt * (
-                self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, self.DIM_solver.grad_phi_gfu))
-                + self.kv * alpha * g * v * self.DIM_solver.mag_grad_phi_gfu
-                ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
-
-        # Conformal stress BC
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker]
-            if self.DG:
-                L += dt * v * h * self._ds(marker)
-            else:
-                L += dt * v.Trace() * h * self._ds(marker)
-
-        # TODO: Add non-Dirichlet DIM BCs.
-
-        return L
-
-    def _linear_Oseen_no_DIM(self, v: ProxyFunction, w: GridFunction, dt: Parameter) -> ngs.LinearForm:
-        """
-        Linear form when Oseen linearization is being used and the diffuse interface method is not being used.
+        Constructs the explicit IMEX terms for the linear form when the diffuse interface method is being used.
         Handles both CG and DG.
         """
 
-        L = dt * v * self.f * ngs.dx
+        # Linearized convection term.
+        L = -dt * ngs.InnerProduct(ngs.Grad(gfu_u) * gfu_u, v) * self.DIM_solver.phi_gfu * ngs.dx
+
+        return L
+
+    def _linear_no_DIM(self, v: ProxyFunction, w: GridFunction, dt: Parameter, time_step: int) -> LinearForm:
+        """
+        Linear form when the diffuse interface method is not being used. Handles both CG and DG.
+        """
 
         # Define the special DG functions.
         n, h, alpha = get_special_functions(self.mesh, self.nu)
+
+        # Domain integrals.
+        L = dt * v * self.f[time_step] * ngs.dx
 
         # Dirichlet BC for u
         if self.DG:
             for marker in self.BC.get('dirichlet', {}).get('u', {}):
-                g = self.BC['dirichlet']['u'][marker]
+                g = self.BC['dirichlet']['u'][marker][time_step]
                 L += dt * (
-                    v * (-0.5 * w * n * g + 0.5 * ngs.Norm(w * n) * g)  # 1/2 of uw^ (convection)
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, n))  # 1/2 of penalty for u=g
-                    + self.kv * alpha * g * v                                          # 1/2 of penalty for u=g
-                                                                                       # from ∇u^ on 𝚪_D
+                    self.kv[time_step] * alpha * g * v  # 1/2 of penalty for u=g from ∇u^ on 𝚪_D
+                    - self.kv[time_step] * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, n))  # 1/2 of penalty for u=g
                 ) * self._ds(marker)
 
+                if self.linearize == 'Oseen':
+                    # Additional 1/2 of uw^ (convection)
+                    L += dt * v * (-0.5 * w * n * g + 0.5 * ngs.Norm(w * n) * g) * self._ds(marker)
+
         # Stress BC
         for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker]
+            h = self.BC['stress']['stress'][marker][time_step]
             if self.DG:
                 L += dt * v * h * self._ds(marker)
             else:
@@ -574,35 +542,13 @@ class INS(Model):
 
         return L
 
-    def _linear_IMEX_no_DIM(self, v: ProxyFunction, gfu_u: GridFunction, dt: Parameter) -> ngs.LinearForm:
+    def _imex_explicit_no_DIM(self, v: ProxyFunction, gfu_u: GridFunction, dt: Parameter) -> LinearForm:
         """
-        Linear form when IMEX linearization is being used and the diffuse interface method is not being used.
+        Constructs the explicit IMEX terms for the linear form when the diffuse interface method is not being used.
         Handles both CG and DG.
         """
 
-        L = dt * (
-            v * self.f - ngs.InnerProduct(ngs.Grad(gfu_u) * gfu_u, v)
-            ) * ngs.dx
-
-        # Define the special DG functions.
-        n, h, alpha = get_special_functions(self.mesh, self.nu)
-
-        # Dirichlet BC for u
-        if self.DG:
-            for marker in self.BC.get('dirichlet', {}).get('u', {}):
-                g = self.BC['dirichlet']['u'][marker]
-                L += dt * (
-                    - self.kv * ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, n))  # 1/2 of penalty for u=g
-                    + self.kv * alpha * g * v                                          # 1/2 of penalty for u=g
-                                                                                       # from ∇u^ on 𝚪_D
-                    ) * self._ds(marker)
-
-        # Stress BC
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker]
-            if self.DG:
-                L += dt * v * h * self._ds(marker)
-            else:
-                L += dt * v.Trace() * h * self._ds(marker)
+        # Linearized convection term.
+        L = -dt * ngs.InnerProduct(ngs.Grad(gfu_u) * gfu_u, v) * ngs.dx
 
         return L

@@ -1,47 +1,44 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 import numpy as np
+from numpy import ndarray
 import scipy.ndimage as spimg
 import scipy.special as spec
 import edt
+from typing import List, Tuple, Union, Dict
 from . import mesh_helpers
 
 
-def get_binary_2d(boundary_lst, N, scale, offset):
+def get_binary_2d(boundary_lst: List, N: List[int], scale: List[float], offset: List[float]) -> ndarray:
     """
-    Generate a binary representation of a 2D complex geometry on a numpy array
-    by setting the array elements corresponding to points inside the geometry
-    to 1 and all other array elements to 0.
+    Generate a binary representation of a 2D complex geometry on a numpy array.
+
+    This is done by setting the array elements corresponding to points inside the geometry to 1 and all other array
+    elements to 0.
 
     Args:
-        boundary_lst (list): List of coordinates of the geometry's boundary
-                             vertices in counterclockwise order.
-        N (list): Number of mesh elements in each direction (N+1 nodes).
-        scale (list): Extent of the meshed domain in each direction ([-2,2]
-                      square -> scale=[4,4]).
-        offset (list): Centers the meshed domain in each direction ([-2,2]
-                       square -> offset=[2,2]).
+        boundary_lst: List of coordinates of the geometry's boundary vertices in counterclockwise order.
+        N: Number of mesh elements in each direction (N+1 nodes).
+        scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
+        offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
 
     Returns:
-        binary (numpy array): Array containing a binary representation of the
-                              complex geometry.
+        Array containing a binary representation of the complex geometry.
     """
 
     shape = (int(N[0] + 1), int(N[1] + 1))
@@ -57,30 +54,25 @@ def get_binary_2d(boundary_lst, N, scale, offset):
     return binary
 
 
-def get_binary_3d(face_lst, N, scale, offset, mnum=1, close=False):
+def get_binary_3d(face_lst: ndarray, N: List[int], scale: List[float], offset: List[float], mnum: float = 1,
+                  close: bool = False) -> ndarray:
     """
-    Generate a binary representation of a 3D complex geometry on a numpy array
-    by setting the array elements corresponding to points inside the geometry
-    to 1 and all other array elements to 0.
+    Generate a binary representation of a 3D complex geometry on a numpy array.
+
+    This is done by setting the array elements corresponding to points inside the geometry to 1 and all other array
+    elements to 0.
 
     Args:
-        face_lst (list): List of the vertices and outwards facing normals of
-                         the complex geometry's faces.
-        N (list): Number of mesh elements in each direction (N+1 nodes).
-        scale (list): Extent of the meshed domain in each direction ([-2,2]
-                      cube -> scale=[4,4,4]).
-        offset (list): Centers the meshed domain in each direction ([-2,2]
-                       cube -> offset=[2,2,2]).
-        mnum (float): Magic number that increases the distance an array element
-                      can be from a vertex while still belonging to that
-                      vertex. Increase for higher order interpolants if the
-                      generated border has gaps.
-        close (bool): If True, wraps the binary hole filling in a binary
-                      closing. Use if the generated border has gaps.
+        face_lst: List of the vertices and outwards facing normals of the complex geometry's faces.
+        N: Number of mesh elements in each direction (N+1 nodes).
+        scale: Extent of the meshed domain in each direction ([-2,2] cube -> scale=[4,4,4]).
+        offset: Centers the meshed domain in each direction ([-2,2] cube -> offset=[2,2,2]).
+        mnum: Magic number that increases the distance an array element can be from a vertex while still belonging to
+            that vertex. Increase for higher order interpolants if the generated border has gaps.
+        close: If True, wraps the binary hole filling in a binary closing. Use if the generated border has gaps.
 
     Returns:
-        binary (numpy array): Array containing a binary representation of the
-                              complex geometry.
+        Array containing a binary representation of the complex geometry.
     """
 
     shape = (int(N[0] + 1), int(N[1] + 1), int(N[2] + 1))
@@ -132,25 +124,23 @@ def get_binary_3d(face_lst, N, scale, offset, mnum=1, close=False):
     return binary
 
 
-def get_phi(binary, lmbda, N, scale, offset, dim=2):
+def get_phi(binary: ndarray, lmbda: float, N: List[int], scale: List[float], offset: List[float], dim: int = 2) \
+        -> ndarray:
     """
     Generate a phase field from a binary representation of a complex geometry.
-    The phase field diffuses from 1 inside of the complex geometry to 0 outside
-    of the complex geometry.
+
+    The phase field diffuses from 1 inside of the complex geometry to 0 outside of the complex geometry.
 
     Args:
-        binary (numpy array): Array containing binary representation of complex
-                              geometry.
-        lmbda (float): Measure of the diffuseness of the phase field boundary.
-        N (list): Number of mesh elements in each direction (N+1 nodes).
-        scale (list): Extent of the meshed domain in each direction ([-2,2]
-                      square -> scale=[4,4]).
-        offset (list): Centers the meshed domain in each direction ([-2,2]
-                       square -> offset=[2,2]).
-        dim (int): Dimension of the domain (must be 2 or 3).
+        binary: Array containing binary representation of complex geometry.
+        lmbda: Measure of the diffuseness of the phase field boundary.
+        N: Number of mesh elements in each direction (N+1 nodes).
+        scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
+        offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
+        dim: Dimension of the domain (must be 2 or 3).
 
     Returns:
-        phi (numpy array): Array containing phase field.
+        Array containing the phase field.
     """
 
     if dim == 2:
@@ -164,8 +154,9 @@ def get_phi(binary, lmbda, N, scale, offset, dim=2):
     # of binary, then get the distance transform relative to that border. The
     # distance transform is a Euclidean distance transform that takes into
     # account the entire array, not just a local neighbourhood.
-    erosion = spimg.morphology.binary_erosion(binary, kernel, 1).astype(np.float64)
+    erosion = spimg.morphology.binary_erosion(binary, kernel, 1).astype(np.float32)
     border = 1.0 - (binary - erosion)
+    border = border.astype(np.float32)
 
     dt = edt.edt(border)
     dt *= min(scale) / min(N)
@@ -183,31 +174,26 @@ def get_phi(binary, lmbda, N, scale, offset, dim=2):
     return phi
 
 
-def nonconformal_subdomain_2d(boundary_lst, vertices, N, scale, offset, lmbda_overlap=False, centroid=None):
+def nonconformal_subdomain_2d(boundary_lst: List, vertices: List, N: List[int], scale: List[float], offset: List[float],
+                              lmbda_overlap: Union[float, bool] = False, centroid: Union[Tuple[float], None] = None) \
+        -> ndarray:
     """
-    Generate a numpy array that can be used to mask a NGSolve function based on
-    partitioning a mesh's interior domain into sections that will have
-    different boundary conditions. Only works in 2D.
+    Function to generate a 2D BC mask.
+
+    Generate a numpy array that can be used to mask a NGSolve function based on partitioning a mesh's interior domain
+    into sections that will have different boundary conditions. Only works in 2D.
 
     Args:
-        boundary_lst (list): List of coordinates of an interior domain's
-                             boundary vertices in counterclockwise order.
-        vertices (list): List of coordinates of the two vertices that denote
-                         the different sections of the interior boundary.
-        N (list): Number of mesh elements in each direction (N+1 nodes).
-        scale (list): Extent of the meshed domain in each direction ([-2,2]
-                      square -> scale=[4,4]).
-        offset (list): Centers the meshed domain in each direction ([-2,2]
-                       square -> offset=[2,2]).
-        lmbda_overlap (float or False): Measure of the diffuseness of the
-                                       boundary between sections (sharp
-                                       boundary if False).
-        centroid (tuple or None): Coordinates of the point to use as the
-                                  centroid of the split (centroid of domain if
-                                  None).
+        boundary_lst: List of coordinates of an interior domain's boundary vertices in counterclockwise order.
+        vertices: The coordinates of the two vertices that denote the section of the interior boundary.
+        N: Number of mesh elements in each direction (N+1 nodes).
+        scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
+        offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
+        lmbda_overlap: Measure of the diffuseness of the boundary between sections (sharp boundary if False).
+        centroid: Coordinates of the point to use as the centroid of the split (centroid of domain if None).
 
     Returns:
-        mask (numpy array): Mask of domain.
+        Mask of domain.
     """
 
     shape = (int(N[0] + 1), int(N[1] + 1))
@@ -274,40 +260,32 @@ def nonconformal_subdomain_2d(boundary_lst, vertices, N, scale, offset, lmbda_ov
     return mask
 
 
-def split_nonconformal_subdomains_2d(boundary_lst, vertices, N, scale, offset, lmbda_overlap=False, remainder=False, centroid={}):
+def split_nonconformal_subdomains_2d(boundary_lst: List, vertices: Dict, N: List[int], scale: List[float],
+                                     offset: List[float], lmbda_overlap: Union[float, bool] = False,
+                                     remainder: bool = False, centroid: Dict = {}) -> Dict[str, ndarray]:
     """
-    Generate a list of numpy arrays that can be used to mask a NGSolve function
-    based on partitioning a mesh's interior domain into sections that will have
-    different boundary conditions. Only works in 2D.
+    Function to generate all BC masks for a 2D diffuse interface simulation.
+
+    Generate a dictionary of numpy arrays that can be used to mask a NGSolve function based on partitioning a mesh's
+    interior domain into sections that will have different boundary conditions. Only works in 2D.
 
     Args:
-        boundary_lst (list): List of coordinates of an interior domain's
-                             boundary vertices in counterclockwise order.
-        vertices (dict): Dict of coordinates of the vertices that denote the
-                         different sections of the interior boundary. Vertices
-                         must be ordered counterclockwise (unit
-                         square with different boundary conditions on each side
-                         -> vertices={'bottom': [(0,0), (1,0)]
-                                      'right': [(1,0), (1,1)]
-                                      'top': [(1,1), (0,1)]
-                                      'left': [(0,1), (0,0)]}).
-        N (list): Number of mesh elements in each direction (N+1 nodes).
-        scale (list): Extent of the meshed domain in each direction ([-2,2]
-                      square -> scale=[4,4]).
-        offset (list): Centers the meshed domain in each direction ([-2,2]
-                       square -> offset=[2,2]).
-        lmbda_overlap (float or False): Measure of the diffuseness of the
-                                       boundary between sections (sharp
-                                       boundary if False).
-        remainder (bool): If True a final mask is made from the regions left
-                          unmasked by all the previous masks (use if a
-                          particular boundary section has poorly defined end
-                          vertices).
-        centroid (dict): Dict of the coordinates of the points to use as the
-                         centroids of the splits.
+        boundary_lst: List of coordinates of an interior domain's boundary vertices in counterclockwise order.
+        vertices: Dictionary of coordinates of the vertices that denote the different sections of the interior boundary.
+            Vertices must be ordered counterclockwise (unit square with different boundary conditions on each side ->
+            vertices={'bottom': [(0,0), (1,0)], 'right': [(1,0), (1,1)], 'top': [(1,1), (0,1)],
+            'left': [(0,1), (0,0)]}).
+        N: Number of mesh elements in each direction (N+1 nodes).
+        scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
+        offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
+        lmbda_overlap: Measure of the diffuseness of the boundary between sections (sharp boundary if False).
+        remainder: If True a final mask is made from the regions left unmasked by all the previous masks (use if a
+            particular boundary section has poorly defined end vertices).
+        centroid: Dictionary of the coordinates of the points to use as the centroids of the splits. The dictionary's
+            keys should correspond to the boundary condition names like those of vertices.
 
     Returns:
-        mask_dict (dict): Dict of numpy array masks.
+        Dictionary of numpy array masks.
     """
 
     shape = (int(N[0] + 1), int(N[1] + 1))
@@ -331,31 +309,26 @@ def split_nonconformal_subdomains_2d(boundary_lst, vertices, N, scale, offset, l
     return mask_dict
 
 
-def nonconformal_subdomain_3d(face_lst, vertices, N, scale, offset, lmbda_overlap=False, centroid=None):
+def nonconformal_subdomain_3d(face_lst: ndarray, vertices: str, N: List[int], scale: List[float], offset: List[float],
+                              lmbda_overlap: Union[float, bool] = False, centroid: Union[Tuple[float], None] =None) \
+        -> ndarray:
     """
-    Generate a numpy array that can be used to mask a NGSolve function based on
-    partitioning a mesh's interior domain into sections that will have
-    different boundary conditions. Only works in 3D.
+    Function to generate a 3D BC mask.
+
+    Generate a numpy array that can be used to mask a NGSolve function based on partitioning a mesh's interior domain
+    into sections that will have different boundary conditions. Only works in 3D.
 
     Args:
-        face_lst (list): List of the vertices and outwards facing normals of
-                         the interior domain's faces.
-        vertices (list): List of paths to .msh or .stl files defining the
-                         different boundary regions of the domain.
-        N (list): Number of mesh elements in each direction (N+1 nodes).
-        scale (list): Extent of the meshed domain in each direction ([-2,2]
-                      cube -> scale=[4,4,4]).
-        offset (list): Centers the meshed domain in each direction ([-2,2]
-                       cube -> offset=[2,2,2]).
-        lmbda_overlap (float or False): Measure of the diffuseness of the
-                                       boundary between sections (sharp
-                                       boundary if False).
-        centroid (tuple or None): Coordinates of the point to use as the
-                                  centroid of the split (centroid of domain if
-                                  None).
+        face_lst: List of the vertices and outwards facing normals of the interior domain's faces.
+        vertices: The path to the .msh or .stl file defining the boundary region of the domain.
+        N: Number of mesh elements in each direction (N+1 nodes).
+        scale: Extent of the meshed domain in each direction ([-2,2] cube -> scale=[4,4,4]).
+        offset: Centers the meshed domain in each direction ([-2,2] cube -> offset=[2,2,2]).
+        lmbda_overlap: Measure of the diffuseness of the boundary between sections (sharp boundary if False).
+        centroid: Coordinates of the point to use as the centroid of the split (centroid of domain if None).
 
     Returns:
-        mask (numpy array): Mask of domain.
+        Mask of domain.
     """
 
     shape = (int(N[0] + 1), int(N[1] + 1), int(N[2] + 1))
@@ -433,34 +406,31 @@ def nonconformal_subdomain_3d(face_lst, vertices, N, scale, offset, lmbda_overla
     return mask
 
 
-def split_nonconformal_subdomains_3d(face_lst, vertices, N, scale, offset, lmbda_overlap=False, remainder=False, centroid={}):
+def split_nonconformal_subdomains_3d(face_lst: List, vertices: Dict[str, str], N: List[int], scale: List[float],
+                                     offset: List[float], lmbda_overlap: Union[float, bool] = False,
+                                     remainder: bool = False, centroid: Dict = {}) -> Dict[str, ndarray]:
     """
+    Function to generate all BC masks for a 3D diffuse interface simulation.
+
     Generate a list of numpy arrays that can be used to mask a NGSolve function
     based on partitioning a mesh's interior domain into sections that will have
     different boundary conditions. Only works in 3D.
 
     Args:
-        face_lst (list): List of the vertices and outwards facing normals of
-                         the interior domain's faces.
-        vertices (list): List of paths to .msh or .stl files defining the
-                         different boundary regions of the domain.
-        N (list): Number of mesh elements in each direction (N+1 nodes).
-        scale (list): Extent of the meshed domain in each direction ([-2,2]
-                      cube -> scale=[4,4,4]).
-        offset (list): Centers the meshed domain in each direction ([-2,2]
-                       cube -> offset=[2,2,2]).
-        lmbda_overlap (float or False): Measure of the diffuseness of the
-                                       boundary between sections (sharp
-                                       boundary if False).
-        remainder (bool): If True a final mask is made from the regions left
-                          unmasked by all the previous masks (use if a
-                          particular boundary section has poorly defined end
-                          vertices).
-        centroid (Dict): Dict of the coordinates of the points to use as the
-                         centroids of the splits.
+        face_lst: List of coordinates of an interior domain's boundary vertices in counterclockwise order.
+        vertices: Dictionary of paths to the .msh or .stl files that denote the different sections of the interior
+            boundary.
+        N: Number of mesh elements in each direction (N+1 nodes).
+        scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
+        offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
+        lmbda_overlap: Measure of the diffuseness of the boundary between sections (sharp boundary if False).
+        remainder: If True a final mask is made from the regions left unmasked by all the previous masks (use if a
+            particular boundary section has poorly defined end vertices).
+        centroid: Dictionary of the coordinates of the points to use as the centroids of the splits. The dictionary's
+            keys should correspond to the boundary condition names like those of vertices.
 
     Returns:
-        mask_lst (list): List of numpy array masks.
+        Dictionary of numpy array masks.
     """
 
     shape = (int(N[0] + 1), int(N[1] + 1), int(N[2] + 1))

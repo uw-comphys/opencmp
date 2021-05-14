@@ -25,8 +25,6 @@ Each folder contains the config file and model functions required to run a parti
 
 **Diffuse Interface Method:** 
 
-*DIM is not fully implemented in any model, these examples are only meant to test generating the phase fields*
-
 * DIM_poisson_1: Poisson solve with the phase field, mesh, and masks generated from a .stl file.
 * DIM_poisson_2: Poisson solve with the phase field, mesh, and masks loaded from .sol/.vol files.
 * DIM_poisson_3: Poisson solve that inverts the phase field.

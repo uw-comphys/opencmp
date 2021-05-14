@@ -7,7 +7,7 @@ dim_dir = Example Runs/DIM/Stokes/DIM_stokes_1/dim_dir
 [FINITE ELEMENT SPACE]
 elements = u -> HDiv
            p -> L2
-interpolant_order = 3
+interpolant_order = 2
 
 [DG]
 DG = True

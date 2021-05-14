@@ -1,0 +1,10 @@
+[REFERENCE SOLUTIONS]
+u = [0.0, 0.0]
+p = 0.0
+a = 0.0
+b = 1.0
+c = 1 - x
+
+[METRICS]
+L2_norm = u, p, a, b, c
+divergence = u

@@ -7,4 +7,5 @@ L2_norm = u, p
 L1_norm = u, p
 Linfinity_norm = u, p
 divergence = u
+# TODO: Turn back on once NGSolve updates and it not longer crashes
 ;facet_jumps = u, p

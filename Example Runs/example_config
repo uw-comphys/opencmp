@@ -159,6 +159,7 @@ mesh_scale = x -> integer                  # The absolute extend of the mesh in 
 mesh_offset = x -> integer                 # Centers the mesh in each dimension (length must match mesh_dimension).
               y -> integer
               [z -> integer]
+quad_mesh = True/False                     # If True, a structured quadrilateral/hexahedral mesh is generated. Otherwise, a structured triangular/tetrahedral mesh is generated (needed for adaptive mesh refinement).
 interface_width_parameter = float          # The diffuseness of the diffuse interface.
 mnum = float                               # Highly optional.
 close = True/False                         # Highly optional.
@@ -173,7 +174,9 @@ overlap_interface_parameter = float        # The diffuseness of the borders betw
 [PHASE FIELDS]
 load_method = name                         # file if loading from file, generate if generating from a .stl file, combine if generating from multiple .stl files.
 stl_filename = path/to/file or dict        # The path to the .stl file (or multiple .stl files, see below).
-phi_filename = path/to/file                # The path to the .sol file containing the phase field.
+phase_field_filename = phi -> path/to/file # The path to the .sol files containing each phase field.
+                       grad_phi -> path/to/file
+                       mag_grad_phi -> path/to/file
 invert_phi = True/False                    # If True, the phase field is inverted.
 save_to_file = True/False                  # If True, the phase field, mesh, and BC masks are saved to file after being generated.
 

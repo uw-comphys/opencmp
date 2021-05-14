@@ -5,4 +5,4 @@ multiple_bcs = True
 
 [PHASE FIELDS]
 load_method = file
-phi_filename = Example Runs/DIM/Poisson/DIM_poisson_2/dim_dir/phi.sol
+phase_field_filename = phi -> phi.sol

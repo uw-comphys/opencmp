@@ -15,7 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from math import isclose
+from numpy import isclose
 from multiprocessing import Process
 from pytest import CaptureFixture
 from config_functions import ConfigParser
@@ -68,12 +68,20 @@ def automated_output_check(capsys: CaptureFixture, config: ConfigParser, expecte
     run_example(config)
     captured = capsys.readouterr()
 
+    # Pass through solver output
+    print("")
+    [print(line) for line in captured.out.split('\n')[-(len(expected_err)+1):]]
+
     # Grab error values from console output and convert into float
     errors = [float(line.split(': ')[1]) for line in captured.out.split('\n')[-(len(expected_err)+1):-1]]
 
     # For each error, check it against the provided value
     for i in range(len(expected_err)):
-        assert isclose(errors[i], expected_err[i], rel_tol=1)
+        if not isclose(errors[i], expected_err[i], rtol=3, atol=0):
+
+            print('{}th Expected error: {}'.format(i+1, expected_err[i]))
+            print('{}th Actual   error: {}'.format(i+1, errors[i]))
+            assert False
 
 
 def timed_output_check(func: Callable, args: Tuple, timeout: float) -> None:

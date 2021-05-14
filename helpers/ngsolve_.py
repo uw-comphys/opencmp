@@ -1,39 +1,39 @@
-"""
-Copyright 2021 the authors (see AUTHORS file for full list)
-
-This file is part of OpenCMP.
-
-OpenCMP is free software: you can redistribute it and/or modify
-it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation, either version 2.1 of the License, or
-(at your option) any later version.
-
-OpenCMP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Lesser General Public License for more details.
-
-You should have received a copy of the GNU Lesser General Public License
-along with OpenCMP.  If not, see <https://www.gnu.org/licenses/>.
-"""
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
 import ngsolve as ngs
 from typing import List, Optional, Tuple, Union
 from ngsolve.comp import ProxyFunction
+from ngsolve import CoefficientFunction, Mesh, GridFunction, FESpace
 import numpy as np
+from numpy import ndarray
 
 
-def construct_p_mat(p: Union[float, ProxyFunction], dim: int) -> ngs.CoefficientFunction:
+def construct_p_mat(p: Union[float, ProxyFunction], dim: int) -> CoefficientFunction:
     """
-    Constructs the pressure identity matrix (pI) used by Stokes and
-    incompressible Navier-Stokes flow in boundary integrals.
+    Constructs the pressure identity matrix (pI) used by Stokes and incompressible Navier-Stokes flow in boundary
+    integrals.
 
     Args:
         p: The pressure at the boundary.
         dim: The dimension of the matrix.
 
     Returns:
-        ~: The pI matrix at the boundary.
+        The pI matrix at the boundary.
     """
 
     if dim == 2:
@@ -47,20 +47,20 @@ def construct_p_mat(p: Union[float, ProxyFunction], dim: int) -> ngs.Coefficient
         print('Only supports 2D and 3D meshes, not {}D meshes.'.format(dim))
 
 
-def get_special_functions(mesh: ngs.Mesh, nu: float) \
-        -> Tuple[ngs.CoefficientFunction, ngs.CoefficientFunction, ngs.CoefficientFunction]:
+def get_special_functions(mesh: Mesh, nu: float) \
+        -> Tuple[CoefficientFunction, CoefficientFunction, CoefficientFunction]:
     """
-    Generates a set of special functions needed for DG so they don't need to be 
-    rewritten multiple times.
+    Generates a set of special functions needed for DG so they don't need to be rewritten multiple times.
     
     Args:
         mesh: The mesh used for the simulation.
         nu: The penalty parameter for interior penalty method DG.
         
     Returns:
-        n: The unit normal for every facet of the mesh.
-        h: The "size" of every mesh element.
-        alpha: The penalty coefficient.
+        Tuple[CoefficientFunction, CoefficientFunction, CoefficientFunction]:
+            - n: The unit normal for every facet of the mesh.
+            - h: The "size" of every mesh element.
+            - alpha: The penalty coefficient.
     """
 
     n = ngs.specialcf.normal(mesh.dim)
@@ -70,12 +70,13 @@ def get_special_functions(mesh: ngs.Mesh, nu: float) \
     return n, h, alpha
 
 
-def NGSolve_to_numpy(mesh: ngs.Mesh, gfu: ngs.GridFunction, N: List[int], scale: List, offset: List, dim: int = 2,
-                     binary: Optional[np.ndarray] = None) -> np.ndarray:
+def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[float], offset: List[float], dim: int = 2,
+                     binary: Optional[ndarray] = None) -> List[ndarray]:
     """
-    Assign the values in gfu to a numpy array whose elements correspond to the
-    nodes of mesh while preserving spatial ordering. The output array only
-    contains node values, never the values of higher order dofs.
+    Assign the values in gfu to a numpy array whose elements correspond to the nodes of mesh while preserving spatial
+    ordering.
+
+    The output array only contains node values, never the values of higher order dofs.
 
     Args:
         mesh: Structured quadrilateral/hexahedral NGSolve mesh.
@@ -84,13 +85,12 @@ def NGSolve_to_numpy(mesh: ngs.Mesh, gfu: ngs.GridFunction, N: List[int], scale:
         scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
         offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
         dim: Dimension of the domain (must be 2 or 3).
-        binary (None or numpy array): If exists, arr is multiplied by binary to zero out any
-                                      array elements outside of the approximated complex
-                                      geometry.
+        binary (None or numpy array): If exists, arr is multiplied by binary to zero out any array elements outside of
+            the approximated complex geometry.
 
     Returns:
-        arr_vec (list): List of arrays containing the values in gfu. Since gfu may be vector-valued, the arrays in
-                        arr_vec correspond to the various components of gfu.
+        List of arrays containing the values in gfu. Since gfu may be vector-valued, the arrays in arr_vec correspond to
+            the various components of gfu.
     """
 
     if dim == 2:
@@ -150,11 +150,11 @@ def NGSolve_to_numpy(mesh: ngs.Mesh, gfu: ngs.GridFunction, N: List[int], scale:
     return arr_vec
 
 
-def numpy_to_NGSolve(mesh: ngs.Mesh, interp_ord: int, arr: np.ndarray, scale: List[float], offset: List, dim: int = 2) \
-        -> ngs.GridFunction:
+def numpy_to_NGSolve(mesh: Mesh, interp_ord: int, arr: ndarray, scale: List[float], offset: List[float], dim: int = 2) \
+        -> GridFunction:
     """
-    Assign the values in arr to a NGSolve GridFunction defined over the given
-    NGSolve mesh while preserving spatial ordering.
+    Assign the values in arr to a NGSolve GridFunction defined over the given NGSolve mesh while preserving spatial
+    ordering.
 
     Args:
         mesh: Mesh used by the problem the GridFunction will be needed to solve.
@@ -165,7 +165,7 @@ def numpy_to_NGSolve(mesh: ngs.Mesh, interp_ord: int, arr: np.ndarray, scale: Li
         dim: Dimension of the domain (must be 2 or 3).
 
     Returns:
-        grid_func: Contains the values in arr.
+        Gridfunction containing the values in arr.
     """
 
     if dim == 2:
@@ -196,7 +196,7 @@ def numpy_to_NGSolve(mesh: ngs.Mesh, interp_ord: int, arr: np.ndarray, scale: Li
     return grid_func
 
 
-def inverse_rigid_body_motion(new_coords: np.ndarray, inv_R: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+def inverse_rigid_body_motion(new_coords: ndarray, inv_R: ndarray, b: ndarray, c: ndarray) -> ndarray:
     """
     Based on future coordinates new_coords, find the previous coordinates if rigid body motion occurred.
 
@@ -207,14 +207,14 @@ def inverse_rigid_body_motion(new_coords: np.ndarray, inv_R: np.ndarray, b: np.n
         c: The translation vector.
 
     Returns:
-        ~ : The coordinates at the previous time.
+        The coordinates at the previous time.
     """
     return np.matmul(inv_R, (new_coords - c)) + b
 
 
-def gridfunction_rigid_body_motion(mesh: ngs.Mesh, old_gfu: ngs.GridFunction, fes: ngs.FESpace, inv_R: np.ndarray,
-                                   b: np.ndarray, c: np.ndarray, N: List, scale: List, offset: List,
-                                   dim: int) -> ngs.GridFunction:
+def gridfunction_rigid_body_motion(mesh: Mesh, old_gfu: GridFunction, fes: FESpace, inv_R: ndarray,
+                                   b: ndarray, c: ndarray, N: List[int], scale: List[float], offset: List[float],
+                                   dim: int) -> GridFunction:
     """
     Construct a gridfunction following rigid body motion of an original field.
 
@@ -231,7 +231,7 @@ def gridfunction_rigid_body_motion(mesh: ngs.Mesh, old_gfu: ngs.GridFunction, fe
         dim: Dimension of the domain (must be 2 or 3).
 
     Returns:
-        gfu: Gridfunction containing the field at the future time.
+        Gridfunction containing the field at the future time.
     """
 
     if dim == 2:

@@ -6,7 +6,7 @@ dim_dir = Example Runs/DIM/Poisson/DIM_poisson_5/dim_dir
 
 [FINITE ELEMENT SPACE]
 elements = u -> H1
-interpolant_order = 3
+interpolant_order = 2
 
 [DG]
 DG = False

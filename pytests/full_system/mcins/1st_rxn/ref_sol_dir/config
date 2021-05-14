@@ -1,0 +1,8 @@
+[REFERENCE SOLUTIONS]
+u = [0.0, 0.0]
+a = exp(- 1*t)
+b = exp(- 10*t)
+
+[METRICS]
+L2_norm = u, a, b
+divergence = u
