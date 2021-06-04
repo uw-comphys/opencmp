@@ -483,8 +483,16 @@ class Model(ABC):
                 solution.
         """
 
-        if precond is None or self.solver == 'direct':
-            # Need to provide a freedofs argument to the solver.
+        if precond is None:
+            # Need to provide a freedofs argument to the solver. Confirm that the user hasn't specified that all 
+            # dofs should be free dofs.
+            no_constrained_dofs = self.config.get_item(['FINITE ELEMENT SPACE', 'no_constrained_dofs'], bool, quiet=True)
+            if no_constrained_dofs:
+                raise ValueError('Must constrain Dirichlet DOFs if not providing a preconditioner.')
+            
+            freedofs = self.fes.FreeDofs()
+            
+        else:
             if 'HDiv' in self.element.values() or 'RT' in self.element.values():
                 # HDiv elements can only strongly apply u.n Dirichlet boundary conditions. In order to apply other
                 # Dirichlet boundary conditions (ex: on the full vector or the tangential vector) the boundary
@@ -501,8 +509,7 @@ class Model(ABC):
                     freedofs = self.fes.FreeDofs()
             else:
                 freedofs = self.fes.FreeDofs()
-        else:
-            freedofs = None
+
 
         if self.solver == 'direct':
             inv = a_assembled.mat.Inverse(freedofs=freedofs)

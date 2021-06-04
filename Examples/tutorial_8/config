@@ -1,0 +1,33 @@
+[MESH]
+filename = mesh_files/channel_w_cyl.vol 
+curved_elements = True
+
+[FINITE ELEMENT SPACE]
+elements = u -> HDiv
+           p -> L2
+interpolant_order = 3
+
+[DG]
+DG = True
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = default
+preconditioner = default
+linearization_method = IMEX
+
+[TRANSIENT]
+transient = True
+scheme = euler IMEX
+time_range = 0.0, 1.0
+dt = 1e-2
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtu
+save_frequency = 0.1, time
+
+[OTHER]
+model = INS
+run_dir = Examples/tutorial_8
+num_threads = 6

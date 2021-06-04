@@ -80,6 +80,9 @@ class MultiComponentINS(Model):
             self.abs_nonlinear_tolerance = nonlinear_tolerance['absolute']
             self.rel_nonlinear_tolerance = nonlinear_tolerance['relative']
             self.nonlinear_max_iters = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
+            if self.nonlinear_max_iters < 1:
+                raise ValueError('Nonlinear solve must involve at least one iteration. Set nonlinear_max_iterations to '
+                                 'at least 1.')
             self.W = self._construct_linearization_terms()
 
     @staticmethod
@@ -248,8 +251,6 @@ class MultiComponentINS(Model):
             done_iterating = False
 
             while not done_iterating:
-                self.W[comp_index].vec.data = gfu.components[comp_index].vec
-
                 self.apply_dirichlet_bcs_to(gfu, time_step=time_step)
 
                 a.Assemble()
@@ -266,10 +267,9 @@ class MultiComponentINS(Model):
                 if self.verbose > 0:
                     print(num_iteration, err)
 
+                self.W[comp_index].vec.data = gfu.components[comp_index].vec
                 done_iterating = (err < self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) \
                                  or (num_iteration > self.nonlinear_max_iters)
-
-            self.W[comp_index].vec.data = gfu.components[comp_index].vec
         elif self.linearize == 'IMEX':
             self.construct_and_run_solver(a, L, precond, gfu)
         else:
@@ -302,7 +302,7 @@ class MultiComponentINS(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Separate out the trial and test functions for velocity and pressure.
         u, p = U[0], U[1]
@@ -399,7 +399,7 @@ class MultiComponentINS(Model):
         """
         # TODO: Not sure that this has actually been split up correctly. Convection term is currently the only term that must always be solved implicitly.
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Separate out the trial and test functions for velocity and pressure.
         u, p = U[0], U[1]
@@ -466,7 +466,7 @@ class MultiComponentINS(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Separate out the test functions for velocity and pressure.
         v, q = V[0], V[1]
@@ -540,7 +540,7 @@ class MultiComponentINS(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Separate out the test functions for velocity and pressure.
         v, q = V[0], V[1]

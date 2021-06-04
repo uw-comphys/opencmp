@@ -16,10 +16,10 @@
 ########################################################################################################################
 
 import ngsolve as ngs
-from helpers.ngsolve_ import construct_p_mat, get_special_functions
+from helpers.ngsolve_ import get_special_functions
 from helpers.dg import jump, grad_avg
 from models import INS
-from ngsolve.comp import FESpace, ProxyFunction
+from ngsolve.comp import ProxyFunction
 from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
 from typing import Tuple, List, Union, Optional
 from config_functions import ConfigParser
@@ -117,7 +117,7 @@ class Stokes(INS):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         a = dt * (
             self.kv[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
@@ -156,7 +156,7 @@ class Stokes(INS):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         a = dt * (
             - ngs.div(u) * q  # Conservation of mass
@@ -196,7 +196,7 @@ class Stokes(INS):
             ) * ngs.dx
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Bulk of Bilinear form
         if self.DG:
@@ -224,7 +224,7 @@ class Stokes(INS):
             ) * ngs.dx
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Bulk of Bilinear form
         if self.DG:
@@ -250,7 +250,7 @@ class Stokes(INS):
         L = dt * v * self.f[time_step] * self.DIM_solver.phi_gfu * ngs.dx
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         if self.DG:
             # Conformal Dirichlet BCs for u
@@ -288,7 +288,7 @@ class Stokes(INS):
         L = dt * v * self.f[time_step] * ngs.dx
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         if self.DG:
             # Dirichlet BCs for u

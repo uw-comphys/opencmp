@@ -56,6 +56,9 @@ class INS(Model):
             self.abs_nonlinear_tolerance = nonlinear_tolerance['absolute']
             self.rel_nonlinear_tolerance = nonlinear_tolerance['relative']
             self.nonlinear_max_iters = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
+            if self.nonlinear_max_iters < 1:
+                raise ValueError('Nonlinear solve must involve at least one iteration. Set nonlinear_max_iterations to '
+                                 'at least 1.')
             self.W = self._construct_linearization_terms()
 
     @staticmethod
@@ -221,8 +224,6 @@ class INS(Model):
             done_iterating = False
 
             while not done_iterating:
-                self.W[comp_index].vec.data = gfu.components[comp_index].vec
-
                 self.apply_dirichlet_bcs_to(gfu, time_step=time_step)
 
                 a.Assemble()
@@ -239,9 +240,8 @@ class INS(Model):
                 if self.verbose > 0:
                     print(num_iteration, err)
 
+                self.W[comp_index].vec.data = gfu.components[comp_index].vec
                 done_iterating = (err < self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) or (num_iteration > self.nonlinear_max_iters)
-
-            self.W[comp_index].vec.data = gfu.components[comp_index].vec
         elif self.linearize == 'IMEX':
             self.construct_and_run_solver(a, L, precond, gfu)
         else:
@@ -259,7 +259,7 @@ class INS(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Domain integrals.
         a = dt * (
@@ -327,7 +327,7 @@ class INS(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Domain integrals.
         a = dt * (
@@ -368,7 +368,7 @@ class INS(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Domain integrals.
         a = dt * (
@@ -417,7 +417,7 @@ class INS(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Domain integrals.
         a = dt * (
@@ -453,7 +453,7 @@ class INS(Model):
         """
 
         # Define the special DG functions.
-        n, h, alpha = get_special_functions(self.mesh, self.nu)
+        n, h, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Domain integrals.
         L = dt * v * self.f[time_step] * self.DIM_solver.phi_gfu * ngs.dx
@@ -514,7 +514,7 @@ class INS(Model):
         """
 
         # Define the special DG functions.
-        n, h, alpha = get_special_functions(self.mesh, self.nu)
+        n, h, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Domain integrals.
         L = dt * v * self.f[time_step] * ngs.dx

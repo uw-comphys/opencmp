@@ -10,9 +10,11 @@ Welcome to OpenCMP's documentation!
    :maxdepth: 1
    :caption: Contents
    
-   source/modules
    getting_started/index
+   tutorials/index
+   mathematical_notes/index
    helpers/index
+   source/modules
 
 
 Indices and tables

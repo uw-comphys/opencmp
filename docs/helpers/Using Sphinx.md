@@ -56,14 +56,24 @@ I'm using recommonmark to parse Markdown into reStructuredText. I installed it w
 
 
 
+I'm using aafigure for ASCII art. I installed it with `pip3 install aafigure` then added `aafigure.sphinxext` to `extensions`.
+
+
+
 **Helpful Tips**
 
 * When using Markdown files the title must be denoted by underlining it with "=" (ex: look at this file in plain text). Sphinx won't recognise "#" and you will get an error about a missing title.
 
 * To specify that a function returns multiple values do the following within the docstring:
 
-  ![](../images/docstring_multiple_returns.png)
+  ![](../_static/docstring_multiple_returns.png)
 
 * To force line breaks or other formatting within the main docstring block do the following:
 
-  ![](../images/docstring_main_block_formatting.png)
+  ![](../_static/docstring_main_block_formatting.png)
+
+* If Sphinx is displaying old docstrings or failing to find modules that have been renamed or removed delete the "source" folder and then run `sphinx-apidoc -o source/ ../` from within the "docs" folder to recreate the automatic docstring documentation.
+
+* Running `make clean` will clear out anything cached in the "_build" directory.
+
+* Sphinx automatically wraps math blocks in the LaTeX "split" environment, so & can be used to align multi-line equations.

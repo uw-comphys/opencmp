@@ -23,32 +23,31 @@ import numpy as np
 from numpy import ndarray
 
 
-def construct_p_mat(p: Union[float, ProxyFunction], dim: int) -> CoefficientFunction:
+def construct_identity_mat(dim: int) -> CoefficientFunction:
     """
-    Constructs the pressure identity matrix (pI) used by Stokes and incompressible Navier-Stokes flow in boundary
-    integrals.
+    Constructs an identity matrix of the given dimension.
+
+    This expects
 
     Args:
-        p: The pressure at the boundary.
         dim: The dimension of the matrix.
 
     Returns:
-        The pI matrix at the boundary.
+        An identity matrix of the desired dimension.
     """
+    if dim < 1:
+        raise ValueError('Can\'t construct a 0D identity matrix.')
 
-    if dim == 2:
-        return ngs.CoefficientFunction((p, 0.0,
-                                        0.0, p), dims=(2, 2))
-    elif dim == 3:
-        return ngs.CoefficientFunction((p, 0.0, 0.0,
-                                        0.0, p, 0.0,
-                                        0.0, 0.0, p), dims=(3, 3))
-    else:
-        print('Only supports 2D and 3D meshes, not {}D meshes.'.format(dim))
+    lst = []
+    for i in range(dim):
+        new_lst = [0.0] * i + [1.0] + [0.0] * (dim - i - 1)
+        lst += new_lst
+
+    return ngs.CoefficientFunction(tuple(lst), dims=(dim, dim))
 
 
 def get_special_functions(mesh: Mesh, nu: float) \
-        -> Tuple[CoefficientFunction, CoefficientFunction, CoefficientFunction]:
+        -> Tuple[CoefficientFunction, CoefficientFunction, CoefficientFunction, CoefficientFunction]:
     """
     Generates a set of special functions needed for DG so they don't need to be rewritten multiple times.
     
@@ -57,17 +56,19 @@ def get_special_functions(mesh: Mesh, nu: float) \
         nu: The penalty parameter for interior penalty method DG.
         
     Returns:
-        Tuple[CoefficientFunction, CoefficientFunction, CoefficientFunction]:
+        Tuple[CoefficientFunction, CoefficientFunction, CoefficientFunction, CoefficientFunction]:
             - n: The unit normal for every facet of the mesh.
             - h: The "size" of every mesh element.
             - alpha: The penalty coefficient.
+            - I_mat: An identity matrix that matches the mesh dimension.
     """
 
     n = ngs.specialcf.normal(mesh.dim)
     h = ngs.specialcf.mesh_size
     alpha = nu / h
+    I_mat = construct_identity_mat(mesh.dim)
 
-    return n, h, alpha
+    return n, h, alpha, I_mat
 
 
 def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[float], offset: List[float], dim: int = 2,

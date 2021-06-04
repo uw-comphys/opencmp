@@ -128,7 +128,7 @@ class Poisson(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Laplacian term
         a = dt * self.dc[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v)) * self.DIM_solver.phi_gfu * ngs.dx
@@ -176,7 +176,7 @@ class Poisson(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         if self.DG:
             jump_u = jump(u)
@@ -210,7 +210,7 @@ class Poisson(Model):
         # Bulk of Bilinear form
         if self.DG:
             # Define the special DG functions.
-            n, _, alpha = get_special_functions(self.mesh, self.nu)
+            n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
             if self.dirichlet_names.get('u', None) is not None:
                 # Penalty terms for Dirichlet BCs
@@ -236,7 +236,7 @@ class Poisson(Model):
 
         if self.DG:
             # Define the special DG functions.
-            n, _, alpha = get_special_functions(self.mesh, self.nu)
+            n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
             jump_u = jump(u)
             avg_grad_u = grad_avg(u)
@@ -262,7 +262,7 @@ class Poisson(Model):
         """
 
         # Define the special DG functions.
-        n, _, alpha = get_special_functions(self.mesh, self.nu)
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
         # Source term
         L = dt * self.f[time_step] * v * self.DIM_solver.phi_gfu * ngs.dx
@@ -320,7 +320,7 @@ class Poisson(Model):
         # Dirichlet BCs for u, they only get added if using DG
         if self.DG:
             # Define the special DG functions.
-            n, _, alpha = get_special_functions(self.mesh, self.nu)
+            n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
             for marker in self.BC.get('dirichlet', {}).get('u', {}):
                 g = self.BC['dirichlet']['u'][marker][time_step]

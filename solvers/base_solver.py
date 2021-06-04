@@ -209,10 +209,10 @@ class Solver(ABC):
             corrected_time          = self.t_param[0].Get() - self.t_range[0]
             # The number of save periods (rounded to next next highest)
             n_save_periods          = math.ceil(corrected_time / self.save_freq[0])
-            # Time for the 1st next save
-            time_for_next_save      = n_save_periods * self.save_freq[0]
-            # Time for the 2nd after save
-            time_for_next_next_save = (n_save_periods + 1) * self.save_freq[0]
+            # Time for the 1st next save. Need to re-account for the simulation possibly not starting at 0.
+            time_for_next_save      = n_save_periods * self.save_freq[0] + self.t_range[0]
+            # Time for the 2nd after save. Need to re-account for the simulation possibly not starting at 0.
+            time_for_next_next_save = (n_save_periods + 1) * self.save_freq[0] + self.t_range[0]
 
             times.append(time_for_next_save)
             times.append(time_for_next_next_save)
@@ -292,9 +292,14 @@ class Solver(ABC):
 
                 if self.save_to_file and self.transient:
                     if self.save_freq[1] == 'time':
-                        # This is ugly, but it's needed to make the modulo math work
+                        # This is ugly, but it's needed to make the modulo math work.
+                        # 0.9999999 % 1 = 0.999999 but 1.000001 % 1 = 0 as expected.
                         if self.save_freq[0] < 1.0:
-                            tmp = (self.t_param[0].Get() - self.t_range[0]) * (1/self.save_freq[0]) % 1.0
+                            tmp_delta = (self.t_param[0].Get() - self.t_range[0]) * (1/self.save_freq[0])
+                            if tmp_delta < 1.0:
+                                tmp = tmp_delta - 1.0
+                            else:
+                                tmp = tmp_delta % 1.0
                         else:
                             tmp = (self.t_param[0].Get() - self.t_range[0]) % self.save_freq[0]
                         if math.isclose(tmp, 0.0, abs_tol=self.dt_param[0].Get() * 1e-2):
@@ -494,7 +499,7 @@ class Solver(ABC):
 
         Returns:
             Tuple containing a bool, a float, and a string. The bool indicates whether or not the result of the current iteration
-            was accepted based on all of the criteria established by the individual solver. NOTE: a stationary solver
-            MUST return True. The float indicates the current local error.
-               The string contains the variable name for the
+                was accepted based on all of the criteria established by the individual solver. NOTE: a stationary solver
+                MUST return True. The float indicates the current local error. The string contains the variable name for the 
+                variable with the highest local error.
         """

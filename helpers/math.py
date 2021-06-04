@@ -16,7 +16,8 @@
 ########################################################################################################################
 
 from typing import Union
-from ngsolve import CoefficientFunction, Parameter, exp, IfPos
+from ngsolve import CoefficientFunction, Parameter, exp, IfPos, cos
+from math import pi
 
 
 def tanh(x: Union[int, float, Parameter, CoefficientFunction]) -> Union[float, CoefficientFunction]:
@@ -58,7 +59,7 @@ def sig(x: Union[int, float, Parameter, CoefficientFunction]) -> Union[float, Co
     return 1 / (1 + exp(-x))
 
 
-def H_t(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1)  -> Union[float, CoefficientFunction]:
+def H_t(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1) -> Union[float, CoefficientFunction]:
     """
     Function to approximate the Heaviside function (step function) using a hyperbolic tangent (tanh).
 
@@ -82,7 +83,7 @@ def H_t(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1)  -
     # Get my solving: tanh(shift) = tanh(scaling_term * w - shift)
     scaling_term = (2 * shift) / w
 
-    return 1/2 * tanh(scaling_term * t - shift) + 0.5
+    return 1 / 2 * tanh(scaling_term * t - shift) + 0.5
 
 
 def H_s(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1) -> Union[float, CoefficientFunction]:
@@ -90,7 +91,7 @@ def H_s(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1) ->
     Function to approximate the Heaviside function (step function) using a sigmoid.
 
     Args:
-        t: Parameter reprenting time (or another value)
+        t: Parameter representing time (or another value)
         w: Length of time over which to go from 0.0001 to 0.9999
 
     Return:
@@ -110,3 +111,21 @@ def H_s(t: Union[int, float, Parameter, CoefficientFunction], w: float = 0.1) ->
     scaling_term = (2 * shift) / w
 
     return sig(scaling_term * t - shift)
+
+
+def ramp_cos(t: Union[int, float, Parameter], p1: float = 0.0, p2: float = 1.0,
+             tr: float = 1.0) -> float:
+    """
+    Function to ramp from one specified value to another in a specified amount of time using the cosine function.
+
+    Args:
+        t: Parameter representing time (or another value).
+        p1: The value to start the ramp at.
+        p2: The value to end the ramp at.
+        tr: How quickly to ramp.
+
+    Return:
+        The evaluated value of the ramp function.
+    """
+
+    return IfPos(tr - t, 0.5 * (p1 - p2) * cos(t * pi / tr) + 0.5 * (p1 + p2), p2)

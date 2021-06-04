@@ -1,0 +1,5 @@
+[PARAMETERS]
+diffusion_coefficient = all -> 1.0
+
+[FUNCTIONS]
+source = all -> 2*(x*(1-x) + y*(1-y))

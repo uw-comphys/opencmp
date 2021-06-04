@@ -30,7 +30,7 @@ import ngsolve as ngs
 from ngsolve import Parameter, CoefficientFunction
 import operator
 from typing import List, Tuple, Union, Dict, Any, Optional
-from helpers.math import tanh, sig, H_s
+from helpers.math import tanh, sig, H_s, ramp_cos
 
 
 def parse_to_arith(expr_stack: List[Union[str, Tuple[str, int]]]):
@@ -154,7 +154,8 @@ def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], t_param: Opti
              'round': round,
              'sqrt': ngs.sqrt,
              'sgn': lambda a: -1 if a < -epsilon else 1 if a > epsilon else 0,
-             'vec': lambda *a: ngs.CoefficientFunction(a)}
+             'vec': lambda *a: ngs.CoefficientFunction(a),
+             'ramp': ramp_cos}
 
     constants = {'pi': math.pi,
                  'e': math.e,

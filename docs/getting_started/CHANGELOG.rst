@@ -1,6 +1,11 @@
 OpenCMP Changelog
 =================
 
+June 4
+
+* Minor bug fixes.
+* Added documentation including tutorials to walk through OpenCMP's functionality.
+
 May 14
 
 * Added the multicomponent INS model.

@@ -113,18 +113,23 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
         else:
             # Repeat the time step with the new dt.
             #
-            # Reset the time values to the previous time step.
-            for i in range(len(self.t_param)):
-                self.t_param[i].Set(self.t_param[i].Get() - self.dt_param[0].Get())
-
             # Set all intermediate step solutions to the previous solution.
             for i in range(self.scheme_order - 1):
                 self.gfu_0_list[i].vec.data = self.gfu_0_list[-1].vec
 
-            # Set all dt values to the new dt.
+            # Reset the current time value to the previous time step.
+            self.t_param[0].Set(self.t_param[0].Get() - self.dt_param[0].Get())
+
+            # Set all dt values to the new dt except for the last dt value (keep as the dt for the previous time step).
             self.dt_param[-1].Set(self.dt_param[0].Get())
             for i in range(self.scheme_order):
                 self.dt_param[i].Set(dt_new * self.scheme_dt_coef[i])
+
+            # Now adjust all intermediate time values to the correct value for the previous time step based on the new
+            # dt.
+            self.t_param[-1].Set(self.t_param[0].Get() - self.dt_param[0].Get())
+            for i in range(1, self.scheme_order):
+                self.t_param[i].Set(self.t_param[0].Get() - self.dt_param[i].Get())
 
             # Reset self.step to one.
             self.step = 1
@@ -150,7 +155,7 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
         Function to calculate the local error in the time step's solution and the norm of the time step's solution.
 
         Returns:
-            Tuple[Union[str, List], List]:
+            Tuple[List[float], List[float], List[str]]
                 - local_error: List of local error for each model variable as specified by model_local_error_components.
                 - gfu_norm: List of solution norm for each model variable as specified by model_local_error_components.
                 - component_names: List of names for the components that were tested, in the order that they were.

@@ -55,3 +55,4 @@ The following libraries are required to use OpenCMP.
 * tabulate (`pip install tabulate`)
 * meshio (`pip install meshio`)
 * pytest (`pip install pytest`)
+

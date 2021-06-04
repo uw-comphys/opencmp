@@ -1,0 +1,20 @@
+[MESH]
+filename = mesh_files/unit_square_4bcs.vol
+
+[FINITE ELEMENT SPACE]
+elements = u -> H1
+interpolant_order = 2
+
+[SOLVER]
+solver = direct
+preconditioner = None
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtu
+
+[OTHER]
+model = Poisson
+run_dir = Examples/tutorial_2
+num_threads = 6
+
