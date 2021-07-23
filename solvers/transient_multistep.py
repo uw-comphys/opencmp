@@ -28,6 +28,7 @@ from typing import List, Tuple
 Module for the multistep transient solver class.
 """
 
+
 class TransientMultiStepSolver(Solver):
     """
     Transient multistep solver with a fixed time step.
@@ -52,22 +53,30 @@ class TransientMultiStepSolver(Solver):
         self.dt_param[0].Set(1e-10)
         a, L = implicit_euler(self.model, self.gfu_0_list, self.dt_param)
 
-        if self.model.preconditioner is not None:
-            preconditioner = self.model.construct_preconditioner(a)
-            preconditioner.Update()
+        if self.model.preconditioners is not None:
+            preconditioners = self.model.construct_preconditioners(a)
+
+            for preconditioner in preconditioners:
+                if preconditioner is not None:
+                    preconditioner.Update()
         else:
-            preconditioner = None
+            preconditioners = []
 
         while self.num_iters < self.scheme_order - 1:
             for i in range(len(self.t_param)):
                 self.t_param[i].Set(self.t_param[i].Get() + self.dt_param[i].Get())
 
             self.model.apply_dirichlet_bcs_to(self.gfu)
-            a.Assemble()
-            L.Assemble()
-            if preconditioner is not None:
-                preconditioner.Update()
-            self.model.single_iteration(a, L, preconditioner, self.gfu)
+
+            for i in range(len(a)):
+                a[i].Assemble()
+                L[i].Assemble()
+
+            for preconditioner in preconditioners:
+                if preconditioner is not None:
+                    preconditioner.Update()
+
+            self.model.single_iteration(a, L, preconditioners, self.gfu)
 
             self.num_iters += 1
 
@@ -99,9 +108,11 @@ class TransientMultiStepSolver(Solver):
         self.model.apply_dirichlet_bcs_to(self.gfu)
 
     def _assemble(self) -> None:
-        self.a.Assemble()
-        self.L.Assemble()
-        self._update_preconditioner()
+        for i in range(len(self.a)):
+            self.a[i].Assemble()
+            self.L[i].Assemble()
+
+        self._update_preconditioners()
 
     def _create_linear_and_bilinear_forms(self) -> None:
         if self.scheme == 'explicit euler':
@@ -119,12 +130,13 @@ class TransientMultiStepSolver(Solver):
         else:
             raise ValueError('Have not implemented {} time integration yet.'.format(self.scheme))
 
-    def _create_preconditioner(self) -> None:
-        self.preconditioner = self.model.construct_preconditioner(self.a)
+    def _create_preconditioners(self) -> None:
+        self.preconditioners = self.model.construct_preconditioners(self.a)
 
-    def _update_preconditioner(self, precond: Optional[Preconditioner] = None) -> None:
-        if self.preconditioner is not None:
-            self.preconditioner.Update()
+    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
+        for preconditioner in self.preconditioners:
+            if preconditioner is not None:
+                preconditioner.Update()
 
     def _load_and_apply_initial_conditions(self) -> None:
         self.gfu_0_list: List[ngs.GridFunction] = []
@@ -142,7 +154,7 @@ class TransientMultiStepSolver(Solver):
         self._assemble()
 
     def _single_solve(self) -> None:
-        self.model.single_iteration(self.a, self.L, self.preconditioner, self.gfu)
+        self.model.single_iteration(self.a, self.L, self.preconditioners, self.gfu)
 
     def _update_time_step(self) -> Tuple[bool, float, float, str]:
         # Update all previous timestep solutions.

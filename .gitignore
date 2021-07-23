@@ -1,5 +1,5 @@
 /*\.pyc
-/__pycache__
+**/__pycache__/
 /*\.ipynb_checkpoints
 /*\.vtk
 /*\.vtu
@@ -16,4 +16,6 @@ jupyter/*
 .hg/*
 .hgignore
 docs/_build/*
-/*\output/*
+**/output/
+CFD2021/*
+Example\ Runs/*

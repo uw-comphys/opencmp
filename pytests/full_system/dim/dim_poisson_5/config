@@ -1,0 +1,30 @@
+[MESH]
+
+[DIM]
+diffuse_interface_method = True
+dim_dir = pytests/full_system/dim/dim_poisson_5/dim_dir
+
+[FINITE ELEMENT SPACE]
+elements = u -> H1
+interpolant_order = 2
+
+[DG]
+DG = False
+
+[SOLVER]
+solver = default
+preconditioner = default
+
+[TRANSIENT]
+transient = False
+
+[ERROR ANALYSIS]
+check_error = True
+
+[OTHER]
+num_threads = 6
+model = Poisson
+run_dir = pytests/full_system/dim/dim_poisson_5
+
+[VISUALIZATION]
+save_to_file = False

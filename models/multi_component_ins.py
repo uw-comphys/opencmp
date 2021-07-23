@@ -19,11 +19,11 @@ import ngsolve as ngs
 
 from helpers.ngsolve_ import get_special_functions
 from helpers.dg import avg, jump, grad_avg
-from models import Model
+from models import INS
 from config_functions import ConfigParser
 from typing import Dict, List, Optional, Union, cast
 from ngsolve import BilinearForm, FESpace, Grad, InnerProduct, LinearForm, Norm, GridFunction, OuterProduct, div, dx, \
-    Parameter, HDiv, Preconditioner, IfPos
+    Parameter, HDiv, Preconditioner, IfPos, CoefficientFunction
 from ngsolve.comp import ProxyFunction
 from helpers.error import norm, mean
 
@@ -33,17 +33,18 @@ from helpers.error import norm, mean
 # https://github.com/NGSolve/modeltemplates/blob/master/introduction/introduction.ipynb
 
 
-class MultiComponentINS(Model):
+class MultiComponentINS(INS):
     """
     A single phase multicomponent incompressible Navier-Stokes model.
     """
 
-    def __init__(self, config: ConfigParser, t_param: Parameter) -> None:
+    def __init__(self, config: ConfigParser, t_param: List[Parameter]) -> None:
         # Specify information about the model components
         # NOTE: These MUST be set before calling super(), since it's needed in superclass' __init__
-        self.model_components               = {'u': 0,      'p': 1}
-        self.model_local_error_components   = {'u': True,   'p': False}
-        self.time_derivative_components     = {'u': True,   'p': False}
+        self.model_components               = {'u':  0,      'p': 1}
+        self.model_local_error_components   = {'u':  True,   'p': False}
+        self.time_derivative_components     = [{'u': True,   'p': False}]
+        self.num_weak_forms                 = 1
 
         # Read in and add the multiple components
         self._add_multiple_components(config)
@@ -65,8 +66,10 @@ class MultiComponentINS(Model):
                         'total_flux': {},
                         'surface_rxn': {}}
 
-        super().__init__(config, t_param)
+        # Bypass INS' __init__ and directly call Model's __init__
+        super(INS, self).__init__(config, t_param)
 
+        # TODO: Remove once DG and DIM have been implemented.
         if self.DIM or self.DG:
             raise NotImplementedError('DIM and DG is not yet implemented.')
 
@@ -76,7 +79,8 @@ class MultiComponentINS(Model):
             raise TypeError('Don\'t recognize the linearization method.')
 
         if self.linearize == 'Oseen':
-            nonlinear_tolerance: Dict[str, float] = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'], None)
+            nonlinear_tolerance: Dict[str, float] = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'],
+                                                                         self.run_dir, None)
             self.abs_nonlinear_tolerance = nonlinear_tolerance['absolute']
             self.rel_nonlinear_tolerance = nonlinear_tolerance['relative']
             self.nonlinear_max_iters = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
@@ -85,11 +89,6 @@ class MultiComponentINS(Model):
                                  'at least 1.')
             self.W = self._construct_linearization_terms()
 
-    @staticmethod
-    def allows_explicit_schemes() -> bool:
-        # MultiComponentINS cannot work with explicit schemes
-        return False
-
     def _set_model_parameters(self) -> None:
         self.kv = self.model_functions.model_parameters_dict['kinematic_viscosity']['all']
         self.f = self.model_functions.model_functions_dict['source']
@@ -97,6 +96,34 @@ class MultiComponentINS(Model):
 
         # Ensure that a value was loaded for each extra component
         assert len(self.Ds) == len(self.config.get_list(['OTHER', 'component_names'], str))
+
+    def _add_multiple_components(self, config: ConfigParser) -> None:
+        """
+        Function to add multiple components to the model from the config file.
+
+        Args:
+            config: The ConfigParser
+        """
+
+        # Name of new components
+        new_components                                = config.get_list(['OTHER', 'component_names'], str)
+        # Whether each component should be added to the local error calculation
+        new_components_in_error_calc: Dict[str, bool] = config.get_dict(['OTHER', 'component_in_error_calc'], None)
+        # Whether each component has a time derivative associated with it
+        new_components_in_time_deriv: Dict[str, bool] = config.get_dict(['OTHER', 'component_in_time_deriv'], None)
+
+        # Ensure that the user specified the required information about each variable
+        assert len(new_components) == len(new_components_in_error_calc) == len(new_components_in_time_deriv)
+
+        # Number of default variables
+        num_existing = len(self.model_components)
+
+        for i in range(len(new_components)):
+            component = new_components[i]
+
+            self.model_components[component]                = i + num_existing
+            self.model_local_error_components[component]    = new_components_in_error_calc[component]
+            self.time_derivative_components[0][component]   = new_components_in_time_deriv[component]
 
     def _construct_fes(self) -> FESpace:
         if not self.DG:
@@ -130,21 +157,6 @@ class MultiComponentINS(Model):
 
         return ngs.FESpace([fes_u, fes_p] + fes_components, dgjumps=self.DG)
 
-    def _construct_linearization_terms(self) -> Optional[List[GridFunction]]:
-        tmp = GridFunction(self.fes.components[0])
-        tmp.vec.data = self.IC.components[0].vec
-
-        return [tmp]
-
-    def update_linearization_terms(self, gfu: GridFunction) -> None:
-        if self.linearize == 'Oseen':
-            # Update the velocity linearization term.
-            comp_index = self.model_components['u']
-            self.W[comp_index].vec.data = gfu.components[comp_index].vec
-        else:
-            # Do nothing, no linearization term to update.
-            pass
-
     def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
                                     dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
 
@@ -171,7 +183,7 @@ class MultiComponentINS(Model):
         return [a]
 
     def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction],
-                                    dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
+                                            dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
 
         comp_index = self.model_components['u']
 
@@ -235,49 +247,9 @@ class MultiComponentINS(Model):
             L = self._imex_explicit_no_DIM(V, gfu_0, dt, time_step)
 
         return [L]
-
-    def single_iteration(self, a: BilinearForm, L: LinearForm, precond: Preconditioner, gfu: GridFunction,
-                         time_step: int = 0) -> None:
-
-        if self.linearize == 'Oseen':
-            # The component index representing velocity
-            component = self.fes.components[self.model_components['u']]
-            comp_index = self.model_components['u']
-
-            # Number of linear iterations for this timestep
-            num_iteration = 1
-
-            # Boolean used to keep the while loop going
-            done_iterating = False
-
-            while not done_iterating:
-                self.apply_dirichlet_bcs_to(gfu, time_step=time_step)
-
-                a.Assemble()
-                L.Assemble()
-                precond.Update()
-
-                self.construct_and_run_solver(a, L, precond, gfu)
-
-                err = norm('l2_norm', self.W[comp_index], gfu.components[comp_index], self.mesh, component, average=False)
-                gfu_norm = mean(gfu.components[comp_index], self.mesh)
-
-                num_iteration += 1
-
-                if self.verbose > 0:
-                    print(num_iteration, err)
-
-                self.W[comp_index].vec.data = gfu.components[comp_index].vec
-                done_iterating = (err < self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) \
-                                 or (num_iteration > self.nonlinear_max_iters)
-        elif self.linearize == 'IMEX':
-            self.construct_and_run_solver(a, L, precond, gfu)
-        else:
-            raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
-
-########################################################################################################################
-# BILINEAR AND LINEAR FORM HELPER FUNCTIONS
-########################################################################################################################
+    ########################################################################################################################
+    # BILINEAR AND LINEAR FORM HELPER FUNCTIONS
+    ########################################################################################################################
     def _bilinear_time_ODE_DIM(self, L: List[Union[ProxyFunction, GridFunction]], V: List[ProxyFunction],
                                w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
         """
@@ -310,8 +282,8 @@ class MultiComponentINS(Model):
 
         # Flow profile domain integrals.
         a = dt * (
-            self.kv[time_step] * InnerProduct(Grad(u), Grad(v))  # Stress, Newtonian
-            ) * dx
+                self.kv[time_step] * InnerProduct(Grad(u), Grad(v))  # Stress, Newtonian
+        ) * dx
 
         if self.linearize == 'Oseen':
             # Linearized convection term.
@@ -332,27 +304,31 @@ class MultiComponentINS(Model):
             # Domain integrals.
             a += dt * self.Ds[comp][time_step] * InnerProduct(Grad(c), Grad(r)) * dx
 
-            # TODO: Does not work
+            # NOTE: Reaction terms can go in either the bilinear form or the linear form depending on if the reaction
+            #       coefficients are functions of the trial functions. Basic type-checking can't be used since the
+            #       reaction coefficients will always be coefficientfunctions or gridfunctions. Instead, check if the
+            #       reaction coefficients are gridfunctions (go in linear form) and if they are coefficientfunctions
+            #       expand out the coefficientfunction tree and check for the presence of "trial-function" (goes in
+            #       bilinear form).
+
             # Surface reaction
+            # TODO: Does not work
             for marker in self.BC.get('surface_rxn', {}).get(comp, {}):
-                # NOTE: bc_re_parse_dict is a dictionary which contains info about which bc terms contain
-                #       a trial function. Thus if it contains a value, then that particular rxn term belongs
-                #       in the bilinear form.
-                if self.bc_functions.bc_re_parse_dict.get('surface_rxn', {}).get(comp, None) is not None:
-                    a += -dt * self.BC['surface_rxn'][comp][marker][time_step] * r * self._ds(marker)
+                val = self.BC['surface_rxn'][comp][marker][time_step]
+                if isinstance(val, ProxyFunction) or (isinstance(val, CoefficientFunction) and ('trial-function' in val.__str__())):
+                    a += -dt * val * r * self._ds(marker)
 
             # Bulk reaction
-            # NOTE: model_functions_re_parse_dict is a dictionary which contains info about which source terms contain
-            #       a trial function.
-            if self.model_functions.model_functions_re_parse_dict.get('source', {}).get(comp, None) is not None:
-                # NOTE: The negative sign is here since the source term was brought over to bilinear side,
-                #       it usually does not have one since it is on the linear term side.
-                # TODO: Temp solution to test, implement better once parser has been updated
+            # TODO: Temp solution to test, implement better once parser has been updated
+            val = self.f[comp][time_step]
+            if isinstance(val, ProxyFunction) or (isinstance(val, CoefficientFunction) and ('trial-function' in val.__str__())):
+                # NOTE: The negative sign is here since the source term was brought over to bilinear side, it usually
+                #       does not have one since it is on the linear term side.
                 if self.BC.get('surface_rxn', {}).get(comp, None) is not None:
                     marker = list(self.BC['surface_rxn'][comp].keys())[0]
-                    a += -dt * self.f[comp][time_step] * r * self._ds(marker)
+                    a += -dt * val * r * self._ds(marker)
                 else:
-                    a += -dt * self.f[comp][time_step] * r * dx
+                    a += -dt * val * r * dx
 
             if self.linearize == 'Oseen':
                 # Neumann BC for C
@@ -365,10 +341,10 @@ class MultiComponentINS(Model):
             # Penalty for dirichlet BCs
             if self.dirichlet_names.get('u', None) is not None:
                 a += dt * (
-                    self.kv[time_step] * alpha * u * v  # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
-                    - self.kv[time_step] * InnerProduct(Grad(u), OuterProduct(v, n))  # ∇u^ = ∇u
-                    - self.kv[time_step] * InnerProduct(Grad(v), OuterProduct(u, n))  # 1/2 of penalty for u=g on
-                    ) * self._ds(self.dirichlet_names['u'])
+                        self.kv[time_step] * alpha * u * v  # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
+                        - self.kv[time_step] * InnerProduct(Grad(u), OuterProduct(v, n))  # ∇u^ = ∇u
+                        - self.kv[time_step] * InnerProduct(Grad(v), OuterProduct(u, n))  # 1/2 of penalty for u=g on
+                ) * self._ds(self.dirichlet_names['u'])
 
                 if self.linearize == 'Oseen':
                     # Additional 1/2 of uw^ (convection term)
@@ -407,10 +383,10 @@ class MultiComponentINS(Model):
 
         # Flow profile domain integrals.
         a = dt * (
-            - div(u) * q  # Conservation of mass
-            - div(v) * p  # Pressure
-            - 1e-10 * p * q  # Stabilization term
-            ) * dx
+                - div(u) * q  # Conservation of mass
+                - div(v) * p  # Pressure
+                - 1e-10 * p * q  # Stabilization term
+        ) * dx
 
         if self.DG:
             avg_u = avg(u)
@@ -422,10 +398,10 @@ class MultiComponentINS(Model):
 
             # Penalty for discontinuities
             a += dt * (
-                self.kv[time_step] * alpha * InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I from ∇u^
-                - self.kv[time_step] * InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
-                - self.kv[time_step] * InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
-                ) * dx(skeleton=True)
+                    self.kv[time_step] * alpha * InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I from ∇u^
+                    - self.kv[time_step] * InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
+                    - self.kv[time_step] * InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
+            ) * dx(skeleton=True)
 
             if self.linearize == 'Oseen':
                 # Additional penalty for the convection term.
@@ -490,32 +466,36 @@ class MultiComponentINS(Model):
                 h = self.BC['total_flux'][comp][marker][time_step]
                 L += dt * r.Trace() * h * self._ds(marker)
 
+            # NOTE: Reaction terms can go in either the bilinear form or the linear form depending on if the reaction
+            #       coefficients are functions of the trial functions. Basic type-checking can't be used since the
+            #       reaction coefficients will always be coefficientfunctions or gridfunctions. Instead, check if the
+            #       reaction coefficients are gridfunctions (go in linear form) and if they are coefficientfunctions
+            #       expand out the coefficientfunction tree and check for the presence of "trial-function" (goes in
+            #       bilinear form).
+
             # Surface reaction
             for marker in self.BC.get('surface_rxn', {}).get(comp, {}):
-                # NOTE: bc_re_parse_dict is a dictionary which contains info about which bc terms contain
-                #       a trial function. Thus if it contains a value, then that particular rxn term belongs
-                #       in the bilinear form.
-                if self.bc_functions.bc_re_parse_dict.get('surface_rxn', {}).get(comp, None) is None:
-                    L += -dt * self.BC['surface_rxn'][comp][marker][time_step] * r * self._ds(marker)
+                val = self.BC['surface_rxn'][comp][marker][time_step]
+                if not isinstance(val, ProxyFunction) and (not isinstance(val, CoefficientFunction) or ('trial-function' not in val.__str__())):
+                    L += -dt * val * r * self._ds(marker)
 
             # Bulk reaction
-            # NOTE: model_functions_re_parse_dict is a dictionary which contains info about which source terms contain
-            #       a trial function.
-            if self.model_functions.model_functions_re_parse_dict.get('source', {}).get(comp, None) is None:
-                # TODO: Temp solution to test, implement better once parser has been updated
+            # TODO: Temp solution to test, implement better once parser has been updated
+            val = self.f[comp][time_step]
+            if not isinstance(val, ProxyFunction) and (not isinstance(val, CoefficientFunction) or ('trial-function' not in val.__str__())):
                 if self.BC.get('surface_rxn', {}).get(comp, None) is not None:
                     marker = list(self.BC['surface_rxn'][comp].keys())[0]
-                    L += dt * self.f[comp][time_step] * r * self._ds(marker)
+                    L += dt * val * r * self._ds(marker)
                 else:
-                    L += dt * self.f[comp][time_step] * r * dx
+                    L += dt * val * r * dx
 
         # Dirichlet BC for u
         if self.DG:
             for marker in self.BC.get('dirichlet', {}).get('u', {}):
                 g = self.BC['dirichlet']['u'][marker][time_step]
                 L += dt * (
-                    self.kv[time_step] * alpha * g * v  # 1/2 of penalty for u=g from ∇u^ on 𝚪_D
-                    - self.kv[time_step] * InnerProduct(Grad(v), OuterProduct(g, n))  # 1/2 of penalty for u=g
+                        self.kv[time_step] * alpha * g * v  # 1/2 of penalty for u=g from ∇u^ on 𝚪_D
+                        - self.kv[time_step] * InnerProduct(Grad(v), OuterProduct(g, n))  # 1/2 of penalty for u=g
                 ) * self._ds(marker)
 
                 if self.linearize == 'Oseen':
@@ -578,4 +558,3 @@ class MultiComponentINS(Model):
                 raise ValueError('Cannot specify total flux for IMEX schemes since convection term is fully explicit.')
 
         return L
-

@@ -17,7 +17,7 @@
 
 from .base_config_functions import ConfigFunctions
 import ngsolve as ngs
-from ngsolve import Parameter, CoefficientFunction, GridFunction, FESpace
+from ngsolve import Mesh, Parameter, CoefficientFunction, GridFunction, FESpace
 from typing import Dict, Union, List
 
 
@@ -26,13 +26,14 @@ class RefSolFunctions(ConfigFunctions):
     Class to hold the reference solutions.
     """
 
-    def __init__(self, config_rel_path: str, t_param: List[Parameter] = [Parameter(0.0)],
+    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = [Parameter(0.0)],
                  new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
-        super().__init__(config_rel_path, t_param)
+        super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the reference solution dict from the reference solution configfile.
         try:
-            ref_sols, ref_sols_re_parse = self.config.get_one_level_dict('REFERENCE SOLUTIONS', self.t_param, new_variables)
+            ref_sols, ref_sols_re_parse = self.config.get_one_level_dict('REFERENCE SOLUTIONS', self.import_dir, mesh,
+                                                                         self.t_param, new_variables)
         except KeyError:
             # No options specified for L2_error.
             ref_sols = {}
@@ -40,7 +41,8 @@ class RefSolFunctions(ConfigFunctions):
 
         try:
             # Note that all of the metrics are time-independent since they are just names of error metrics.
-            metrics, metrics_re_parse = self.config.get_one_level_dict('METRICS', None, new_variables, all_str=True)
+            metrics, metrics_re_parse = self.config.get_one_level_dict('METRICS', self.import_dir, mesh,
+                                                                       new_variables=new_variables, all_str=True)
         except KeyError:
             # No options specified for other metrics.
             metrics = {}

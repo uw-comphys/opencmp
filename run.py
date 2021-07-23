@@ -25,7 +25,7 @@ from helpers.error import calc_error
 from config_functions import ConfigParser
 import pyngcore as ngcore
 from ngsolve import ngsglobals
-from helpers.post_processing import sol_to_vtu
+from helpers.post_processing import sol_to_vtu, PhaseFieldModelMimic
 
 
 def main(config_file_path: str, config_passed: Optional[ConfigParser] = None) -> None:
@@ -34,7 +34,7 @@ def main(config_file_path: str, config_passed: Optional[ConfigParser] = None) ->
 
     Args:
         config_file_path: Filename of the config file to load.
-        config_passed: Optionally provide the config parser if running tests
+        config_passed: Optionally provide the config parser if running tests.
     """
     # Load the config file.
     if config_passed is None:
@@ -89,6 +89,21 @@ def main(config_file_path: str, config_passed: Optional[ConfigParser] = None) ->
 
             # Run the conversion
             sol_to_vtu(config, output_dir_path, solver.model)
+
+            # Repeat for the saved phase field .sol files if using the diffuse interface method.
+            if solver.model.DIM:
+                print('Converting saved phase fields to VTU.')
+
+                # Construct a mimic of the Model class appropriate for the phase field (mainly contains the correct
+                # finite element space).
+                phi_model = PhaseFieldModelMimic(solver.model)
+
+                # Path where the output is stored
+                output_dir_phi_path = config.get_item(['OTHER', 'run_dir'], str) + '/output_phi/'
+
+                # Run the conversion. Note that the normal main simulation config file can be used since it is only used
+                # to get a value for subdivision.
+                sol_to_vtu(config, output_dir_phi_path, phi_model)
 
     return
 

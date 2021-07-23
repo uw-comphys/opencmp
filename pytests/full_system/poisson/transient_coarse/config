@@ -21,8 +21,8 @@ transient = True
 scheme = explicit euler
 time_range = 0.0, 1.0
 dt = 1e-3
-dt_tolerance = relative -> 1e-4
-               absolute -> 1e-6
+dt_tolerance = relative -> 1e-5
+               absolute -> 1e-7
 dt_range = 1e-8, 0.01
 
 [VISUALIZATION]

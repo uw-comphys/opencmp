@@ -18,23 +18,23 @@ Drawing inspiration from packages like OpenFOAM and SU2, OpenCMP's user interfac
    |
    +-- "bc_dir"
    |      |
-   |      +-- config
+   |      +-- bc_config
    |
    +-- "ic_dir"
    |      |
-   |      +-- config
+   |      +-- ic_config
    |
    +-- "model_dir"
    |      |
-   |      +-- config
+   |      +-- model_config
    |
    +-- "ref_sol_dir"
    |      |
-   |      +-- config
+   |      +-- ref_sol_config
    |
    +-- output
 
-The main directory and each subdirectory contain a configuration file - "config". These are plaintext files that specify the simulation parameters and run conditions.
+The main directory and each subdirectory contain a configuration file - "< >_config". These are plaintext files that specify the simulation parameters and run conditions.
 
 The Main Directory
 ------------------

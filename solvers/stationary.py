@@ -17,13 +17,14 @@
 
 import ngsolve as ngs
 from ngsolve import Preconditioner
-from typing import Optional
+from typing import List, Optional
 from .base_solver import Solver
 from typing import Tuple
 
 """
 Module for the stationary solver class.
 """
+
 
 class StationarySolver(Solver):
     """
@@ -34,28 +35,43 @@ class StationarySolver(Solver):
         self.model.apply_dirichlet_bcs_to(self.gfu)
 
     def _assemble(self) -> None:
-        self.a.Assemble()
-        self.L.Assemble()
-        self._update_preconditioner()
+        for i in range(len(self.a)):
+            self.a[i].Assemble()
+            self.L[i].Assemble()
+        self._update_preconditioners()
 
     def _create_linear_and_bilinear_forms(self) -> None:
         # TODO: Add something to handle a model with multiple coupled solves.
         U, V = self.model.get_trial_and_test_functions()
-        
-        self.a = ngs.BilinearForm(self.model.fes)
-        self.a += self.model.construct_bilinear_time_coefficient(U, V)[0]
-        self.a += self.model.construct_bilinear_time_ODE(U, V)[0]
 
-        self.L = ngs.LinearForm(self.model.fes)
-        self.L += self.model.construct_linear(V)[0]
-        # No IMEX terms since IMEX should only be used with transient solves.
+        # Bilinear form
+        self.a = []
+        a_coeff_terms = self.model.construct_bilinear_time_coefficient(U, V)
+        a_ode_terms = self.model.construct_bilinear_time_ODE(U, V)
 
-    def _create_preconditioner(self) -> None:
-        self.preconditioner = self.model.construct_preconditioner(self.a)
+        for i in range(self.model.num_weak_forms):
+            a = ngs.BilinearForm(self.model.fes)
+            a += a_coeff_terms[i]
+            a += a_ode_terms[i]
+            self.a.append(a)
 
-    def _update_preconditioner(self, precond: Optional[Preconditioner] = None) -> None:
-        if self.preconditioner is not None:
-            self.preconditioner.Update()
+        # Linear form
+        # NOTE: No IMEX terms since IMEX should only be used with transient solves.
+        self.L = []
+        L_terms = self.model.construct_linear(V)
+
+        for i in range(self.model.num_weak_forms):
+            L = ngs.LinearForm(self.model.fes)
+            L += L_terms[i]
+            self.L.append(L)
+
+    def _create_preconditioners(self) -> None:
+        self.preconditioners = self.model.construct_preconditioners(self.a)
+
+    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
+        for preconditioner in self.preconditioners:
+            if preconditioner is not None:
+                preconditioner.Update()
 
     def _load_and_apply_initial_conditions(self) -> None:
         # Nothing to do since it's a stationary solve
@@ -69,7 +85,7 @@ class StationarySolver(Solver):
         self._assemble()
 
     def _single_solve(self) -> None:
-        self.model.single_iteration(self.a, self.L, self.preconditioner, self.gfu)
+        self.model.single_iteration(self.a, self.L, self.preconditioners, self.gfu)
 
     def _startup(self) -> None:
         # Not applicable.

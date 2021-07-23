@@ -98,6 +98,16 @@ The following variables are defined by default for the given simulation domain. 
 * "x", "y", "z" - spatial coordinates
 * "t" - temporal coordinate
 
+Additional known variables can be added through the "parameter_names" option in the main configuration file. For example, if the diffusion coefficient is dependent on the viscosity then the main configuration file should include the following: ::
+
+   [OTHER]
+   parameter_names = kinematic_viscosity_all
+    
+Then, the model configuration file could contain an expression for the diffusion coefficient in terms of viscosity: ::
+
+   [PARAMETERS]
+   diffusion_coefficients = a -> 2.0 * kinematic_viscosity_all ^ 2
+
 Coordinates
 ***********
 
@@ -120,3 +130,26 @@ As an example, a Stokes flow velocity boundary condition for a 2D domain could b
 
 which would evaluate as :math:`u = y(1-y) \hat{x} + 0 \hat{y}`.
 
+Importing Python Functions
+--------------------------
+
+Parameter values can be obtained from imported Python functions in cases where their mathematical expressions require operators not available to the OpenCMP parser or require the use of external Python libraries.
+
+Consider the following example: ::
+
+   [DIRICHLET]
+   u = left -> IMPORT(left_bc_func)
+   
+IMPORT indicates that the boundary condition value will be obtained by importing a Python function "left_bc_func". This function is defined in the Python script "import_functions.py" which should be placed in the main simulation directory. The contents of "import_functions.py" would appear as follows:
+
+.. code-block:: python
+
+   def left_bc_func(t_param, model_variables, mesh):
+       # Some code
+       return u_left_value
+       
+The function to call must have the name given within IMPORT, must take the three indicated arguments, and must return a grid function. The arguments passed to the function are as follows:
+
+* t_param - A list of time parameters for each time step in the time discretization scheme in reverse order. For example, if the implicit Euler time discretization scheme is being used t_param = [t^n+1, t^n] where t^n+1 is the time parameter for the time step being solved for and t^n is the time parameter for the last solved time step.
+* model_variables - A list of dictionaries where each dictionary contains the value of each model variable. These values are given for the time step associated with the order in the list. For example, if the implicit Euler time discretization scheme is being used with the Poisson equation model_variables = [{'u': u^n+1}, {'u': u^n}]. Note that model_variables will contain any parameters with variable value given by the "parameter_names" parameter in the main configuration file (see :ref:`example_config`).
+* mesh - The mesh used by the simulation.

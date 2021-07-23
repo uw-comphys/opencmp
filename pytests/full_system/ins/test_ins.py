@@ -121,22 +121,22 @@ class TestTransient:
         automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
 
     #def test_sinusoidal_oseen_adaptive_three_step_cg(self, capsys: CaptureFixture,
-    #                                                 sinusoidal_transient: ConfigParser) -> None:
-    #    # Change time discretization scheme
-    #    sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive three step'
-    #    # Run
-    #    automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
+    #                                                sinusoidal_transient: ConfigParser) -> None:
+    #   # Change time discretization scheme
+    #   sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive three step'
+    #   # Run
+    #   automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
     #
     #def test_sinusoidal_oseen_adaptive_three_step_dg(self, capsys: CaptureFixture,
-    #                                                 sinusoidal_transient: ConfigParser) -> None:
-    #    # Change time discretization scheme
-    #    sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive three step'
-    #    # Change from CG to DG
-    #    sinusoidal_transient['DG']['DG'] = 'True'
-    #    # Change elements
-    #    sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
-    #    # Run
-    #    automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
+    #                                                sinusoidal_transient: ConfigParser) -> None:
+    #   # Change time discretization scheme
+    #   sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive three step'
+    #   # Change from CG to DG
+    #   sinusoidal_transient['DG']['DG'] = 'True'
+    #   # Change elements
+    #   sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
+    #   # Run
+    #   automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
 
     def test_sinusoidal_imex_euler_cg(self, capsys: CaptureFixture,
                                                 sinusoidal_transient: ConfigParser) -> None:

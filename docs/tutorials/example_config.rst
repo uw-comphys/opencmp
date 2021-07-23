@@ -123,6 +123,11 @@ This is the main configuration file for the simulation run. It is kept in the ru
 |               |                              |                    |                | reference solution after   |
 |               |                              |                    |                | every time step.           |
 |               +------------------------------+--------------------+----------------+----------------------------+
+|               | save_error_every_timestep    | True/False         | False          | If True computes the error |
+|               |                              |                    |                | after every time step and  |
+|               |                              |                    |                | saves it to file in the    |
+|               |                              |                    |                | "output" subdirectory.     |
+|               +------------------------------+--------------------+----------------+----------------------------+
 |               | convergence_test             | h -> vars/False    | False for both | If vars is given as a      |
 |               |                              +--------------------+                | variable name or list of   |
 |               |                              | p -> vars/False    |                | variable names, that type  |
@@ -188,6 +193,10 @@ This is the main configuration file for the simulation run. It is kept in the ru
 |               |                              |                    |                | error estimation if using  |
 |               |                              |                    |                | an adaptive time-stepping  |
 |               |                              |                    |                | scheme.                    |
+|               +------------------------------+--------------------+----------------+----------------------------+
+|               | parameter_names              | name, name...      | Nothing        | Names of parameters that   |
+|               |                              |                    |                | will be used as additional |
+|               |                              |                    |                | variables in the model.    |
 |               +------------------------------+--------------------+----------------+----------------------------+
 |               | run_dir                      | filepath           |                | Path to the main directory |
 |               |                              |                    |                | for the simulation.        |
@@ -265,8 +274,8 @@ Below is an example for multicomponent flow. The model only has one single kinem
             a -> 0.1
             b -> -0.1
 
-Error Analysis Configuration File
----------------------------------
+Reference Solution Configuration File
+-------------------------------------
 
 This configuration file holds information about the error analysis of the simulation results. It is kept in the reference solution directory.
 
@@ -283,7 +292,7 @@ Here is an example where reference solutions are specified separately for each m
    u = [y*(1 - y), 0.0]
    p = ref_sol_p_file.sol
    
-The METRICS section holds information about what errors to compute. Options are L1_norm, L2_norm, Linfinity_norm, divergence, and facet_jumps. These metrics can be computed for any or all of the model variables. However, if any of the norms are to be computed a reference solution must be given for the relevant model variable.
+The METRICS section holds information about what errors to compute. Options are L1_norm, L2_norm, Linfinity_norm, divergence, facet_jumps, and surface_traction. These metrics can be computed for any or all of the model variables. However, if any of the norms are to be computed a reference solution must be given for the relevant model variable. For surface_traction, pass a list of mesh surface markers to compute on instead of a list of model variables.
 
 Below is an example where a reference solution is given for both model variables and used to compute the L2 norm in error for the final simulation results. ::
 
@@ -399,8 +408,17 @@ Main Diffuse Interface Configuration File
 |            |                             |                          |                | sharp transition between   |
 |            |                             |                          |                | boundary conditions.       |
 +------------+-----------------------------+--------------------------+----------------+----------------------------+
+| RIGID BODY | rotation_speed              | number, number           | 1, 0.25        | The final rotation speed   |
+| MOTION     |                             |                          |                | (RPS) and the time taken   |
+|            |                             |                          |                | to ramp from zero to the   |
+|            |                             |                          |                | final rotation speed (ex:  |
+|            |                             |                          |                | the defaults ramp from     |
+|            |                             |                          |                | 0 RPS to 1 RPS in 0.25s    |
++------------+-----------------------------+--------------------------+----------------+----------------------------+
 
-.. note:: The DIM section parameters only need to be specified if the phase fields are to be generated from .stl files.
+.. note:: The DIM section parameters only need to be specified if the phase fields are to be generated from .stl files or if the phase fields are to undergo rigid body motion.
+
+.. note:: Currently rigid body motion of phase fields is only implemented as rotation about the z-axis centered on the origin for use in simulating impellers in stirred tank reactors.
 
 Diffuse Interface Boundary Condition Configuration File
 *******************************************************

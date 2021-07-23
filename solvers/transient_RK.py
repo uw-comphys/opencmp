@@ -49,9 +49,10 @@ class TransientRKSolver(Solver):
         self.model.apply_dirichlet_bcs_to(self.gfu, self.scheme_order - self.step)
 
     def _assemble(self) -> None:
-        self.a_list[-self.step].Assemble()
-        self.L_list[-self.step].Assemble()
-        self._update_preconditioner(self.preconditioner_list[-self.step])
+        for i in range(len(self.a_list[-self.step])):
+            self.a_list[-self.step][i].Assemble()
+            self.L_list[-self.step][i].Assemble()
+        self._update_preconditioners(self.preconditioner_list[-self.step])
 
     def _create_linear_and_bilinear_forms(self) -> None:
         # Each intermediate step has its own bilinear and linear form. Add the weak forms in reverse step order to be
@@ -70,14 +71,15 @@ class TransientRKSolver(Solver):
             else:
                 raise ValueError('Have not implemented {} time integration yet.'.format(self.scheme))
 
-    def _create_preconditioner(self) -> None:
+    def _create_preconditioners(self) -> None:
         # Each intermediate step needs its own preconditioner. Add the preconditioners in reverse step order to be
         # consistent with the order of t_param, dt_param, and gfu_0_list.
-        self.preconditioner_list = [self.model.construct_preconditioner(a) for a in self.a_list]
+        self.preconditioner_list = [self.model.construct_preconditioners(a) for a in self.a_list]
 
-    def _update_preconditioner(self, precond: Optional[Preconditioner] = None) -> None:
-        if precond is not None:
-            precond.Update()
+    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
+        for preconditioner in precond_lst:
+            if preconditioner is not None:
+                preconditioner.Update()
 
     def _load_and_apply_initial_conditions(self) -> None:
         self.gfu_0_list: List[ngs.GridFunction] = []

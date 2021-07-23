@@ -26,7 +26,11 @@ from config_functions import ConfigParser
 import sys
 from helpers.saving import SolutionFileSaver
 from helpers.error import calc_error
+from helpers.ngsolve_ import gridfunction_rigid_body_motion
 import numpy as np
+from pathlib import Path
+import os
+import contextlib
 
 """
 Module for the base solver class.
@@ -60,20 +64,19 @@ scheme_dt_coef = {'explicit euler': [1.0],
                   'RK 222': [1.0, 0.5 * (2.0 - ngs.sqrt(2.0))],
                   'RK 232': [1.0, 1.0, 0.5 * (2.0 - ngs.sqrt(2.0))]}
 
+
 class Solver(ABC):
     """
     Base class for the different stationary/transient solvers.
     """
     def __init__(self, model_class: Type[Model], config: ConfigParser) -> None:
         """
-        This function initializer the TimeSolver class.
+        This function initializes the TimeSolver class.
 
         Args:
             model_class: The model to solve.
         """
         self.config = config
-
-        self.check_error = self.config.get_item(['ERROR ANALYSIS', 'check_error_every_timestep'], bool, quiet=True)
 
         self.transient = self.config.get_item(['TRANSIENT', 'transient'], bool)
 
@@ -81,6 +84,7 @@ class Solver(ABC):
             self.scheme = self.config.get_item(['TRANSIENT', 'scheme'], str)
             self.scheme_order = scheme_order[self.scheme]
             self.scheme_dt_coef = scheme_dt_coef[self.scheme]
+            # Differentiate between multi-step and Runge-Kutta schemes. They use time step information differently.
             if self.scheme in ['RK 222', 'RK 232', 'adaptive three step']:
                 self.scheme_type = 'RK'
             else:
@@ -117,7 +121,7 @@ class Solver(ABC):
                 self.adaptive = True
 
                 # An adaptive scheme has additional parameters.
-                dt_tol = self.config.get_dict(['TRANSIENT', 'dt_tolerance'], None)
+                dt_tol = self.config.get_dict(['TRANSIENT', 'dt_tolerance'], '', None)
                 self.dt_abs_tol = dt_tol['absolute']
                 self.dt_rel_tol = dt_tol['relative']
 
@@ -142,12 +146,30 @@ class Solver(ABC):
         # Initialize model
         self.model = model_class(self.config, self.t_param)
 
+        # Set everything up for if error metrics should be calculated and saved to file after every time step.
+        self.check_error = self.config.get_item(['ERROR ANALYSIS', 'check_error_every_timestep'], bool, quiet=True)
+        self.save_error = self.config.get_item(['ERROR ANALYSIS', 'save_error_every_timestep'], bool, quiet=True)
+
+        if self.save_error:
+            # Error values at each time step will be saved to a file inside the output directory. Need to make sure the
+            # output directory exists or create it if it doesn't exist.
+            Path(self.model.run_dir + '/output/').mkdir(parents=True, exist_ok=True)
+            self.save_error_filename = self.model.run_dir + '/output/error_at_each_timestep.txt'
+
+            with open(self.save_error_filename, 'w') as f:
+                header = [metric + '_' + var for metric, var_lst in self.model.ref_sol['metrics'].items() for var in var_lst]
+                header.insert(0, 'time')
+                f.write(', '.join(header) + '\n')
+
         # Check that the linearization method is consistent with the time integration scheme chosen.
         if self.transient:
             if self.scheme in ['euler IMEX', 'CNLF', 'SBDF', 'adaptive IMEX', 'RK 222', 'RK 232']:
                 if self.model.linearize == 'Oseen':
+                    # IMEX + using Oseen linearization is nonsensical.
                     raise ValueError('Oseen linearization can\'t be used with IMEX time integration schemes.')
             elif self.model.linearize == 'IMEX':
+                # Not an IMEX scheme (would be caught by previous if statement) + not using IMEX linearization is
+                # nonsensical.
                 raise ValueError('IMEX linearization must be used with an IMEX time integration scheme.')
 
         self.gfu = self.model.construct_gfu()
@@ -187,6 +209,9 @@ class Solver(ABC):
         if self.save_to_file:
             if hasattr(self, 'gfu_0_list'):
                 self.saver.save(self.gfu_0_list[0], self.t_param[0].Get())
+                
+            if self.model.DIM:
+                self.saver.save(self.model.DIM_solver.phi_gfu_orig, self.t_param[0].Get(), DIM=True)
 
     def _dt_for_next_time_to_hit(self) -> float:
         """
@@ -271,6 +296,14 @@ class Solver(ABC):
                     for i in range(len(self.t_param)):
                         self.t_param[i].Set(self.t_param[i].Get() + self.dt_param[i].Get())
 
+                if self.model.DIM and self.model.DIM_solver.rigid_body_motion:
+                    # If using rigid body motion need to update the phase field to reflect the new location of the
+                    # phase field.
+                    gridfunction_rigid_body_motion(self.t_param[0], self.model.DIM_solver.phi_gfu_orig,
+                                                   self.model.DIM_solver.phi_gfu, self.model.DIM_solver.inv_R,
+                                                   self.model.mesh, self.model.DIM_solver.N,
+                                                   self.model.DIM_solver.scale, self.model.DIM_solver.offset)
+                    
             self._apply_boundary_conditions()
 
             self._re_assemble()
@@ -280,7 +313,7 @@ class Solver(ABC):
             # Calculate local error, accept/reject current result, and update timestep
             accept_this_iteration, local_error_abs, local_error_rel, component = self._update_time_step()
 
-            # Log information about the current timesstep
+            # Log information about the current timestep
             self._log_timestep(accept_this_iteration, local_error_abs, local_error_rel, component)
 
             # If this iteration met all all requirements for accepting the solution
@@ -304,9 +337,16 @@ class Solver(ABC):
                             tmp = (self.t_param[0].Get() - self.t_range[0]) % self.save_freq[0]
                         if math.isclose(tmp, 0.0, abs_tol=self.dt_param[0].Get() * 1e-2):
                             self.saver.save(self.gfu, self.t_param[0].Get())
+                            
+                            if self.model.DIM:
+                                self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+
                     elif self.save_freq[1] == 'numit':
                         if self.num_iters % self.save_freq[0] == 0:
                             self.saver.save(self.gfu, self.t_param[0].Get())
+                            
+                            if self.model.DIM:
+                                self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
 
                 # This iteration was accepted, break out of the while loop
                 break
@@ -318,9 +358,15 @@ class Solver(ABC):
                     # Save the current solution before ending the run.
                     if self.save_to_file:
                         self.saver.save(self.gfu, self.t_param[0].Get())
+
+                        if self.model.DIM:
+                            self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
                     else:
                         tmp_saver = SolutionFileSaver(self.model, quiet=True)
                         tmp_saver.save(self.gfu, self.t_param[0].Get())
+
+                        if self.model.DIM:
+                            tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
 
                     sys.exit('At t = {0} the maximum number of rejected time steps has been exceeded. Saving current '
                              'solution to file and ending the run.'.format(self.t_param[0].Get()))
@@ -341,7 +387,7 @@ class Solver(ABC):
         # Recreate the linear form, bilinear form, and preconditioner
         self._create_linear_and_bilinear_forms()
         self._assemble()
-        self._create_preconditioner()
+        self._create_preconditioners()
 
     def reset_model(self) -> None:
         """
@@ -367,7 +413,7 @@ class Solver(ABC):
                     self.t_param[i+1].Set(tmp)
 
             if self.adaptive:
-                dt_tol = self.config.get_dict(['TRANSIENT', 'dt_tolerance'], None)
+                dt_tol = self.config.get_dict(['TRANSIENT', 'dt_tolerance'], '', None)
                 self.dt_abs_tol = dt_tol['absolute']
                 self.dt_rel_tol = dt_tol['relative']
                 self.dt_range = self.config.get_list(['TRANSIENT', 'dt_range'], float)
@@ -381,9 +427,22 @@ class Solver(ABC):
             self.t_param = [ngs.Parameter(0.0)]
             self.scheme_type = 'stationary'
 
+        # If error metrics are being saved after every time step add a note to the file that the model was reset.
+        if self.save_error:
+            with open(self.save_error_filename, 'a') as f:
+                f.write('reset model\n')
+
         self.gfu = self.model.construct_gfu()
 
+        if self.transient:
+            # If a transient solve is being conducted the model variables need to be reset to the initial condition. The
+            # initial condition and reference solution may also need to be reloaded if the mesh or finite element space
+            # has changed.
+            self.model.update_model_variables(self.gfu, ic_update=True, ref_sol_update=True, time_step=None)
+
         self._load_and_apply_initial_conditions()
+
+        self.model.update_linearization_terms(self.model.IC)
 
         self.num_iters = 0
         self.num_rejects = 0  # Flag to prevent an infinite loop of rejected runs.
@@ -404,6 +463,9 @@ class Solver(ABC):
             if hasattr(self, 'gfu_0_list'):
                 self.saver.save(self.gfu_0_list[0], self.t_param[0].Get())
 
+            if self.model.DIM:
+                self.saver.save(self.model.DIM_solver.phi_gfu_orig, self.t_param[0].Get(), DIM=True)
+
     def solve(self) -> GridFunction:
         """
         This function solves the model, either a single stationary solve or the entire transient solve.
@@ -413,7 +475,7 @@ class Solver(ABC):
         """
         self._create_linear_and_bilinear_forms()
 
-        self._create_preconditioner()
+        self._create_preconditioners()
 
         self._assemble()
 
@@ -423,8 +485,30 @@ class Solver(ABC):
             while (self.t_param[0].Get() < self.t_range[1]) and not np.isclose(self.t_param[0].Get(), self.t_range[1]):
                 self._solve()
 
-                if self.check_error:
+                if self.check_error and self.save_error:
+                    # Print out the error metrics at each time step and save them to file.
+                    error_lst = calc_error(self.config, self.model, self.gfu)
+                    error_lst.insert(0, str(self.t_param[0].Get()))
+
+                    # Write the calculated error metrics at the given time step to file.
+                    with open(self.save_error_filename, 'a') as f:
+                        f.write(', '.join([str(item) for item in error_lst]) + '\n')
+
+                elif self.check_error:
+                    # Print out the error metrics at each time step.
                     calc_error(self.config, self.model, self.gfu)
+
+                elif self.save_error:
+                    # Only saving the error metrics to file at each time step, so need to suppress the print statements
+                    # from calc_error.
+                    with open(os.devnull, 'w') as f_tmp, contextlib.redirect_stdout(f_tmp):
+                        error_lst = calc_error(self.config, self.model, self.gfu)
+                        error_lst.insert(0, str(self.t_param[0].Get()))
+
+                        # Write the calculated error metrics at the given time step to file.
+                        with open(self.save_error_filename, 'a') as f:
+                            f.write(', '.join([str(item) for item in error_lst]) + '\n')
+
         else:
             # Perform a stationary solve
             self._solve()
@@ -432,6 +516,9 @@ class Solver(ABC):
         # Save the final result
         if self.save_to_file:
             self.saver.save(self.gfu, self.t_param[0].Get())
+
+            if self.model.DIM:
+                self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
 
         return self.gfu
 
@@ -460,13 +547,13 @@ class Solver(ABC):
         """
 
     @abstractmethod
-    def _create_preconditioner(self) -> None:
+    def _create_preconditioners(self) -> None:
         """
         Create the preconditioner(s) used by this time integration scheme.
         """
 
     @abstractmethod
-    def _update_preconditioner(self, precond: Optional[Preconditioner] = None) -> None:
+    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
         """
         Update the preconditioner(s) used by this time integration scheme. This is needed because the preconditioner(s)
         can't be updated if it is None.

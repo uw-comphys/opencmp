@@ -28,12 +28,13 @@ class ICFunctions(ConfigFunctions):
     Class to hold the initial condition functions.
     """
 
-    def __init__(self, config_rel_path: str, t_param: List[Parameter] = [Parameter(0.0)],
+    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = [Parameter(0.0)],
                  new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
-        super().__init__(config_rel_path, t_param)
+        super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the IC dict from the IC configfile.
-        self.ic_dict, self.ic_re_parse_dict = self.config.get_three_level_dict(self.t_param, new_variables)
+        self.ic_dict, self.ic_re_parse_dict = self.config.get_three_level_dict(self.import_dir, mesh, self.t_param,
+                                                                               new_variables)
 
     def set_initial_conditions(self, gfu_IC: GridFunction, mesh: Mesh, model_name: str,
                                model_components: Dict[str, int]) -> None:
@@ -54,10 +55,6 @@ class ICFunctions(ConfigFunctions):
             # Determine which component of the gridfunction the initial condition is for
             if var == 'all':
                 component = None
-
-            elif var.startswith('C_'):
-                # Source constant values are kept in model_components_values, not in the IC gridfunction.
-                continue
 
             else:
                 component = model_components[var]

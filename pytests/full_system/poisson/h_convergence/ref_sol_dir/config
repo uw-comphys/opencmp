@@ -1,5 +1,0 @@
-[REFERENCE SOLUTIONS]
-u = sin(pi * x) * cos(pi * y)
-
-[METRICS]
-L2_norm = u

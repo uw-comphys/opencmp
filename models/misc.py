@@ -25,6 +25,7 @@ from typing import Type
 Module containing helper functions related to models.
 """
 
+
 def get_model_class(model_name: str) -> Type[Model]:
     """
     Function to find the correct model to to find, initialize, and return an instance of the desired model class(es).

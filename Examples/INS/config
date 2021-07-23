@@ -1,0 +1,43 @@
+[MESH]
+filename = mesh_files/coarse_large_square_4bcs.vol 
+
+[DIM]
+diffuse_interface_method = False
+
+[FINITE ELEMENT SPACE]
+elements = u -> HDiv
+           p -> L2
+interpolant_order = 3
+
+[DG]
+DG = True
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = default
+preconditioner = default
+linearization_method = Oseen
+nonlinear_tolerance = relative -> 1e-4
+                      absolute -> 1e-6
+nonlinear_max_iterations = 3
+
+[TRANSIENT]
+transient = True
+scheme = adaptive two step
+time_range = 0.0, 0.1
+dt = 0.001
+dt_range = 1e-12, 0.01
+dt_tolerance = relative -> 1e-3
+               absolute -> 1e-3
+
+[VISUALIZATION]
+save_to_file = False
+
+[ERROR ANALYSIS]
+check_error = True
+error_average = p
+
+[OTHER]
+num_threads = 6
+model = INS
+run_dir = Examples/INS

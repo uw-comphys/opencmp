@@ -15,7 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from typing import Union, TYPE_CHECKING
+from typing import Union, Tuple, Optional, Dict, List, TYPE_CHECKING
 
 # Sphinx runs into a circular import with `from models import Model`, so only 
 # import Model for type checking.
@@ -29,6 +29,7 @@ import numpy as np
 from ngsolve import CoefficientFunction, FESpace, GridFunction, Mesh
 
 from config_functions import ConfigParser
+from helpers.ngsolve_ import get_special_functions
 
 
 def mean_to_zero(gfu: GridFunction, fes: FESpace, mesh: Mesh) -> GridFunction:
@@ -165,7 +166,85 @@ def _divergence(sol: GridFunction, mesh: Mesh) -> float:
     return div_var
 
 
-def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> None:
+def _surface_traction(sol: GridFunction, model: Model, marker: Optional[str]) -> CoefficientFunction:
+    """
+    Function to calculate the surface traction on an object described by a given mesh surface.
+
+    Args:
+        sol: The solution gridfunction.
+        model: The solved model to calculate the error for.
+        marker: The mesh marker for the surface of the object. If the diffuse interface method is being used this is not
+            needed since the phase field will be used to locate the object.
+
+    Returns:
+        The surface traction on the object due to the flow field.
+    """
+
+    if not 'u' in model.model_components.keys() and 'p' in model.model_components.keys():
+        raise ValueError('Surface traction can only be computed for models with fluid flow.')
+    else:
+        u_comp = model.model_components['u']
+        p_comp = model.model_components['p']
+
+    # Need some of the special ngsolve helper functions.
+    n, h, alpha, I_mat = get_special_functions(model.mesh, model.nu)
+
+    # Also need the kinematic viscosity at the current time step. Any model with fluid flow should have a kv parameter,
+    # so don't both checking for it.
+    kv = model.kv[0]
+
+    # If using L2 spaces for pressure need to use a special type of coefficient function to be able to evaluate boundary
+    # integrals.
+    if model.element['p'] == 'L2':
+        p_mat = ngs.BoundaryFromVolumeCF(sol.components[p_comp]) * I_mat
+    else:
+        p_mat = sol.components[p_comp] * I_mat
+
+    # For some reason using Grad(u) is less accurate than building a coefficientfunction out of the components of
+    # Grad(u).
+    marker_fes = ngs.H1(model.mesh, order=model.interp_ord, dgjumps=model.DG)
+    marker_gfu_lst = []
+    for i in range(model.mesh.dim):
+        for j in range(model.mesh.dim):
+            gfu_tmp = ngs.GridFunction(marker_fes)
+            gfu_tmp.Set(ngs.Grad(sol.components[u_comp])[i,j])
+            marker_gfu_lst.append(gfu_tmp)
+
+    grad_u = ngs.CoefficientFunction(tuple(marker_gfu_lst), dims=(model.mesh.dim, model.mesh.dim))
+
+    if isinstance(marker, str):
+        # A conformal mesh is being used.
+        #
+        # Confirm that the marker name corresponds to an actual mesh surface.
+        if not marker in model.mesh.GetBoundaries():
+            raise ValueError('{} is not a mesh surface.'.format(marker))
+
+        # Note that the rho*u*u component of the stress tensor is not included because it is assumed that there is no
+        # mass transfer through the surface.
+        surface_gfu = ngs.GridFunction(marker_fes)
+        surface_gfu.Set(ngs.CoefficientFunction(1.0), definedon=model.mesh.Boundaries(marker))
+        surface_traction = ngs.Integrate(((kv * grad_u - p_mat) * n) * surface_gfu, model.mesh, ngs.BND)
+
+    elif marker is None:
+        # The diffuse interface method is being used.
+        #
+        # Confirm that DIM is actually being used.
+        if not model.DIM:
+            raise ValueError('The diffuse interface method is not being used, so a mesh surface must be given to locate'
+                             ' the surface of the object.')
+
+        # Note that the rho*u*u component of the stress tensor is not included because it is assumed that there is no
+        # mass transfer through the surface.
+        # Also note that phi is assumed to be 1 in the fluid and 0 in the object, so a (1-phi) term is added to ensure
+        # that the surface traction integral only occurs over the outer surface of the object. Otherwise the surface
+        # traction integral would double count the inner and outer surfaces of the object.
+        surface_traction = ngs.Integrate((kv * grad_u - p_mat) * -model.DIM_solver.grad_phi_gfu
+                                         * model.DIM_solver.phi_gfu, model.mesh)
+
+    return surface_traction
+
+
+def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> List:
     """
     Function to calculate L2 error and other error metrics and print them.
 
@@ -173,10 +252,15 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> None:
         config: Config file from which to grab.
         model: The solved model to calculate the error for.
         sol: Gridfunction that contains the current solution.
+
+    Returns:
+        A list of all of the calculated error metrics ordered by the order of the model.ref_sol['metrics'] dictionary.
     """
 
     average_lst = config.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
     norm_lst = ['l1_norm', 'l2_norm', 'linfinity_norm']
+
+    error_lst = []
 
     if model.ref_sol['metrics']:
         for metric, var_lst in model.ref_sol['metrics'].items():
@@ -191,6 +275,7 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> None:
                     else:
                         err = norm(metric.lower(), sol.components[component], ref_sol, model.mesh, model.fes.components[component], average)
 
+                    error_lst.append(err)
                     print('{0} in {1}: {2}'.format(metric.replace('_', ' '), var, err))
 
             elif metric == 'divergence':
@@ -202,6 +287,7 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> None:
                     else:
                         div_var = _divergence(sol.components[component], model.mesh)
 
+                    error_lst.append(div_var)
                     print('divergence of {0}: {1}'.format(var, div_var))
 
             elif metric == 'facet_jumps':
@@ -213,7 +299,22 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> None:
                     else:
                         mag_jumps = _facet_jumps(sol.components[component], model.mesh)
 
+                    error_lst.append(mag_jumps)
                     print('magnitude of jump of {0} facets: {1}'.format(var, mag_jumps))
+
+            elif metric == 'surface_traction':
+                # Calculate the surface traction.
+                for marker in var_lst:
+                    if marker == 'None':
+                        surface_traction = _surface_traction(sol, model, None)
+                        error_lst.append([st for st in surface_traction])
+                        print('surface traction: {}'.format([st for st in surface_traction]))
+                    else:
+                        surface_traction = _surface_traction(sol, model, marker)
+                        error_lst.append([st for st in surface_traction])
+                        print('surface traction on {0}: {1}'.format(marker, [st for st in surface_traction]))
 
             else:
                 raise ValueError('{} has not been implemented yet.'.format(metric))
+
+    return error_lst

@@ -16,13 +16,13 @@
 ########################################################################################################################
 
 from config_functions import ConfigParser
-from config_functions import load_config
 from . import interface, mesh_helpers
-from helpers.ngsolve_ import numpy_to_NGSolve, gridfunction_rigid_body_motion
-from helpers.io import load_mesh, create_and_load_gridfunction_from_file
+from helpers.ngsolve_ import numpy_to_NGSolve
+from helpers.io import create_and_load_gridfunction_from_file
 import numpy as np
 import ngsolve as ngs
-from ngsolve import CoefficientFunction, GridFunction, Mesh
+from ngsolve import Mesh, Parameter
+from typing import List
 
 
 class DIM:
@@ -30,18 +30,27 @@ class DIM:
     Class to hold the diffuse interface methods and parameters.
     """
 
-    def __init__(self, DIM_dir: str) -> None:
+    def __init__(self, DIM_dir: str, import_dir: str, t_param: List[Parameter]) -> None:
         """
         Initialize the diffuse interface parameters.
 
         Args:
             DIM_dir: The run directory for the diffuse interface parameters.
+            import_dir: The path to the main run directory containing the file from which to import any Python
+                functions.
+            t_param: List of parameters representing the current and previous timestep times.
         """
         # Save the path to the DIM directory.
         self.DIM_dir = DIM_dir
 
+        # Set the file path to import Python functions from.
+        self.import_dir = import_dir
+
+        # Initialize the time parameters.
+        self.t_param = t_param
+
         # Load the DIM-specific configfile.
-        self.config = ConfigParser(self.DIM_dir + '/config')
+        self.config = ConfigParser(self.DIM_dir + '/dim_config')
 
         # Load the BC parameters.
         self.multiple_bcs = self.config.get_item(['DIM BOUNDARY CONDITIONS', 'multiple_bcs'], bool)
@@ -67,7 +76,7 @@ class DIM:
 
             # Generate the BC masks.
             if self.multiple_bcs:
-                self.bc_config = ConfigParser(self.DIM_dir + '/bc_dir/config')
+                self.bc_config = ConfigParser(self.DIM_dir + '/bc_dir/dim_bc_config')
                 self._load_bc_parameters(self.config, self.bc_config)
                 self._generate_BC_masks()
 
@@ -87,7 +96,8 @@ class DIM:
                 self.phi_arr = np.zeros(tuple([n + 1 for n in self.N]))
 
             # Get the names of the .stl files and the config files holding further information about them.
-            stl_filename_dict = self.config.get_dict(['PHASE FIELDS', 'stl_filename'], None, all_str=True)
+            stl_filename_dict = self.config.get_dict(['PHASE FIELDS', 'stl_filename'], self.import_dir, None,
+                                                     None, all_str=True)
             for config_filename, stl_filename in stl_filename_dict.items():
                 # Generate a phase field from the .stl file and incorporate it into self.phi_arr by taking the
                 # elementwise maximum.
@@ -115,7 +125,7 @@ class DIM:
 
             # Reset the BC parameters back to the values from the main DIM config file.
             if self.multiple_bcs:
-                self.bc_config = ConfigParser(self.DIM_dir + '/bc_dir/config')
+                self.bc_config = ConfigParser(self.DIM_dir + '/bc_dir/dim_bc_config')
                 self._load_bc_parameters(self.config, self.bc_config)
 
         elif self.load_method == 'file':
@@ -123,20 +133,42 @@ class DIM:
             #
             if self.multiple_bcs:
                 # Load BC parameters.
-                self.bc_config = ConfigParser(self.DIM_dir + '/bc_dir/config')
+                self.bc_config = ConfigParser(self.DIM_dir + '/bc_dir/dim_bc_config')
                 self._load_bc_parameters(self.config, self.bc_config, quiet=True)
 
         else:
             raise ValueError('Do not recognize method for loading the phase fields.')
 
         # Check for rigid body motion.
+        # Rigid body motion is currently constrained to rotation about the z-axis at some user-specified rotation speed.
+        # This is because rigid body motion is only being used to simulate impeller motion in a stirred-tank reactor.
         if 'RIGID BODY MOTION' in self.config.sections():
             self.rigid_body_motion = True
-            theta = load_config.parse_str(self.config.load_param_simple(['RIGID BODY MOTION', 'rotation_speed']), None)
-            self.b = np.array(load_config.parse_str(self.config.load_param_simple(['RIGID BODY MOTION', 'center_of_rotation']), None)).transpose()
-            speed = load_config.parse_str(self.config.load_param_simple(['RIGID BODY MOTION', 'translation_vector']), None)
-            self.inv_R = lambda t: np.array([[(1 - np.sin(theta*t)**2)/np.cos(theta*t), np.sin(theta*t)], [-np.sin(theta*t), np.cos(theta*t)]])
-            self.c = lambda t: np.array([s*t for s in speed]).transpose()
+            tmp = self.config.get_list(['RIGID BODY MOTION', 'rotation_speed'], float)
+            if len(tmp) == 2:
+                tmp_theta, ramp_time = tmp
+            else:
+                raise ValueError('Incorrect number of options specified for RIGID BODY MOTION rotation_speed. Expecting'
+                                 ' a rotation speed (rotations per unit time) and a ramp-up time (unit time).')
+            theta = lambda t: 0.5 * (0.0 - tmp_theta) * np.cos(np.pi * t / ramp_time) + 0.5 * (0.0 + tmp_theta) if t < ramp_time else tmp_theta
+
+            # Make sure N, scale, and offset are known, even if the phase fields are being loaded from file.
+            try:
+                tmp = self.N
+            except AttributeError:
+                self._load_nonconformal_parameters()
+
+            if self.dim == 2:
+                self.inv_R = lambda t: np.array([[(1 - ngs.sin(2.0 * np.pi * theta(t) * t) ** 2) / ngs.cos(2.0 * np.pi * theta(t) * t), ngs.sin(2.0 * np.pi * theta(t) * t)],
+                                                 [-ngs.sin(2.0 * np.pi * theta(t) * t), ngs.cos(2.0 * np.pi * theta(t) * t)]])
+
+            elif self.dim == 3:
+                self.inv_R = lambda t: \
+                    np.array([[(1 - ngs.sin(2.0 * np.pi * theta(t) * t) ** 2) / ngs.cos(2.0 * np.pi * theta(t) * t), ngs.sin(2.0 * np.pi * theta(t) * t), 0.0],
+                              [-ngs.sin(2.0 * np.pi * theta(t) * t), ngs.cos(2.0 * np.pi * theta(t) * t), 0.0],
+                              [0.0, 0.0, 1]])
+            else:
+                raise ValueError('Rigid body motion is only available in 2D and 3D.')
         else:
             self.rigid_body_motion = False
 
@@ -151,12 +183,12 @@ class DIM:
             raise ValueError('The diffuse interface method is only implemented in 2D and 3D.')
 
         # Load the nonconformal mesh parameters.
-        N_mesh = self.config.get_dict(['DIM', 'num_mesh_elements'], None)
-        scale = self.config.get_dict(['DIM', 'mesh_scale'], None)
-        offset = self.config.get_dict(['DIM', 'mesh_offset'], None)
+        N_mesh = self.config.get_dict(['DIM', 'num_mesh_elements'], self.import_dir, None)
+        scale  = self.config.get_dict(['DIM', 'mesh_scale'],        self.import_dir, None)
+        offset = self.config.get_dict(['DIM', 'mesh_offset'],       self.import_dir, None)
 
         # Check if phi should be created on a more refined mesh.
-        N = self.config.get_dict(['DIM', 'num_phi_mesh_elements'], None, quiet=True)
+        N = self.config.get_dict(['DIM', 'num_phi_mesh_elements'], self.import_dir, None, quiet=True)
         if not N:
             # Just use the mesh spacing of the full mesh to create phi.
             N = N_mesh
@@ -173,7 +205,7 @@ class DIM:
             self.offset = [offset['x'], offset['y'], offset['z']]
 
         # Load the interface parameters.
-        self.lmbda = self.config.get_item(['DIM', 'interface_width_parameter'], float)
+        self.lmbda = self.config.get_item(['DIM', 'interface_width_parameter'], float, quiet=True)
 
         # Load some parameters specific to how the interface approximation is created. These are highly optional.
         self.mnum = self.config.get_item(['DIM', 'mnum'], float, quiet=True)
@@ -191,10 +223,10 @@ class DIM:
             bc_config: The DIM BC config file (or the config file containing [VERTICES] and [CENTROIDS]).
             quiet: If True suppresses warnings about using default parameter values.
         """
-        self.vertices, _ = bc_config.get_one_level_dict('VERTICES', None) # There should be no reason to ever re-parse vertices.
+        self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None) # There should be no reason to ever re-parse vertices.
 
         try:
-            self.centroid, _ = bc_config.get_one_level_dict('CENTROIDS', None) # There should be no reason to ever re-parse centroid.
+            self.centroid, _ = bc_config.get_one_level_dict('CENTROIDS', self.import_dir, None) # There should be no reason to ever re-parse centroid.
         except KeyError:
             self.centroid = {}
 
@@ -309,7 +341,7 @@ class DIM:
             # The phase field and masks have already been created and saved as gridfunctions.
             fes = ngs.H1(mesh, order=interp_ord)
 
-            phase_field_filename_dict = self.config.get_dict(['PHASE FIELDS', 'phase_field_filename'], None, all_str=True)
+            phase_field_filename_dict = self.config.get_dict(['PHASE FIELDS', 'phase_field_filename'], self.import_dir, None, all_str=True)
             self.phi_gfu = create_and_load_gridfunction_from_file(phase_field_filename_dict['phi'], fes, [self.DIM_dir])
 
             if phase_field_filename_dict['grad_phi'] is None:
@@ -392,5 +424,14 @@ class DIM:
         # Enforce that phi stays within the range [0, 1]. Particularly necessary when the phase fields are originally
         # constructed on a refined mesh then projected onto a coarser simulation mesh.
         for i in range(len(self.phi_gfu.vec)):
-            self.phi_gfu.vec[i] = min(max(self.phi_gfu.vec[i], 0.0), 1.0)
+            self.phi_gfu.vec[i] = min(max(self.phi_gfu.vec[i], 1e-10), 1.0)
 
+        # Save a copy of phi as the initial phase field gridfunction (particularly important for rigid body motion).
+        fes = ngs.H1(mesh, order=interp_ord)
+        self.phi_gfu_orig = ngs.GridFunction(fes)
+        self.phi_gfu_orig.vec.data = self.phi_gfu.vec
+
+        if self.rigid_body_motion:
+            # Grad(phi) and |Grad(phi)| need to be coefficientfunctions so that they update as phi changes.
+            self.grad_phi_gfu = ngs.Grad(self.phi_gfu)
+            self.mag_grad_phi_gfu = ngs.Norm(ngs.Grad(self.phi_gfu))

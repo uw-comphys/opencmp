@@ -18,7 +18,7 @@
 import math
 # TODO: generalize so we don't have to import each one individually
 from models import Model
-from typing import Tuple, Type, List, Union
+from typing import Tuple, Type, List
 from config_functions import ConfigParser
 from solvers import TransientMultiStepSolver
 from abc import ABC, abstractmethod

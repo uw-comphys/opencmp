@@ -18,7 +18,7 @@
 from .base_config_functions import ConfigFunctions
 import ngsolve as ngs
 from ngsolve import Parameter, CoefficientFunction, GridFunction, FESpace, Mesh
-from typing import Dict, Tuple, Union, Optional, List
+from typing import Dict, Tuple, Union, List
 
 
 class BCFunctions(ConfigFunctions):
@@ -26,12 +26,14 @@ class BCFunctions(ConfigFunctions):
     Class to hold the boundary condition functions.
     """
 
-    def __init__(self, config_rel_path: str, t_param: List[Parameter] = [Parameter(0.0)],
+    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = [Parameter(0.0)],
                  new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
-        super().__init__(config_rel_path, t_param)
+        super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the BC dict from the BC configfile.
-        self.bc_dict, self.bc_re_parse_dict = self.config.get_three_level_dict(self.t_param, new_variables, ignore=['VERTICES', 'CENTROIDS'])
+        self.bc_dict, self.bc_re_parse_dict = self.config.get_three_level_dict(self.import_dir, None, self.t_param,
+                                                                               new_variables,
+                                                                               ignore=['VERTICES', 'CENTROIDS'])
 
     def load_bc_gridfunctions(self, bc_dict: Dict, fes: FESpace, model_components: Dict[str, int]) -> Dict:
         """
@@ -225,8 +227,8 @@ class BCFunctions(ConfigFunctions):
         return g_D
 
     def update_boundary_conditions(self, t_param: List[Parameter],
-                                   updated_variables: List[Dict[
-                                       str, Union[float, CoefficientFunction, GridFunction]]]) -> None:
+                                   updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]],
+                                   mesh: Mesh) -> None:
         """
         Function to update the boundary conditions with new values of the model_variables.
 
@@ -234,8 +236,10 @@ class BCFunctions(ConfigFunctions):
             t_param: List of parameters representing the current time and previous time steps.
             updated_variables: List of dictionaries containing any new model variables and their values at each time
                 step used in the time discretization scheme.
+            mesh: Mesh used by the model
         """
 
         for k1, v1 in self.bc_re_parse_dict.items():
             for k2, v2 in self.bc_re_parse_dict[k1].items():
-                self.bc_dict[k1][k2] = self.re_parse(self.bc_dict[k1][k2], self.bc_re_parse_dict[k1][k2], t_param, updated_variables)
+                self.bc_dict[k1][k2] = self.re_parse(self.bc_dict[k1][k2], self.bc_re_parse_dict[k1][k2],
+                                                     t_param,updated_variables, mesh)

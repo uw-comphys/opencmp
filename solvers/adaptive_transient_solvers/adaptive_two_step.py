@@ -48,25 +48,28 @@ class AdaptiveTwoStep(BaseAdaptiveTransientMultiStepSolver):
         self.model.apply_dirichlet_bcs_to(self.gfu)
 
     def _assemble(self) -> None:
-        self.a_pred.Assemble()
-        self.L_pred.Assemble()
-        self._update_preconditioner(self.preconditioner_pred)
+        for i in range(len(self.a_pred)):
+            self.a_pred[i].Assemble()
+            self.L_pred[i].Assemble()
+        self._update_preconditioners(self.preconditioner_pred)
 
-        self.a_corr.Assemble()
-        self.L_corr.Assemble()
-        self._update_preconditioner(self.preconditioner_corr)
+        for i in range(len(self.a_corr)):
+            self.a_corr[i].Assemble()
+            self.L_corr[i].Assemble()
+        self._update_preconditioners(self.preconditioner_corr)
 
     def _create_linear_and_bilinear_forms(self) -> None:
         self.a_pred, self.L_pred = crank_nicolson(self.model, self.gfu_0_list, self.dt_param)
         self.a_corr, self.L_corr = implicit_euler(self.model, self.gfu_0_list, self.dt_param)
 
-    def _create_preconditioner(self) -> None:
-        self.preconditioner_pred = self.model.construct_preconditioner(self.a_pred)
-        self.preconditioner_corr = self.model.construct_preconditioner(self.a_corr)
+    def _create_preconditioners(self) -> None:
+        self.preconditioner_pred = self.model.construct_preconditioners(self.a_pred)
+        self.preconditioner_corr = self.model.construct_preconditioners(self.a_corr)
 
-    def _update_preconditioner(self, precond: Optional[Preconditioner] = None) -> None:
-        if precond is not None:
-            precond.Update()
+    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
+        for preconditioner in precond_lst:
+            if preconditioner is not None:
+                preconditioner.Update()
 
     def _re_assemble(self) -> None:
         self._assemble()

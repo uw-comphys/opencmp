@@ -18,7 +18,7 @@
 import ngsolve as ngs
 from typing import List, Optional, Tuple, Union
 from ngsolve.comp import ProxyFunction
-from ngsolve import CoefficientFunction, Mesh, GridFunction, FESpace
+from ngsolve import CoefficientFunction, Mesh, GridFunction, Parameter
 import numpy as np
 from numpy import ndarray
 
@@ -213,64 +213,86 @@ def inverse_rigid_body_motion(new_coords: ndarray, inv_R: ndarray, b: ndarray, c
     return np.matmul(inv_R, (new_coords - c)) + b
 
 
-def gridfunction_rigid_body_motion(mesh: Mesh, old_gfu: GridFunction, fes: FESpace, inv_R: ndarray,
-                                   b: ndarray, c: ndarray, N: List[int], scale: List[float], offset: List[float],
-                                   dim: int) -> GridFunction:
+def gridfunction_rigid_body_motion(t: Parameter, orig_gfu: GridFunction, gfu: GridFunction, inv_R: callable, mesh: Mesh,
+                                   N: List[int], scale: List[float], offset: List[float]) -> GridFunction:
     """
     Construct a gridfunction following rigid body motion of an original field.
 
+    This function currently only handles rigid body rotation as the only application of the diffuse interface method to
+    moving domains is currently simulation of impeller motion in a stirred-tank reactor.
+
     Args:
+        t: Parameter containing the current time.
+        orig_gfu: Gridfunction containing the initial field.
+        gfu: The gridfunction whose values should be updated.
+        inv_R: The inverse of the rotation matrix.
         mesh: Structured quadrilateral/hexahedral NGSolve mesh.
-        old_gfu: Gridfunction containing the field at the previous time step.
-        fes: NGSolve FEM space used by the problem the gridfunction will be needed to solve.
-        inv_R: The inverse of the rotation matrix at the previous time.
-        b: The vector to the center of rotation.
-        c: The translation vector at the previous time.
         N: Number of mesh elements in each direction (N+1 nodes).
         scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
         offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
-        dim: Dimension of the domain (must be 2 or 3).
 
     Returns:
-        Gridfunction containing the field at the future time.
+        Gridfunction containing the field at the current time.
     """
 
-    if dim == 2:
-        tmp_arr = np.zeros((N[0] + 1, N[1] + 1))
+    if mesh.dim == 2:
+        tmp_arr = np.ones((N[0] + 1, N[1] + 1))
 
-        for i in range(N[0] + 1):
-            for j in range(N[1] + 1):
-                x = -offset[0] + scale[0] * i / N[0]
-                y = -offset[1] + scale[1] * j / N[1]
+        indices = np.indices((N[0] + 1, N[1] + 1)).transpose().reshape(-1, 2)
 
-                old_x, old_y = inverse_rigid_body_motion(np.array([x, y]).transpose(), inv_R, b, c)
+        new_coords = -np.array(offset) + np.array(scale) * indices / np.array(N)
+        old_coords = np.matmul(inv_R(t.Get()), new_coords.transpose())
 
-                if (old_x >= -offset[0]) and (old_x <= scale[0] - offset[0]) and (old_y >= -offset[1]) \
-                        and (old_y <= scale[1] - offset[1]):
+        for i in range(len(indices)):
+            old_x, old_y = old_coords[:, i]
+            ii, jj = indices[i, :]
+
+            if (old_x >= -offset[0]) and (old_x <= scale[0] - offset[0]) and (old_y >= -offset[1]) and \
+                    (old_y <= scale[1] - offset[1]):
+                # Only update points that are still within the original bounds of the phase field.
+                try:
                     mip = mesh(old_x, old_y)
-                    tmp_arr[i, j] = old_gfu(mip)
+                    tmp_arr[ii, jj] = orig_gfu(mip)
+                except:
+                    # The bounds of the phase field may extend beyond the bounds of the mesh (ex: a cylindrical mesh
+                    # with a rectangular prism phase field). As long as the object being approximated by the phase field
+                    # remains within the bounds of the mesh points on the phase field outside said bounds can be
+                    # ignored.
+                    pass
 
-    elif dim == 3:
-        tmp_arr = np.zeros((N[0] + 1, N[1] + 1, N[2] + 1))
+        gfu.Set(ngs.VoxelCoefficient((-offset[0], -offset[1]), (scale[0] - offset[0], scale[1] - offset[1]),
+                                     tmp_arr.transpose(), linear=True))
 
-        for i in range(N[0] + 1):
-            for j in range(N[1] + 1):
-                for k in range(N[2] + 1):
-                    x = -offset[0] + scale[0] * i / N[0]
-                    y = -offset[1] + scale[1] * j / N[1]
-                    z = -offset[2] + scale[2] * k / N[2]
+    elif mesh.dim == 3:
+        tmp_arr = np.ones((N[0] + 1, N[1] + 1, N[2] + 1))
 
-                    old_x, old_y, old_z = inverse_rigid_body_motion(np.array([x, y, z]).transpose(), inv_R, b, c)
+        indices = np.indices((N[0] + 1, N[1] + 1, N[2] + 1)).transpose().reshape(-1, 3)
 
-                    if (old_x >= -offset[0]) and (old_x <= scale[0] - offset[0]) and (old_y >= -offset[1]) \
-                            and (old_y <= scale[1] - offset[1]) and (old_z >= -offset[2]) and (old_z <= scale[2] -
-                                                                                               offset[2]):
-                        mip = mesh(old_x, old_y, old_z)
-                        tmp_arr[i, j, j] = old_gfu(mip)
+        new_coords = -np.array(offset) + np.array(scale) * indices / np.array(N)
+        old_coords = np.matmul(inv_R(t.Get()), new_coords.transpose())
+
+        for i in range(len(indices)):
+            old_x, old_y, old_z = old_coords[:, i]
+            ii, jj, kk = indices[i, :]
+
+            if (old_x >= -offset[0]) and (old_x <= scale[0] - offset[0]) and (old_y >= -offset[1]) and \
+                    (old_y <= scale[1] - offset[1]) and (old_z >= -offset[2]) and (old_z <= scale[2] - offset[2]):
+                # Only update points that are still within the original bounds of the phase field.
+                try:
+                    mip = mesh(old_x, old_y, old_z)
+                    tmp_arr[ii, jj, kk] = orig_gfu(mip)
+                except:
+                    # The bounds of the phase field may extend beyond the bounds of the mesh (ex: a cylindrical mesh
+                    # with a rectangular prism phase field). As long as the object being approximated by the phase field
+                    # remains within the bounds of the mesh points on the phase field outside said bounds can be
+                    # ignored.
+                    pass
+
+        gfu.Set(ngs.VoxelCoefficient((-offset[0], -offset[1], -offset[2]), (scale[0] - offset[0], scale[1] - offset[1],
+                                                                            scale[2] - offset[2]),
+                                     tmp_arr.transpose(2,1,0), linear=True))
 
     else:
         raise ValueError('Only works with 2D or 3D meshes.')
-
-    gfu = numpy_to_NGSolve(fes, tmp_arr, scale, offset, dim)
 
     return gfu

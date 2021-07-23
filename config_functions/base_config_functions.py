@@ -16,8 +16,7 @@
 ########################################################################################################################
 
 from .expanded_config_parser import ConfigParser
-import ngsolve as ngs
-from ngsolve import CoefficientFunction, GridFunction, Parameter
+from ngsolve import CoefficientFunction, GridFunction, Mesh, Parameter
 from os import path
 from typing import Dict, Union, Optional, List
 from .load_config import parse_str
@@ -28,13 +27,14 @@ class ConfigFunctions:
     Class to hold any functions from the config files.
     """
 
-    def __init__(self, config_rel_path: str, t_param: List[Parameter],
+    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter],
                  new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
         """
         Initializer
 
         Args:
             config_rel_path: The filename, and relative path, for the config file for this controller.
+            import_dir: The path to the main run directory containing the file from which to import any Python functions.
             t_param: List of parameters representing the current time and previous time steps.
             new_variables: List of dictionaries containing any new model variables and their values at each time step
                 used in the time discretization scheme.
@@ -59,6 +59,9 @@ class ConfigFunctions:
 
         # Set the time parameter.
         self.t_param = t_param
+
+        # Set the import file path.
+        self.import_dir = import_dir
 
     def _find_rel_path_for_file(self, file_name: str) -> str:
         """
@@ -87,9 +90,10 @@ class ConfigFunctions:
 
         return rel_file_path
 
-    def re_parse(self, param_dict: Dict[str, Union[str, float, CoefficientFunction, GridFunction]],
+    def re_parse(self, param_dict: Dict[str, Union[str, float, CoefficientFunction, GridFunction, list]],
                  re_parse_dict: Dict[str, str], t_param: Optional[List[Parameter]],
-                 updated_variables: List[Dict[str, Union[str, float, CoefficientFunction, GridFunction]]]) -> Dict:
+                 updated_variables: List[Dict[str, Union[str, float, CoefficientFunction, GridFunction]]],
+                 mesh: Mesh) -> Dict:
         """
         Iterates through a parameter dictionary and re-parses any expressions containing model variables to use the
         updated values of those variables.
@@ -101,6 +105,7 @@ class ConfigFunctions:
             t_param: List of parameters representing the current time and previous time steps. If None, the re-parsed
                 values have no possible time dependence and one single value is returned instead of a list of values
                 corresponding to the re-parsed value at each time step.
+            mesh: Mesh used by the model
             updated_variables: List of dictionaries containing any new model variables and their values at each time
                 step used in the time discretization scheme.
 
@@ -109,9 +114,14 @@ class ConfigFunctions:
         """
 
         for key, val in re_parse_dict.items():
-            # Re-parse the string expression and use to replace the parameter value in dict.
-            re_parse_val, variable_eval = parse_str(val, t_param, updated_variables)
-            param_dict[key] = re_parse_val
+            if callable(val):
+                # The expression is an imported Python function, so just re-evaluate it with the new time and model
+                # variable values.
+                param_dict[key] = [val(t_param[i], updated_variables[i], mesh) for i in range(len(t_param))]
+            else:
+                # Re-parse the string expression and use to replace the parameter value in dict.
+                re_parse_val, variable_eval = parse_str(val, self.import_dir, t_param, updated_variables, mesh=mesh)
+                param_dict[key] = re_parse_val
 
         return param_dict
 

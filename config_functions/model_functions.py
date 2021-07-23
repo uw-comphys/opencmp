@@ -17,8 +17,7 @@
 
 from .base_config_functions import ConfigFunctions
 from helpers.io import create_and_load_gridfunction_from_file
-import ngsolve as ngs
-from ngsolve import Parameter, CoefficientFunction, GridFunction, FESpace
+from ngsolve import Mesh, Parameter, CoefficientFunction, GridFunction, FESpace
 from typing import Dict, Optional, Union, List
 
 
@@ -27,22 +26,35 @@ class ModelFunctions(ConfigFunctions):
     Class to hold the model functions and parameters.
     """
 
-    def __init__(self, config_rel_path: str, t_param: List[Parameter] = [Parameter(0.0)],
+    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = [Parameter(0.0)],
                  new_variables: List[Dict[str, Optional[int]]] = [{}]) -> None:
-        super().__init__(config_rel_path, t_param)
+        super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the model functions/parameters/components dict from the main config file.
         try:
-            self.model_parameters_dict, self.model_parameters_re_parse_dict = self.config.get_two_level_dict('PARAMETERS', self.t_param, new_variables)
+            self.model_parameters_dict, self.model_parameters_re_parse_dict = self.config.get_two_level_dict(
+                'PARAMETERS', self.import_dir, mesh, self.t_param, new_variables)
         except KeyError:
             self.model_parameters_dict = {}
             self.model_parameters_re_parse_dict = {}
 
         try:
-            self.model_functions_dict, self.model_functions_re_parse_dict = self.config.get_two_level_dict('FUNCTIONS', self.t_param, new_variables)
+            self.model_functions_dict, self.model_functions_re_parse_dict = self.config.get_two_level_dict('FUNCTIONS',
+                                                                                                           self.import_dir,
+                                                                                                           mesh,
+                                                                                                           self.t_param,
+                                                                                                           new_variables)
         except KeyError:
             self.model_functions_dict = {}
             self.model_functions_re_parse_dict = {}
+
+        # Also construct a flattened version of the model parameters dictionary that can be used to identify model
+        # parameters which will be inputs to model expressions (ex: variables in the BCs or model function definitions).
+        self.model_parameters_names = {}
+        for parameter, var in self.model_parameters_dict.items():
+            for var in self.model_parameters_dict[parameter].keys():
+                name = parameter + '_' + var
+                self.model_parameters_names[name] = [parameter, var]
 
     def set_model_functions(self, fes: FESpace, model_components: Dict[str, int]) -> None:
         """
@@ -82,8 +94,8 @@ class ModelFunctions(ConfigFunctions):
                             self.model_functions_dict[function][var][i] = create_and_load_gridfunction_from_file(val, fes_tmp, [self.run_dir, self.run_dir + '/model_dir'])
 
     def update_model_functions(self, t_param: List[Parameter],
-                               updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]]) \
-            -> None:
+                               updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]],
+                               mesh: Mesh) -> None:
         """
         Function to update the model parameters/functions with new values of the model_variables.
 
@@ -94,7 +106,11 @@ class ModelFunctions(ConfigFunctions):
         """
 
         for k1, v1 in self.model_parameters_re_parse_dict.items():
-            self.model_parameters_dict[k1] = self.re_parse(self.model_parameters_dict[k1], self.model_parameters_re_parse_dict[k1], t_param, updated_variables)
+            self.model_parameters_dict[k1] = self.re_parse(self.model_parameters_dict[k1],
+                                                           self.model_parameters_re_parse_dict[k1],
+                                                           t_param, updated_variables, mesh)
 
         for k1, v1 in self.model_functions_re_parse_dict.items():
-            self.model_functions_dict[k1] = self.re_parse(self.model_functions_dict[k1], self.model_functions_re_parse_dict[k1], t_param, updated_variables)
+            self.model_functions_dict[k1] = self.re_parse(self.model_functions_dict[k1],
+                                                          self.model_functions_re_parse_dict[k1],
+                                                          t_param, updated_variables, mesh)

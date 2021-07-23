@@ -33,9 +33,10 @@ class Poisson(Model):
     def __init__(self, config: ConfigParser, t_param: List[Parameter]) -> None:
         # Specify information about the model components
         # NOTE: These MUST be set before calling super(), since it's needed in superclass' __init__
-        self.model_components               = {'u': None}
-        self.model_local_error_components   = {'u': True}
-        self.time_derivative_components     = {'u': True}
+        self.model_components               = {'u':  None}
+        self.model_local_error_components   = {'u':  True}
+        self.time_derivative_components     = [{'u': True}]
+        self.num_weak_forms                 = 1
 
         # Pre-define which BCs are accepted for this model, all others are thrown out.
         self.BC_init = {'robin':     {},
@@ -111,10 +112,10 @@ class Poisson(Model):
 
         return [u], [v]
 
-    def single_iteration(self, a: BilinearForm, L: LinearForm, precond: Preconditioner, gfu: GridFunction,
-                         time_step: int = 0) -> None:
+    def single_iteration(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
+                         precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
 
-        self.construct_and_run_solver(a, L, precond, gfu)
+        self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
 
 ########################################################################################################################
 # BILINEAR AND LINEAR FORM HELPER FUNCTIONS

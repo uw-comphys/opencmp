@@ -19,7 +19,7 @@ import configparser
 from .load_config import parse_str, convert_str_to_dict
 from os.path import isfile
 from typing import Any, Dict, List, Type, TypeVar, Union, cast, Optional, Tuple
-from ngsolve import CoefficientFunction, Parameter, GridFunction
+from ngsolve import CoefficientFunction, Mesh, Parameter
 
 T = TypeVar('T')
 
@@ -47,6 +47,7 @@ config_defaults: Dict = {
                   'maximum_rejected_solves': 1000},
     'ERROR ANALYSIS': {'check_error': False,
                        'check_error_every_timestep': False,
+                       'save_error_every_timestep': False,
                        'convergence_test': {'h': False, 'p': False},
                        'error_average': [],
                        'num_refinements': 4},
@@ -54,6 +55,7 @@ config_defaults: Dict = {
               'messaging_level': 0,
               'model': 'REQUIRED',
               'component_names': [],
+              'parameter_names': [],
               'run_dir': 'REQUIRED'},
     'VISUALIZATION': {'save_to_file': False,
                       'save_type': '.sol',
@@ -78,9 +80,7 @@ config_defaults: Dict = {
     'DIM BOUNDARY CONDITIONS': {'multiple_bcs': False,
                                 'overlap_interface_parameter': -1,
                                 'remainder': False},
-    'RIGID BODY MOTION': {'rotation_speed': 'REQUIRED',
-                          'center_of_rotation': 'REQUIRED',
-                          'translation_vector': 'REQUIRED'}
+    'RIGID BODY MOTION': {'rotation_speed': [1.0, 0.25]}
 }
 
 
@@ -97,7 +97,7 @@ class ConfigParser(configparser.ConfigParser):
 
         self.read(config_file_path)
 
-    def get_one_level_dict(self, config_section: str, t_param: Optional[List[Parameter]] = None,
+    def get_one_level_dict(self, config_section: str, import_dir: str, mesh: Mesh, t_param: Optional[List[Parameter]] = None,
                            new_variables: List[Dict[str, Optional[int]]] = [{}], all_str: bool = False) \
             -> Tuple[Dict, Dict]:
         """
@@ -112,9 +112,12 @@ class ConfigParser(configparser.ConfigParser):
 
         Args:
             config_section: The section of the config file to load parameters from.
+            import_dir: The path to the main run directory containing the file from which to import any Python
+                functions.
             t_param: List of parameters representing the current time and previous time steps. If None, the re-parsed
                 values have no possible time dependence and one single value is returned instead of a list of values
                 corresponding to the re-parsed value at each time step.
+            mesh: Mesh used by the model
             new_variables: List of dictionaries containing any new model variables and their values at each time
                 step used in the time discretization scheme.
             all_str: If True, don't bother parsing any values, just load them as strings.
@@ -127,7 +130,7 @@ class ConfigParser(configparser.ConfigParser):
         """
 
         dict_one: Dict[str, Union[str, float, CoefficientFunction, list]] = {}
-        re_parse_dict: Dict[str, str] = {}
+        re_parse_dict: Dict[str, Union[str, callable]] = {}
         for key in self[config_section]:
             if all_str:
                 # If all_str option is passed none of the parameters should ever need to be re-parsed.
@@ -139,16 +142,18 @@ class ConfigParser(configparser.ConfigParser):
                     dict_one[key] = [val_str for _ in t_param]
             else:
                 val_str = self.load_param_simple([config_section, key])
-                val, variable_eval = parse_str(val_str, t_param, new_variables, ['.sol'])
+                val, variable_eval = parse_str(val_str, import_dir, t_param, mesh=mesh, filetypes=['.sol'],
+                                               new_variables=new_variables)
                 dict_one[key] = val
 
-                if isinstance(variable_eval, str):
-                    # Add the string expression to re_parse_dict in case it needs to be re-parsed in the future,
+                if isinstance(variable_eval, str) or callable(variable_eval):
+                    # Add the string expression or imported Python function to re_parse_dict in case it needs to be
+                    # re-parsed in the future,
                     re_parse_dict[key] = variable_eval
 
         return dict_one, re_parse_dict
 
-    def get_two_level_dict(self, config_section: str, t_param: Optional[List[Parameter]] = None,
+    def get_two_level_dict(self, config_section: str, import_dir: str, mesh: Mesh, t_param: Optional[List[Parameter]] = None,
                            new_variables: List[Dict[str, Optional[int]]] = [{}]) -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a two-level dictionary. 
@@ -163,6 +168,8 @@ class ConfigParser(configparser.ConfigParser):
 
         Args:
             config_section: The section of the config file to load parameters from.
+            import_dir: The path to the main run directory containing the file from which to import any Python
+                functions.
             t_param: List of parameters representing the current time and previous time steps. If None, the re-parsed
                 values have no possible time dependence and one single value is returned instead of a list of values
                 corresponding to the re-parsed value at each time step.
@@ -182,13 +189,14 @@ class ConfigParser(configparser.ConfigParser):
 
         for key in self[config_section]:
             # 2nd level dictionary
-            dict_two, re_parse_dict_two = convert_str_to_dict(self[config_section][key], t_param, new_variables, ['.sol'])
+            dict_two, re_parse_dict_two = convert_str_to_dict(self[config_section][key], import_dir, t_param,
+                                                              mesh, new_variables, ['.sol'])
             dict_one[key] = dict_two
             re_parse_dict[key] = re_parse_dict_two
 
         return dict_one, re_parse_dict
 
-    def get_three_level_dict(self, t_param: Optional[List[Parameter]] = None,
+    def get_three_level_dict(self, import_dir: str, mesh: Mesh, t_param: Optional[List[Parameter]] = None,
                              new_variables: List[Dict[str, Optional[int]]] = [{}], ignore=[]) -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a three-level dictionary.
@@ -205,6 +213,8 @@ class ConfigParser(configparser.ConfigParser):
         |                }
 
         Args:
+            import_dir: The path to the main run directory containing the file from which to import any Python
+                functions.
             t_param: List of parameters representing the current time and previous time steps. If None, the re-parsed
                 values have no possible time dependence and one single value is returned instead of a list of values
                 corresponding to the re-parsed value at each time step.
@@ -232,7 +242,8 @@ class ConfigParser(configparser.ConfigParser):
             re_parse_dict_two = {}
             for k2 in self[k1]:
                 # 3rd level dictionaries
-                dict_three, re_parse_dict_three = convert_str_to_dict(self[k1][k2], t_param, new_variables, ['.sol'])
+                dict_three, re_parse_dict_three = convert_str_to_dict(self[k1][k2], import_dir, t_param, mesh,
+                                                                      new_variables, ['.sol'])
                 dict_two[k2] = dict_three
                 re_parse_dict_two[k2] = re_parse_dict_three
             dict_one[k1.lower()] = dict_two
@@ -335,8 +346,9 @@ class ConfigParser(configparser.ConfigParser):
 
         return param
 
-    def get_dict(self, config_keys: List[str], t_param: Optional[List[Parameter]] = None, quiet: bool = False,
-                 all_str: bool = False) -> Dict[str, Any]:
+    def get_dict(self, config_keys: List[str], import_dir: str, mesh: Optional[Mesh] = None,
+                 t_param: Optional[List[Parameter]] = None, quiet: bool = False, all_str: bool = False)\
+            -> Dict[str, Any]:
         """
         Function to load a one level dictionary of parameters from the config file.
 
@@ -344,6 +356,9 @@ class ConfigParser(configparser.ConfigParser):
 
         Args:
             config_keys: The keys needed to access the parameters from the config file.
+            import_dir: The path to the main run directory containing the file from which to import any Python
+                functions.
+            mesh: Mesh for the model
             t_param: List of parameters representing the current time and previous time steps. If None, the re-parsed
                 values have no possible time dependence and one single value is returned instead of a list of values
                 corresponding to the re-parsed value at each time step.
@@ -358,7 +373,7 @@ class ConfigParser(configparser.ConfigParser):
         if isinstance(string, str):
             # If loaded from the config file the string will need to be parsed into a dict, otherwise if it was taken
             # from config_defaults it will already be a dict.
-            param_dict, re_parse_dict = convert_str_to_dict(string, t_param, all_str=all_str)
+            param_dict, re_parse_dict = convert_str_to_dict(string, import_dir, t_param, mesh=mesh, all_str=all_str)
         elif isinstance(string, dict):
             param_dict = string
             re_parse_dict = {}

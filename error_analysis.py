@@ -38,9 +38,6 @@ def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
     component = solver.model.model_components[var]
     average = component in average_lst
 
-    # Reload the model's mesh and finite element space so convergence tests can be chained and don't affect each other.
-    solver.model.load_mesh_fes(mesh=True, fes=True)
-
     # First solve used the default settings.
     if component is None:
         err = norm('l2_norm', sol, solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
@@ -50,7 +47,7 @@ def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
                    solver.model.mesh, solver.model.fes.components[component], average)
 
     # Track the convergence information.
-    num_dofs_lst = [solver.model.fes.ndof]
+    num_dofs_lst = [solver.model.mesh.ne]
     error_lst = [err]
 
     # Then run through a series of mesh refinements and resolve on each
@@ -68,13 +65,13 @@ def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
             err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
                        solver.model.mesh, solver.model.fes.components[component], average)
 
-        num_dofs_lst.append(solver.model.fes.ndof)
+        num_dofs_lst.append(solver.model.mesh.ne)
         error_lst.append(err)
 
         print('L2 norm at refinement {0}: {1}'.format(n+1, err))
 
     # Display the results nicely.
-    convergence_table = [['Refinement Level', 'DOFs', 'Error', 'Convergence Rate']]
+    convergence_table = [['Refinement Level', 'Mesh Elements', 'Error', 'Convergence Rate']]
     convergence_table.append([1, num_dofs_lst[0], error_lst[0], 0])
 
     for n in range(num_refinements):
@@ -100,9 +97,6 @@ def p_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
     average_lst = config.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
     component = solver.model.model_components[var]
     average = component in average_lst
-
-    # Reload the model's mesh and finite element space so convergence tests can be chained and don't affect each other.
-    solver.model.load_mesh_fes(mesh=True, fes=True)
 
     # First solve used the default settings.
     if component is None:

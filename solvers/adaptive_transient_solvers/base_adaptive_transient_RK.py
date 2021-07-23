@@ -18,7 +18,7 @@
 import math
 # TODO: generalize so we don't have to import each one individually
 from models import Model
-from typing import Tuple, Type, List, Union
+from typing import Tuple, Type, List
 from config_functions import ConfigParser
 from solvers import TransientRKSolver
 from abc import ABC, abstractmethod
@@ -28,6 +28,7 @@ import sys
 """
 Module for the Runge Kutta adaptive transient solver class.
 """
+
 
 class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
     """
@@ -73,15 +74,17 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
         # This is checked to ensure that dt does not decrease to ~1e-64 or lower when the solver can't take a step.
         if dt_from_local_error < dt_min_allowed:
             # Save the current solution before ending the run.
-            if self.save_to_file:
+            if self.save_to_file and self.saver is not None:
                 self.saver.save(self.gfu, self.t_param[0].Get())
             else:
                 tmp_saver = SolutionFileSaver(self.model, quiet=True)
                 tmp_saver.save(self.gfu, self.t_param[0].Get())
 
-            sys.exit('At t = {0} further time steps must be smaller than the minimum time step. Saving current '
-                     'solution to file and ending the run. Suggest rerunning with a time step of {1} s.'
-                     .format(self.t_param[0].Get(), dt_from_local_error))
+            print('At t = {0} further time steps must be smaller than the minimum time step. Saving current'
+                  'solution to file and ending the run. Suggest rerunning with a time step of {1} s.'
+                  .format(self.t_param[0].Get(), dt_from_local_error))
+
+            sys.exit(1337)
 
         dt_new = min([dt_from_local_error, self._dt_for_next_time_to_hit(), dt_max_allowed])
 
@@ -99,8 +102,8 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
                 self.gfu_0_list[i].vec.data = self.gfu.vec
                 self.dt_param[i].Set(dt_new * self.scheme_dt_coef[i])
 
-            # Update the values of the model variables based on the previous timestep and re-parse the model functions
-            # as necessary.
+            # Update the values of the model variables based on the newly accepted timestep
+            # and re-parse the model functions as necessary.
             self.model.update_model_variables(self.gfu, time_step=self.scheme_order)
 
             # Update the model component values for all the intermediate time steps to be the trial functions.
@@ -113,6 +116,16 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
         else:
             # Repeat the time step with the new dt.
             #
+            # Update the linearization terms back to their starting values for the time step that will be rerun.
+            self.model.update_linearization_terms(self.gfu_0_list[0])
+
+            # Update the values of the model variables based on the last accepted timestep
+            # and re-parse the model functions as necessary.
+            if self.scheme == 'adaptive three step':
+                self.model.update_model_variables(self.gfu_0_list[0])
+            else:
+                self.model.update_model_variables(self.gfu_0_list[0], time_step=self.scheme_order)
+
             # Set all intermediate step solutions to the previous solution.
             for i in range(self.scheme_order - 1):
                 self.gfu_0_list[i].vec.data = self.gfu_0_list[-1].vec
@@ -121,9 +134,13 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
             self.t_param[0].Set(self.t_param[0].Get() - self.dt_param[0].Get())
 
             # Set all dt values to the new dt except for the last dt value (keep as the dt for the previous time step).
+            if self.scheme == 'adaptive three step':
+                dt_ref = self.dt_param[1].Get()
+            else:
+                dt_ref = dt_new
             self.dt_param[-1].Set(self.dt_param[0].Get())
             for i in range(self.scheme_order):
-                self.dt_param[i].Set(dt_new * self.scheme_dt_coef[i])
+                self.dt_param[i].Set(dt_ref * self.scheme_dt_coef[i])
 
             # Now adjust all intermediate time values to the correct value for the previous time step based on the new
             # dt.

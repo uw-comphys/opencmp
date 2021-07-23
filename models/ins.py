@@ -34,9 +34,10 @@ class INS(Model):
     def __init__(self, config: ConfigParser, t_param: List[Parameter]) -> None:
         # Specify information about the model components
         # NOTE: These MUST be set before calling super(), since it's needed in superclass' __init__
-        self.model_components               = {'u': 0,      'p': 1}
-        self.model_local_error_components   = {'u': True,   'p': True}
-        self.time_derivative_components     = {'u': True,   'p': False}
+        self.model_components                   = {'u':  0,      'p': 1}
+        self.model_local_error_components       = {'u':  True,   'p': True}
+        self.time_derivative_components         = [{'u': True,   'p': False}]
+        self.num_weak_forms                     = 1
 
         # Pre-define which BCs are accepted for this model, all others are thrown out.
         self.BC_init = {'dirichlet':    {},
@@ -52,7 +53,7 @@ class INS(Model):
             raise TypeError('Don\'t recognize the linearization method.')
 
         if self.linearize == 'Oseen':
-            nonlinear_tolerance = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'], None)
+            nonlinear_tolerance = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'], self.run_dir, None)
             self.abs_nonlinear_tolerance = nonlinear_tolerance['absolute']
             self.rel_nonlinear_tolerance = nonlinear_tolerance['relative']
             self.nonlinear_max_iters = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
@@ -102,8 +103,14 @@ class INS(Model):
     def update_linearization_terms(self, gfu: GridFunction) -> None:
         if self.linearize == 'Oseen':
             # Update the velocity linearization term.
-            comp_index = self.model_components['u']
-            self.W[comp_index].vec.data = gfu.components[comp_index].vec
+            try:
+                # First try just updating the value of the term.
+                comp_index = self.model_components['u']
+                self.W[comp_index].vec.data = gfu.components[comp_index].vec
+            except:
+                # In some cases the finite element space of the model will have changed, so the linearization term needs
+                # to be completely reconstructed.
+                self.W = self._construct_linearization_terms()
         else:
             # Do nothing, no linearization term to update.
             pass
@@ -210,8 +217,8 @@ class INS(Model):
 
         return [L]
 
-    def single_iteration(self, a: BilinearForm, L: LinearForm, precond: Preconditioner, gfu: GridFunction,
-                         time_step: int = 0) -> None:
+    def single_iteration(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
+                         precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
         if self.linearize == 'Oseen':
             # The component index representing velocity
             component = self.fes.components[self.model_components['u']]
@@ -226,11 +233,12 @@ class INS(Model):
             while not done_iterating:
                 self.apply_dirichlet_bcs_to(gfu, time_step=time_step)
 
-                a.Assemble()
-                L.Assemble()
-                precond.Update()
+                a_lst[0].Assemble()
+                L_lst[0].Assemble()
+                if precond_lst[0] is not None:
+                    precond_lst[0].Update()
 
-                self.construct_and_run_solver(a, L, precond, gfu)
+                self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
 
                 err = norm("l2_norm", self.W[comp_index], gfu.components[comp_index], self.mesh, component, average=False)
                 gfu_norm = mean(gfu.components[comp_index], self.mesh)
@@ -243,7 +251,7 @@ class INS(Model):
                 self.W[comp_index].vec.data = gfu.components[comp_index].vec
                 done_iterating = (err < self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) or (num_iteration > self.nonlinear_max_iters)
         elif self.linearize == 'IMEX':
-            self.construct_and_run_solver(a, L, precond, gfu)
+            self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
         else:
             raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
 
@@ -270,7 +278,8 @@ class INS(Model):
             # Linearized convection term.
             a += -dt * ngs.InnerProduct(ngs.OuterProduct(u, w), ngs.Grad(v)) * self.DIM_solver.phi_gfu * ngs.dx
 
-        # Force u to zero where phi is zero.
+        # Force u to zero where phi is zero. If DIM rigid body motion is being used force u to the velocity of the
+        # rigid body instead.
         a += dt * alpha * u * v * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
 
         if self.DG:
@@ -336,8 +345,9 @@ class INS(Model):
             - 1e-10 * p * q   # Stabilization term
             ) * self.DIM_solver.phi_gfu * ngs.dx
 
-        # Force grad(p) to zero where phi is zero.
-        a += -dt * p * (ngs.div(v)) * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
+        # Force grad(p) to zero where phi is zero. If rigid body motion is being used ignore this.
+        if not self.DIM_solver.rigid_body_motion:
+            a += -dt * p * (ngs.div(v)) * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
 
         if self.DG:
             avg_u = avg(u)
@@ -457,6 +467,13 @@ class INS(Model):
 
         # Domain integrals.
         L = dt * v * self.f[time_step] * self.DIM_solver.phi_gfu * ngs.dx
+
+        # Force u to zero where phi is zero. If DIM rigid body motion is being used force u to the velocity of the
+        # rigid body instead.
+        if self.DIM_solver.rigid_body_motion:
+            for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
+                g = self.DIM_BC['dirichlet']['u'][marker][time_step]
+                L += dt * alpha * g * v * (1.0 - self.DIM_solver.phi_gfu) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
 
         if self.DG:
             # Conformal Dirichlet BCs for u.

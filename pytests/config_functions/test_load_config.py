@@ -51,6 +51,7 @@ def presets_convert_str_to_dict() -> Tuple[
 
     return config_filename, correct_dict, correct_re_parse_dict, new_variables, filetypes
 
+
 @pytest.fixture()
 def presets_load_coefficientfunction_into_gridfunction() -> Tuple[Mesh, FESpace, FESpace, FESpace, Mesh, FESpace,
                                                                   FESpace, FESpace]:
@@ -84,13 +85,14 @@ def presets_load_coefficientfunction_into_gridfunction() -> Tuple[Mesh, FESpace,
 
     return mesh_2d, fes_scalar_2d, fes_vector_2d, fes_mixed_2d, mesh_3d, fes_scalar_3d, fes_vector_3d, fes_mixed_3d
 
+
 class TestParseStr:
     """ Class to test parse_to_str. """
     def test_1(self):
         """ Check that strings of the specified filetypes get kept as strings. """
         filetype = '.vol'
         input_str = 'mesh' + filetype
-        output_str, variable_eval = parse_str(input_str, None, [{}], [filetype])
+        output_str, variable_eval = parse_str(input_str, 'import_functions.py', None, [{}], [filetype])
 
         assert output_str == input_str # The input string should not have been parsed.
         assert not variable_eval       # The input string should not be flagged for re-parsing.
@@ -105,23 +107,24 @@ class TestParseStr:
         input_str = 'mesh' + unspecified_filetype
 
         with pytest.raises(pyparsing.ParseException): # Expect a parser error.
-            parse_str(input_str, None, [{}], [filetype])
+            parse_str(input_str, 'import_functions.py', None, [{}], [filetype])
 
     def test_3(self):
         """ Check that generic strings are parsed. """
         input_str = '3^2 + 6'            # Need to use a basic expression, can't directly compare coefficientfunctions.
         parsed_str = 3.0**2 + 6.0
-        output_str, variable_eval = parse_str(input_str, None)
+        output_str, variable_eval = parse_str(input_str, 'import_functions.py', None)
 
         assert output_str == parsed_str  # The input string was parsed correctly.
 
     def test_4(self):
         """ Check that non-string inputs do not get parsed and just get passed through. """
         input_obj = [1, 2, 3]
-        output_obj, variable_eval = parse_str(input_obj, None)
+        output_obj, variable_eval = parse_str(input_obj, 'import_functions.py', None)
 
         assert output_obj == input_obj  # The input object should not have been parsed.
         assert not variable_eval        # The input object should not be flagged for re-parsing.
+
 
 class TestConvertStrToDict:
     """ Class to test convert_str_to_dict. """
@@ -133,7 +136,8 @@ class TestConvertStrToDict:
 
         config = load_configfile(config_filename)
         input_str = config[config_section][config_key]
-        output_dict, output_re_parse_dict = convert_str_to_dict(input_str, [ngs.Parameter(0.0)], new_variables, filetypes)
+        output_dict, output_re_parse_dict = convert_str_to_dict(input_str, 'import_functions.py', [ngs.Parameter(0.0)],
+                                                                None, new_variables, filetypes)
 
         assert output_dict == correct_dict                   # Check that the parameter dictionary is correct.
         assert output_re_parse_dict == correct_re_parse_dict # Check that the re-parse dictionary is correct.
@@ -148,7 +152,7 @@ class TestConvertStrToDict:
         input_str = config[config_section][config_key]
 
         with pytest.raises(Exception):  # Expect an error.
-            convert_str_to_dict(input_str, [ngs.Parameter(0.0)], new_variables, filetypes)
+            convert_str_to_dict(input_str, 'import_functions.py', [ngs.Parameter(0.0)], None, new_variables, filetypes)
 
     def test_3(self, load_configfile, presets_convert_str_to_dict):
         """ Check that -> is a necessary separator. """
@@ -160,7 +164,8 @@ class TestConvertStrToDict:
         input_str = config[config_section][config_key]
 
         with pytest.raises(Exception):  # Expect an error.
-            convert_str_to_dict(input_str, [ngs.Parameter(0.0)], new_variables, filetypes)
+            convert_str_to_dict(input_str, 'import_functions.py', [ngs.Parameter(0.0)], None, new_variables, filetypes)
+
 
 class TestLoadCoefficientFunctionIntoGridFunction:
     """ Class to test load_coefficientfunction_into_gridfunction. """

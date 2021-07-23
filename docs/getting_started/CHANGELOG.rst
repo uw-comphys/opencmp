@@ -1,6 +1,16 @@
 OpenCMP Changelog
 =================
 
+July 23
+
+* Added ability for a model to have multiple weak forms. This is necessary for highly nonlinear models which solve each model variable separately (with different linearized forms of the weak form) during the overall solve at each time step.
+* Added ability to specify parameter values in config functions from imported Python functions.
+* Added rigid body rotation of phase fields for use in simulating impellers in chemical reactors.
+* DIM simulations now save the phase field in addition to the usual model variables if specified in the main configuration file. Phase fields are saved to the "output_phi/" directory and converted to a .pvd file in said directory if specified.
+* Fixed bug in CNLF so it now gives the expected second-order convergence for time step refinement.
+* Configuration file names have changed to indicate the subdirectory in which they can be found. They are now "config", "bc_config", "ic_config", "model_config", "ref_sol_config", "dim_config", and "dim_bc_config".
+* Removed the "Example Runs/" directory. All examples and tutorials can be found in "Examples/".
+
 June 4
 
 * Minor bug fixes.

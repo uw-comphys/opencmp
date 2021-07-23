@@ -27,7 +27,8 @@ class TestInitialization:
 
     def test_1(self):
         """ Check that run_dir was parsed correctly from the config file path. """
-        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', ngs.Parameter(1.5))
+        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', 'import_functions.py', None,
+                                                ngs.Parameter(1.5))
 
         assert test_config_functions.run_dir == 'pytests/config_functions'
 
@@ -36,7 +37,7 @@ class TestInitialization:
         # Need to change the working directory to get this to work.
         cur_dir = os.getcwd()
         os.chdir('pytests/config_functions')
-        test_config_functions = ConfigFunctions('example_config', ngs.Parameter(1.5))
+        test_config_functions = ConfigFunctions('example_config', 'import_functions.py', None, ngs.Parameter(1.5))
 
         assert test_config_functions.run_dir == '.'
 
@@ -45,7 +46,8 @@ class TestInitialization:
 
     def test_3(self):
         """ Check that a config parser object was actually created and contains all of the expected values. """
-        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', ngs.Parameter(1.5))
+        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', 'import_functions.py', None,
+                                                ngs.Parameter(1.5))
 
         expected_config = ConfigParser()
         expected_config.read('pytests/config_functions/example_config')
@@ -55,11 +57,13 @@ class TestInitialization:
     def test_4(self):
         """ Check that an error is raised if the config file does not exist. """
         with pytest.raises(FileNotFoundError):
-            test_config_functions = ConfigFunctions('pytests/config_functions/missing_config', ngs.Parameter(1.5))
+            test_config_functions = ConfigFunctions('pytests/config_functions/missing_config', 'import_functions.py',
+                                                    None, ngs.Parameter(1.5))
 
     def test_5(self):
         """ Check that t_param was set correctly. """
-        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', ngs.Parameter(1.5))
+        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', 'import_functions.py', None,
+                                                ngs.Parameter(1.5))
 
         assert isinstance(test_config_functions.t_param, ngs.Parameter)
         assert test_config_functions.t_param.Get() == 1.5
@@ -71,7 +75,7 @@ class TestFindRelPathForFile:
         # Need to change the working directory to get this to work.
         cur_dir = os.getcwd()
         os.chdir('pytests/config_functions')
-        test_config_functions = ConfigFunctions('example_config', ngs.Parameter(0.0))
+        test_config_functions = ConfigFunctions('example_config', 'import_functions.py', None, ngs.Parameter(0.0))
 
         # Confirm that the path to the file is correct.
         rel_path = test_config_functions._find_rel_path_for_file('example_config')
@@ -82,7 +86,8 @@ class TestFindRelPathForFile:
 
     def test_2(self):
         """ Check that a file in the specified run directory can be found. """
-        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', ngs.Parameter(0.0))
+        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', 'import_functions.py', None,
+                                                ngs.Parameter(0.0))
 
         # Confirm that the path to the file is correct.
         rel_path = test_config_functions._find_rel_path_for_file('example_config')
@@ -92,7 +97,8 @@ class TestFindRelPathForFile:
         """
         Check that a file in the main run directory (one level up from the specified run directory) can be found.
         """
-        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', ngs.Parameter(0.0))
+        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', 'import_functions.py', None,
+                                                ngs.Parameter(0.0))
 
         # Confirm that the path to the file is correct.
         rel_path = test_config_functions._find_rel_path_for_file('conftest.py')
@@ -100,7 +106,8 @@ class TestFindRelPathForFile:
 
     def test_4(self):
         """ Check that a file that can't be found raises an error. """
-        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', ngs.Parameter(0.0))
+        test_config_functions = ConfigFunctions('pytests/config_functions/example_config', 'import_functions.py', None,
+                                                ngs.Parameter(0.0))
 
         with pytest.raises(FileNotFoundError):
             rel_path = test_config_functions._find_rel_path_for_file('missing_config')

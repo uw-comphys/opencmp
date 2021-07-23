@@ -15,20 +15,21 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import ngsolve as ngs
-from ngsolve import Parameter, CoefficientFunction, GridFunction
+from ngsolve import Mesh, Parameter, CoefficientFunction, GridFunction
 from typing import List, Optional, Dict, Tuple, Union
 from . import parse_arithmetic
 
 
-def parse_str(string: str, t_param: Optional[List[Parameter]], new_variables: List[Dict[str, Optional[int]]] = [{}],
-              filetypes: List[str] = ['.vol', '.sol', '.vtk']) \
-        -> Tuple[Union[str, float, CoefficientFunction, list], Union[str, bool]]:
+def parse_str(string: str, import_dir: str, t_param: Optional[List[Parameter]],
+              new_variables: List[Dict[str, Optional[int]]] = [{}], filetypes: List[str] = ['.vol', '.sol', '.vtk'],
+              mesh: Optional[Mesh] = None) -> Tuple[Union[str, float, CoefficientFunction, list], Union[str, bool]]:
     """
     Checks if a string appears to be a path to a file and if not parses the string into Python code.
 
     Args:
         string: The string.
+        import_dir: The path to the main run directory containing the file from which to import any Python functions.
+        mesh: Mesh used by the model
         t_param: List of parameters representing the current time and previous time steps. If None, the parsed values
             have no possible time dependence and one single value is returned instead of a list of values corresponding
             to the parsed value at each time step.
@@ -64,17 +65,18 @@ def parse_str(string: str, t_param: Optional[List[Parameter]], new_variables: Li
     # each time step. However, variable_eval will remain the same for each time step since it has nothing to do with the
     # time value.
     if t_param is None:
-        parsed_str, variable_eval = parse_arithmetic.eval_python(string, t_param, new_variables[0])
+        parsed_str, variable_eval = parse_arithmetic.eval_python(string, import_dir, mesh, new_variables[0], t_param)
     else:
         parsed_str = []
         for i in range(len(t_param)):
-            tmp_parsed_str, variable_eval = parse_arithmetic.eval_python(string, t_param[i], new_variables[i])
+            tmp_parsed_str, variable_eval = parse_arithmetic.eval_python(string, import_dir, mesh, new_variables[i],
+                                                                         t_param[i])
             parsed_str.append(tmp_parsed_str)
 
     return parsed_str, variable_eval
 
 
-def convert_str_to_dict(string: str, t_param: Optional[List[Parameter]],
+def convert_str_to_dict(string: str, import_dir: str, t_param: Optional[List[Parameter]], mesh: Mesh,
                         new_variables: List[Dict[str, Optional[int]]] = [{}],
                         filetypes: List[str] = ['.vol', '.sol', '.vtk'], all_str=False) -> Tuple[Dict, Dict]:
     """
@@ -83,9 +85,11 @@ def convert_str_to_dict(string: str, t_param: Optional[List[Parameter]],
 
     Args:
         string: The string.
+        import_dir: The path to the main run directory containing the file from which to import any Python functions.
         t_param: List of parameters representing the current time and previous time steps. If None, the parsed values
             have no possible time dependence and one single value is returned instead of a list of values corresponding
             to the parsed value at each time step.
+        mesh: Mesh used for the model
         new_variables: List of dictionaries containing any new model variables and their values at each time step used
             in the time discretization scheme.
         filetypes: List of possible filetypes to consider.
@@ -122,12 +126,12 @@ def convert_str_to_dict(string: str, t_param: Optional[List[Parameter]],
                 val = [val_tmp] * len(t_param)
             variable_eval = False
         else:
-            val, variable_eval = parse_str(val_tmp, t_param, new_variables, filetypes)
+            val, variable_eval = parse_str(val_tmp, import_dir, t_param, new_variables, filetypes, mesh)
         param_dict[key] = val
 
-        # If variable_eval is a string expression add it to re_parse_dict in case the expression needs to be re-parsed
-        # with new variable values in the future.
-        if isinstance(variable_eval, str):
+        # If variable_eval is a string expression or imported Python function add it to re_parse_dict in case the
+        # expression needs to be re-parsed with new variable values in the future.
+        if isinstance(variable_eval, str) or callable(variable_eval):
             re_parse_dict[key] = variable_eval
 
     return param_dict, re_parse_dict

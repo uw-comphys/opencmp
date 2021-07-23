@@ -45,13 +45,13 @@ def square_coarse_transient() -> ConfigParser:
 class TestStationary:
     def test_h_convergence_cg(self, capsys: CaptureFixture, square_coarse_h_converge: ConfigParser) -> None:
         # Run
-        manual_output_check(capsys, 'h converge CG', square_coarse_h_converge)
+        manual_output_check(capsys, 'h convergence CG', square_coarse_h_converge)
 
     def test_h_convergence_dg(self, capsys: CaptureFixture, square_coarse_h_converge: ConfigParser) -> None:
         # Change from CG to DG
         square_coarse_h_converge['DG']['DG'] = 'True'
         # Run
-        manual_output_check(capsys, 'h converge DG', square_coarse_h_converge)
+        manual_output_check(capsys, 'h convergence DG', square_coarse_h_converge)
 
 
 class TestTransient:
@@ -97,7 +97,7 @@ class TestTransient:
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'adaptive two step'
         # Run
-        automated_output_check(capsys, square_coarse_transient, [1e-5])
+        automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_2_step_adaptive_dg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
         # Change scheme
@@ -105,13 +105,13 @@ class TestTransient:
         # Change from CG to DG
         square_coarse_transient['DG']['DG'] = 'True'
         # Run
-        automated_output_check(capsys, square_coarse_transient, [1e-5])
+        automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_3_step_adaptive_cg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
         # Change scheme
         square_coarse_transient['TRANSIENT']['scheme'] = 'adaptive three step'
         # Run
-        automated_output_check(capsys, square_coarse_transient, [1e-5])
+        automated_output_check(capsys, square_coarse_transient, [9e-6])
 
     def test_3_step_adaptive_dg(self, capsys: CaptureFixture, square_coarse_transient: ConfigParser) -> None:
         # Change scheme
@@ -119,4 +119,4 @@ class TestTransient:
         # Change from CG to DG
         square_coarse_transient['DG']['DG'] = 'True'
         # Run
-        automated_output_check(capsys, square_coarse_transient, [1e-5])
+        automated_output_check(capsys, square_coarse_transient, [9e-6])

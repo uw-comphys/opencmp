@@ -21,25 +21,25 @@ from config_functions import ConfigParser
 
 class TestStationary:
     def test_DIM_poisson_1(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Poisson/DIM_poisson_1/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_poisson_1/config'))
 
     def test_DIM_poisson_2(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Poisson/DIM_poisson_2/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_poisson_2/config'))
 
     def test_DIM_poisson_3(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Poisson/DIM_poisson_3/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_poisson_3/config'))
 
     def test_DIM_poisson_4(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Poisson/DIM_poisson_4/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_poisson_4/config'))
 
     def test_DIM_poisson_5(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Poisson/DIM_poisson_5/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_poisson_5/config'))
 
     def test_DIM_poisson_6(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Poisson/DIM_poisson_6/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_poisson_6/config'))
 
     def test_DIM_stokes_1(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Stokes/DIM_stokes_1/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_stokes_1/config'))
 
     def test_DIM_stokes_2(self) -> None:
-        run_example(ConfigParser('Example Runs/DIM/Stokes/DIM_stokes_2/config'))
+        run_example(ConfigParser('pytests/full_system/dim/dim_stokes_2/config'))

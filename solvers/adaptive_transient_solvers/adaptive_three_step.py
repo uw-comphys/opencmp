@@ -23,6 +23,7 @@ from config_functions import ConfigParser
 from time_integration_schemes import implicit_euler
 from .base_adaptive_transient_RK import BaseAdaptiveTransientRKSolver
 
+
 class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
     """
     A transient solver with adaptive time-stepping that uses a three step method.
@@ -36,14 +37,14 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
     def __init__(self, model_class: Type[Model], config: ConfigParser) -> None:
         super().__init__(model_class, config)
 
-        self.gfu_long = self.model.construct_gfu()
-        self.gfu_short = self.model.construct_gfu()
+        self.gfu_long   = self.model.construct_gfu()
+        self.gfu_short  = self.model.construct_gfu()
 
     def reset_model(self) -> None:
         super().reset_model()
 
-        self.gfu_long = self.model.construct_gfu()
-        self.gfu_short = self.model.construct_gfu()
+        self.gfu_long   = self.model.construct_gfu()
+        self.gfu_short  = self.model.construct_gfu()
 
     def _apply_boundary_conditions(self) -> None:
         self.model.apply_dirichlet_bcs_to(self.gfu_long, 0)
@@ -51,38 +52,46 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
         self.model.apply_dirichlet_bcs_to(self.gfu, 0)
 
     def _assemble(self) -> None:
-        self.a_long.Assemble()
-        self.L_long.Assemble()
+        for i in range(len(self.a_long)):
+            self.a_long[i].Assemble()
+            self.L_long[i].Assemble()
 
     def _create_linear_and_bilinear_forms(self) -> None:
-        self.a_long, self.L_long = implicit_euler(self.model, self.gfu_0_list, self.dt_param, 0)
-        self.a_short, self.L_short = implicit_euler(self.model, self.gfu_0_list, self.dt_param, 1)
-        self.a, self.L = implicit_euler(self.model, [self.gfu_short], [self.dt_param[1]], 0)
+        #t_param    = [t^n+1,         t^n+1/2,         t^n]
+        #dt_param   = [t^n+1 - t^n,   t^n+1 - t^n+1/2, t^n - t^n-1]
+        #gfu_0_list = [gfu^n,         gfu^n,           gfu^n]
+        self.a_long, self.L_long    = implicit_euler(self.model, self.gfu_0_list,   self.dt_param,      0)
+        self.a_short, self.L_short  = implicit_euler(self.model, self.gfu_0_list,   self.dt_param,      1)
+        self.a, self.L              = implicit_euler(self.model, [self.gfu_short], [self.dt_param[1]],  0)
 
-    def _create_preconditioner(self) -> None:
-        self.preconditioner_long = self.model.construct_preconditioner(self.a_long)
-        self.preconditioner_short = self.model.construct_preconditioner(self.a_short)
-        self.preconditioner = self.model.construct_preconditioner(self.a)
+    def _create_preconditioners(self) -> None:
+        self.preconditioner_long    = self.model.construct_preconditioners(self.a_long)
+        self.preconditioner_short   = self.model.construct_preconditioners(self.a_short)
+        self.preconditioner         = self.model.construct_preconditioners(self.a)
 
-    def _update_preconditioner(self, precond: Optional[Preconditioner] = None) -> None:
-        if precond is not None:
-            precond.Update()
+    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
+        for preconditioner in precond_lst:
+            if preconditioner is not None:
+                preconditioner.Update()
 
     def _re_assemble(self) -> None:
         self._assemble()
-        self._update_preconditioner(self.preconditioner_long)
+        self._update_preconditioners(self.preconditioner_long)
 
     def _single_solve(self) -> None:
         # Single solve for the full time step.
         self.model.single_iteration(self.a_long, self.L_long, self.preconditioner_long, self.gfu_long, 0)
 
         # Update the linearization terms back to their t^n values.
+        # gfu_short needs to be solved with the same values for W as gfu_long since they have the same initial time
         self.model.update_linearization_terms(self.gfu_0_list[0])
 
         # Single solve for the first half of the time step.
-        self.a_short.Assemble()
-        self.L_short.Assemble()
-        self._update_preconditioner(self.preconditioner_short)
+        for i in range(len(self.a_short)):
+            self.a_short[i].Assemble()
+            self.L_short[i].Assemble()
+
+        self._update_preconditioners(self.preconditioner_short)
         self.model.single_iteration(self.a_short, self.L_short, self.preconditioner_short, self.gfu_short, 1)
 
         # Update the model component values at t^n+1/2 now that they have been solved for.
@@ -90,9 +99,11 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
         self.model.update_model_variables(self.gfu_short, time_step=1)
 
         # Single solve for the second half of the time step.
-        self.a.Assemble()
-        self.L.Assemble()
-        self._update_preconditioner(self.preconditioner)
+        for i in range(len(self.a)):
+            self.a[i].Assemble()
+            self.L[i].Assemble()
+
+        self._update_preconditioners(self.preconditioner)
         self.model.single_iteration(self.a, self.L, self.preconditioner, self.gfu, 0)
 
     def _calculate_local_error(self) -> Tuple[List[float], List[float], List[str]]:

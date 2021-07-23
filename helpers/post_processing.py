@@ -16,25 +16,48 @@
 ########################################################################################################################
 
 from config_functions import ConfigParser
-from ngsolve import GridFunction, Mesh, Parameter, VTKOutput
+from ngsolve import GridFunction, Mesh, Parameter, VTKOutput, H1
 from models import get_model_class, Model
 from pathlib import Path
 from os import remove
 import meshio
-from typing import Optional, Union, cast
+from typing import Optional, Union
 from multiprocessing.pool import Pool
 from multiprocessing import cpu_count
 
 
-def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Model] = None,
+class PhaseFieldModelMimic:
+    """
+    Helper class that mimics the attributes of the Model class that are used during saving and post-processing in order
+    to be able to post-process saved phase field .sol files to .vtu.
+    """
+
+    def __init__(self, model_to_copy: Model) -> None:
+        """
+        Initializer
+
+        Args:
+            model_to_copy: The model for the general simulation. Needed in order to know the config parameter values.
+        """
+
+        self.interp_ord = model_to_copy.interp_ord
+        self.save_names = ['phi']
+        self.mesh = model_to_copy.mesh
+        self.fes = H1(self.mesh, order=self.interp_ord)
+
+    def construct_gfu(self) -> GridFunction:
+        """ Function to construct a phase field gridfunction. """
+        return GridFunction(self.fes)
+
+
+def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union[Model, PhaseFieldModelMimic]] = None,
                delete_sol_file: bool = False) -> None:
     """
     Function to take the output .sol files and convert them into .vtu for visualization.
 
     Args:
-        confgi: The loaded config parser used by the model
+        config: The loaded config parser used by the model
         output_dir_path: The path to the folder in which the .sol files are, and where the .vtu files will be saved.
-        config_file_path: The path to the config file used by the model.
         model: The model that generated the .sol files.
         delete_sol_file: Bool to indicate whether or not to delete the original .sol files after converting to .vtu,
                          Default is False.
@@ -46,7 +69,7 @@ def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Model
         # Load model
         model_name  = config.get_item(['OTHER', 'model'], str)
         model_class = get_model_class(model_name)
-        model       = model_class(config, Parameter(0.0))
+        model       = model_class(config, [Parameter(0.0)])
 
     # Number of subdivisions per element
     subdivision = config.get_item(['VISUALIZATION', 'subdivision'], int)
@@ -105,7 +128,7 @@ def _sol_to_vtu(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
         sol_path_str: The path to the solve file to load
         output_dir_path: The path to the directory to save the .vtu into
         save_names: The names of the variables to save
-        delete_sol_file: Whether or not to detele the sol file after
+        delete_sol_file: Whether or not to delete the sol file after
         subdivision: Number of subdivisions on each mesh element
         mesh: The mesh on which the gfu was solved.
 
@@ -134,10 +157,20 @@ def _sol_to_vtu(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
               filename=filename, subdivision=subdivision).Do()
 
     # Convert .vtk to .vtu
-    meshio.read(filename + '.vtk').write(filename + '.vtu')
+    # This is only necessary for some versions of NGSolve. Newer versions of NGSolve save to .vtu.
+    if Path(filename + '.vtk').exists():
+        # Convert to .vtu
+        meshio.read(filename + '.vtk').write(filename + '.vtu')
 
-    # Remove the .vtk
-    remove(filename + '.vtk')
+        # Remove the .vtk
+        remove(filename + '.vtk')
+
+    elif Path(filename + '.vtu').exists():
+        # Already .vtu
+        pass
+
+    else:
+        raise FileNotFoundError('Neither .vtk nor .vtu files are being generated. Something is wrong with _sol_to_vtu.')
 
     # Delete .sol
     if delete_sol_file:

@@ -1,5 +1,0 @@
-[MultiComponentINS]
-u = all -> [1.5*4*y*(0.41-y)/(0.41*0.41)*exp(-x*10), 0.0]
-p = all -> 0
-a = all -> 0
-b = all -> 0

@@ -17,6 +17,7 @@
 
 import ngsolve as ngs
 from config_functions import ConfigParser, BCFunctions, ICFunctions, ModelFunctions, RefSolFunctions
+from config_functions.load_config import parse_str
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple, Union, cast
 from ngsolve.comp import ProxyFunction, FESpace, DifferentialSymbol
@@ -27,6 +28,7 @@ from helpers.io import load_mesh
 """
 Module for the base model class.
 """
+
 
 class Model(ABC):
     """
@@ -39,11 +41,17 @@ class Model(ABC):
 
         Args:
             config: A configparser object loaded with config file.
-            t_param: Parameter representing the current time.
+            t_param: List of parameters representing the current and previous timestep times.
         """
 
         # Set time stepping parameter.
         self.t_param = t_param
+
+        # Set config file.
+        self.config = config
+
+        # Get the run directory.
+        self.run_dir = self.config.get_item(['OTHER', 'run_dir'], str)
 
         # Dictionary to map variable name to index inside fes/gridfunctions
         # Also used for labeling variables in vtk output.
@@ -56,8 +64,11 @@ class Model(ABC):
             self.model_components: Dict[str, Optional[int]] = {}
             raise ValueError('Forgot to set self.model_components')
 
-        # Create a list of dictionaries to hold the values of the model variables at each time step.
-        self.model_components_values = [self.model_components.copy() for _ in self.t_param]
+        # Create a list of dictionaries to hold the values of any model variables or parameters that are variables in
+        # model function definitions (ex: if source = u * diffusion_coefficients_a then this list of dictionaries holds
+        # the values of u and diffusion_coefficients_a at each time step in the time discretization scheme).
+        self.update_variables = [self.model_components.copy() for _ in self.t_param]
+        self._add_multiple_parameters(config)
 
         # Dictionary to specify if a particular component should be used for error calculations
         # NOTE: Here for type-checking, do not remove.
@@ -67,18 +78,33 @@ class Model(ABC):
             self.model_local_error_components: Dict[str, bool] = {}
             raise ValueError('Forgot to set self.model_local_error_components')
 
-        # Dictionary to specify if a particular component should have a time derivative
+        # List of dictionaries to specify if a particular component should have a time derivative.
+        # Each dictionary in the list corresponds to a different weak form for the model.
         # NOTE: Here for type-checking, do not remove.
         #       Value must be set in the __init__ of a subclass, and must be set before calling super().
-        self.time_derivative_components: Dict[str, bool]
+        self.time_derivative_components: List[Dict[str, bool]]
         if not self.time_derivative_components:
-            self.time_derivative_components: Dict[str, bool] = {}
+            self.time_derivative_components: List[Dict[str, bool]] = []
             raise ValueError('Forgot to set self.time_derivative_components.')
 
-        # Ensure that no variable was missed
+        # The number of weak forms used by the model. E.g. the drift-flux model has two separate weak forms
+        # due to its discretization scheme. conservation of mass and momentum as de-coupled and solved sequentially
+        # thus each needs an independent weak form.
+        # NOTE: Here for type-checking, do not remove.
+        #       Value must be set in the __init__ of a subclass, and must be set before calling super().
+        self.num_weak_forms: int
+        if not self.num_weak_forms:
+            self.num_weak_forms = 0
+            raise ValueError('Forgot to set self.num_weak_forms.')
+
+        # Ensure that local error calculations are specified for each component
         assert len(self.model_components)\
-               == len(self.model_local_error_components)\
-               == len(self.time_derivative_components)
+               == len(self.model_local_error_components)
+        # Ensure that each weak form has derivatives associated with it
+        assert self.num_weak_forms == len(self.time_derivative_components)
+        # Ensure that every variable is specified for the time derivate terms for each weak form
+        for form in self.time_derivative_components:
+            assert len(self.model_components) == len(form)
 
         # NOTE: Here for type-checking, do not remove.
         #       Value must be set in the __init__ of a subclass, and must be set before calling super().
@@ -90,12 +116,6 @@ class Model(ABC):
         # Invert the model components dictionary, so that you can loop up component name by index
         self.model_components_inverted = dict(zip(self.model_components.values(), self.model_components.keys()))
 
-        # Set config file.
-        self.config = config
-
-        # Get the run directory.
-        self.run_dir = self.config.get_item(['OTHER', 'run_dir'], str)
-
         # The name of the model (helper variable). It is the name of the class.
         self.name = self.__class__.__name__.lower()
 
@@ -103,14 +123,14 @@ class Model(ABC):
         self.DIM = self.config.get_item(['DIM', 'diffuse_interface_method'], bool, quiet=True)
         if self.DIM:
             self.DIM_dir = self.config.get_item(['DIM', 'dim_dir'], str)
-            self.DIM_solver = DIM(self.DIM_dir)
+            self.DIM_solver = DIM(self.DIM_dir, self.run_dir, self.t_param)
 
         # Load the mesh. If the diffuse interface method is being used the mesh will be constructed/loaded by the DIM
         # solver.
         self.load_mesh_fes(mesh=True, fes=False)
 
         # Load the finite element space parameters.
-        self.element = self.config.get_dict(['FINITE ELEMENT SPACE', 'elements'], None, all_str=True)
+        self.element = self.config.get_dict(['FINITE ELEMENT SPACE', 'elements'], self.run_dir, None, all_str=True)
         self.interp_ord = self.config.get_item(['FINITE ELEMENT SPACE', 'interpolant_order'], int)
 
         # Ensure that each component has an associated element
@@ -136,16 +156,22 @@ class Model(ABC):
             # Default to a direct solve.
             self.solver = 'direct'
 
-        self.preconditioner = self.config.get_item(['SOLVER', 'preconditioner'], str)
-        if self.preconditioner == 'default':
-            # 'local' seems to be the default preconditioner in the NGSolve examples.
-            self.preconditioner = 'local'
-        if self.preconditioner == 'None':
-            # Parse the string value.
-            self.preconditioner = None
-            if self.solver in ['CG', 'MinRes']:
-                # CG and MinRes require a preconditioner or they fail with an AssertionError.
-                raise ValueError('Preconditioner can\'t be None if using CG or MinRes solvers.')
+        # Load the preconditioner types
+        self.preconditioners = self.config.get_list(['SOLVER', 'preconditioner'], str)
+        # Ensure that enough have been specified
+        assert len(self.preconditioners) == self.num_weak_forms
+
+        # Perform checks on preconditioner types
+        for i in range(len(self.preconditioners)):
+            if self.preconditioners[i] == 'default':
+                # 'local' seems to be the default preconditioner in the NGSolve examples.
+                self.preconditioners[i] = 'local'
+            if self.preconditioners[i] == 'None':
+                # Parse the string value.
+                self.preconditioners[i] = None
+                if self.solver in ['CG', 'MinRes']:
+                    # CG and MinRes require a preconditioner or they fail with an AssertionError.
+                    raise ValueError('Preconditioner can\'t be None if using CG or MinRes solvers.')
 
         self.solver_tolerance = self.config.get_item(['SOLVER', 'solver_tolerance'], float, quiet=True)
         self.solver_max_iters = self.config.get_item(['SOLVER', 'solver_max_iterations'], int, quiet=True)
@@ -156,9 +182,8 @@ class Model(ABC):
         # Note: Need dirichlet_names before constructing fes, but need to construct fes before gridfunctions can be
         #       loaded for ex: BCs, ICs, reference solutions. So, get the BC dict before constructing fes,
         #       but then actually load the BCs etc after constructing fes.
-        self.bc_functions       = BCFunctions(self.run_dir + '/bc_dir/config',
-                                              self.t_param,
-                                              self.model_components_values)
+        self.bc_functions       = BCFunctions(self.run_dir + '/bc_dir/bc_config', self.run_dir, self.mesh, self.t_param,
+                                              self.update_variables)
 
         # Get the boundary conditions.
         self.BC, self.dirichlet_names = self.bc_functions.set_boundary_conditions(self.BC_init)
@@ -170,15 +195,12 @@ class Model(ABC):
         self._test, self._trial = self._create_test_and_trial_functions()
 
         # Create the rest of the ConfigFunction classes
-        self.ic_functions       = ICFunctions(self.run_dir + '/ic_dir/config',
-                                              self.t_param,
-                                              self.model_components_values)
-        self.model_functions    = ModelFunctions(self.run_dir + '/model_dir/config',
-                                                 self.t_param,
-                                                 self.model_components_values)
-        self.ref_sol_functions  = RefSolFunctions(self.run_dir + '/ref_sol_dir/config',
-                                                  self.t_param,
-                                                  self.model_components_values)
+        self.ic_functions       = ICFunctions(self.run_dir + '/ic_dir/ic_config', self.run_dir, self.mesh, self.t_param,
+                                              self.update_variables)
+        self.model_functions    = ModelFunctions(self.run_dir + '/model_dir/model_config', self.run_dir, self.mesh,
+                                                 self.t_param, self.update_variables)
+        self.ref_sol_functions  = RefSolFunctions(self.run_dir + '/ref_sol_dir/ref_sol_config', self.run_dir, self.mesh,
+                                                  self.t_param, self.update_variables)
 
         # Load initial condition.
         self.IC = self.construct_gfu()
@@ -205,40 +227,31 @@ class Model(ABC):
         if self.DIM:
             self.DIM_solver.get_DIM_gridfunctions(self.mesh, self.interp_ord)
             # DIM_dirichlet_names should never be used and a DIM g_D is not needed.
-            self.DIM_bc_functions = BCFunctions(self.DIM_dir + '/bc_dir/config', self.t_param, self.model_components_values)
+            self.DIM_bc_functions = BCFunctions(self.DIM_dir + '/bc_dir/dim_bc_config', self.run_dir, None, self.t_param,
+                                                self.update_variables)
             self.DIM_BC, DIM_dirichlet_names = self.DIM_bc_functions.set_boundary_conditions(self.BC_init)
             self.DIM_BC = self.DIM_bc_functions.load_bc_gridfunctions(self.DIM_BC, self.fes, self.model_components)
 
         # By default assume that the model does not need to be linearized.
         self.linearize = None
 
-    def _add_multiple_components(self, config: ConfigParser) -> None:
+    def _add_multiple_parameters(self, config: ConfigParser) -> None:
         """
-        Function to add multiple components to the model from the config file.
+        Function to add multiple time-varying parameters (whose values are not known in closed form) to the model from
+        the config file.
 
         Args:
             config: The ConfigParser
         """
 
-        # Name of new components
-        new_components                                = config.get_list(['OTHER', 'component_names'], str)
-        # Whether each component should be added to the local error calculation
-        new_components_in_error_calc: Dict[str, bool] = config.get_dict(['OTHER', 'component_in_error_calc'], None)
-        # Whether each component has a time derivative associated with it
-        new_components_in_time_deriv: Dict[str, bool] = config.get_dict(['OTHER', 'component_in_time_deriv'], None)
+        # Name of time-varying parameters.
+        self.model_parameters = config.get_list(['OTHER', 'parameter_names'], str, quiet=True)
 
-        # Ensure that the user specified the required information about each variable
-        assert len(new_components) == len(new_components_in_error_calc) == len(new_components_in_time_deriv)
-
-        # Number of default variables
-        num_existing = len(self.model_components)
-
-        for i in range(len(new_components)):
-            component = new_components[i]
-
-            self.model_components[component]                     = i + num_existing
-            self.model_local_error_components[new_components[i]] = new_components_in_error_calc[component]
-            self.time_derivative_components[new_components[i]]   = new_components_in_time_deriv[component]
+        # Initialize all time values of each time-varying parameter to zero.
+        for param in self.model_parameters:
+            assert param not in self.update_variables[0].keys() # Should never be using the same name for a model component and parameter.
+            for time_dict in self.update_variables:
+                time_dict[param] = 0
 
     def _create_test_and_trial_functions(self) -> Tuple[List[ProxyFunction], List[ProxyFunction]]:
         """
@@ -320,82 +333,106 @@ class Model(ABC):
             # Only updating the values for one specific step.
             if isinstance(updated_gfu, list):
                 # List of trial functions.
-                for key in self.model_components_values[time_step].keys():
-                    if key.startswith('C_'):
-                        # Source constants do not have trial functions.
-                        pass
-                    else:
-                        component = self.model_components[key]
+                for key in self.model_components.keys():
+                    component = self.model_components[key]
 
-                        if component is None:
-                            # One single model variable.
-                            self.model_components_values[time_step][key] = updated_gfu[0]
-                        else:
-                            # Multiple model variables.
-                            self.model_components_values[time_step][key] = updated_gfu[component]
+                    if component is None:
+                        # One single model variable.
+                        self.update_variables[time_step][key] = updated_gfu[0]
+
+                    else:
+                        # Multiple model variables.
+                        self.update_variables[time_step][key] = updated_gfu[component]
 
             elif isinstance(updated_gfu, GridFunction):
                 # Gridfunction with updated model component values.
-                for key in self.model_components_values[time_step].keys():
+                for key in self.model_components.keys():
                     component = self.model_components[key]
 
                     if component is None:
                         # Gridfunction over the full finite element space.
-                        self.model_components_values[time_step][key] = updated_gfu
+                        self.update_variables[time_step][key] = updated_gfu
                     else:
                         # Component of the finite element space.
-                        self.model_components_values[time_step][key] = updated_gfu.components[component]
+                        self.update_variables[time_step][key] = updated_gfu.components[component]
         else:
             # Confirm that a gridfunction was given, not a list of trial functions. It only makes sense to insert a
             # list of trial functions into the values for the current to-be-solved-for time step, not to update all the
             # time step values.
             assert isinstance(updated_gfu, GridFunction)
 
-            # If len(self.model_components_values) = 1 that means a stationary solve is occurring and it makes no sense
+            # If len(self.update_variables) = 1 that means a stationary solve is occurring and it makes no sense
             # to update the model variable values with information from previous time steps.
-            assert len(self.model_components_values) > 1
+            assert len(self.update_variables) > 1
 
             # First shift values at previous time steps to reflect that a new time step has started.
-            for i in range(1, len(self.model_components_values)-1):
-                self.model_components_values[-i] = self.model_components_values[-(i + 1)].copy()
+            for i in range(1, len(self.update_variables)-1):
+                self.update_variables[-i] = self.update_variables[-(i + 1)].copy()
 
             # Then get the values for the just solved time step.
-            for key in self.model_components_values[1].keys():
+            for key in self.model_components.keys():
                 component = self.model_components[key]
 
                 if component is None:
                     # Gridfunction over the full finite element space.
-                    self.model_components_values[1][key] = updated_gfu
+                    self.update_variables[1][key] = updated_gfu
                 else:
                     # Component of the finite element space.
-                    self.model_components_values[1][key] = updated_gfu.components[component]
+                    self.update_variables[1][key] = updated_gfu.components[component]
 
-        # Re-parse any expressions as necessary with the new model variable values.
+        # Update the values of any time-varying model parameters used in other expressions (model functions, BCs, etc).
+        for key in self.model_parameters:
+            # Weirdness needed to account for model_parameters_dict being a two-level dictionary. Ex: if
+            # model_parameters_values contains a parameter called diffusion_coefficients_a then the value of that
+            # parameter is contained in model_parameters_dict[diffusion_coefficients][a].
+            parameter, var = self.model_functions.model_parameters_names[key]
+            if var in self.model_functions.model_parameters_re_parse_dict[parameter].keys():
+                # Update the value of the parameter either by calling some imported Python function or just by
+                # re-parsing the string expression.
+                re_parse_expression = self.model_functions.model_parameters_re_parse_dict[parameter][var]
+                if callable(re_parse_expression):
+                    val_lst = [re_parse_expression(self.t_param[i], self.update_variables[i], self.mesh) for i in range(len(self.t_param))]
+
+                else:
+                    val_lst, _ = parse_str(self.model_functions.model_parameters_re_parse_dict[parameter][var],
+                                           self.run_dir, self.t_param, self.update_variables, mesh=self.mesh)
+
+            else:
+                # Just grab the value of the parameter from model_functions.model_parameters_dict. Note that this needs
+                # to be done or the value of the parameter will remain the initialized value (0).
+                val_lst = self.model_functions.model_parameters_dict[parameter][var]
+
+            # Re-parsing gives a list of values corresponding to each time step in the time discretization scheme.
+            # Assign these values to the correct dictionary in model_parameter_values.
+            for i in range(len(self.update_variables)):
+                self.update_variables[i][key] = val_lst[i]
+
+        # Re-parse any expressions as necessary with the new model component and model parameter values.
         #
         # Start with the boundary conditions.
-        self.bc_functions.update_boundary_conditions(self.t_param, self.model_components_values)
+        self.bc_functions.update_boundary_conditions(self.t_param, self.update_variables, self.mesh)
         self.BC, dirichlet_names = self.bc_functions.set_boundary_conditions(self.BC)
         self.g_D = self.bc_functions.set_dirichlet_boundary_conditions(self.BC, self.mesh, self.construct_gfu(),
                                                                        self.model_components)
 
         # Also update the DIM boundary conditions if they exist.
         if self.DIM:
-            self.DIM_bc_functions.update_boundary_conditions(self.t_param, self.model_components_values)
+            self.DIM_bc_functions.update_boundary_conditions(self.t_param, self.update_variables, self.mesh)
             self.DIM_BC, DIM_dirichlet_names = self.DIM_bc_functions.set_boundary_conditions(self.DIM_BC)
 
         # Update the model parameters and functions.
-        self.model_functions.update_model_functions(self.t_param, self.model_components_values)
+        self.model_functions.update_model_functions(self.t_param, self.update_variables, self.mesh)
         self._set_model_parameters()
 
         if ic_update:
             # Update the initial conditions.
-            self.ic_functions.update_initial_conditions(self.t_param, self.model_components_values)
+            self.ic_functions.update_initial_conditions(self.t_param, self.update_variables)
             self.IC = self.construct_gfu()
             self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components)
 
         if ref_sol_update:
             # Update the reference solutions.
-            self.ref_sol_functions.update_ref_solutions(self.t_param, self.model_components_values)
+            self.ref_sol_functions.update_ref_solutions(self.t_param, self.update_variables)
             self.ref_sol = self.ref_sol_functions.set_ref_solution(self.fes, self.model_components)
 
     def apply_dirichlet_bcs_to(self, gfu: GridFunction, time_step: int = 0) -> None:
@@ -453,22 +490,25 @@ class Model(ABC):
             # Load/reload the finite element space.
             self.fes = self._construct_fes()
 
-    def construct_preconditioner(self, a_assembled: BilinearForm) -> Preconditioner:
+    def construct_preconditioners(self, a_assembled: List[BilinearForm]) -> List[Preconditioner]:
         """
-        Function to construct the preconditioner.
+        Function to construct the preconditioners needed by the model.
 
         Args:
-            a_assembled: The assembled bilinear form.
+            a_assembled_lst: A list of the assembled bilinear form.
 
         Returns:
-            The preconditioner.
+            A list of the constructed preconditioners.
         """
-        if self.preconditioner is not None:
-            precond = ngs.Preconditioner(a_assembled, self.preconditioner)
-        else:
-            precond = None
+        contructed_preconditioners: List[Preconditioner] = []
 
-        return precond
+        for i in range(len(self.preconditioners)):
+            if self.preconditioners[i] is None:
+                contructed_preconditioners.append(None)
+            else:
+                contructed_preconditioners.append(ngs.Preconditioner(a_assembled[i], self.preconditioners[i]))
+
+        return contructed_preconditioners
 
     def construct_and_run_solver(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner,
                                  gfu: GridFunction):
@@ -484,14 +524,14 @@ class Model(ABC):
         """
 
         if precond is None:
-            # Need to provide a freedofs argument to the solver. Confirm that the user hasn't specified that all 
+            # Need to provide a freedofs argument to the solver. Confirm that the user hasn't specified that all
             # dofs should be free dofs.
             no_constrained_dofs = self.config.get_item(['FINITE ELEMENT SPACE', 'no_constrained_dofs'], bool, quiet=True)
             if no_constrained_dofs:
                 raise ValueError('Must constrain Dirichlet DOFs if not providing a preconditioner.')
-            
+
             freedofs = self.fes.FreeDofs()
-            
+
         else:
             if 'HDiv' in self.element.values() or 'RT' in self.element.values():
                 # HDiv elements can only strongly apply u.n Dirichlet boundary conditions. In order to apply other
@@ -539,9 +579,9 @@ class Model(ABC):
                                                        maxit=self.solver_max_iters, printing=self.verbose)
             gfu.vec.data = ret
 
-    # TODO: Does this really belong in the model?
+    # TODO: Move to time_integration_schemes.py
     def time_derivative_terms(self, gfu_lst: List[List[GridFunction]], scheme: str, step: int = 1)\
-            -> Tuple[CoefficientFunction, CoefficientFunction]:
+            -> Tuple[List[CoefficientFunction], List[CoefficientFunction]]:
         """
         Function to produce the time derivative terms for the linear and bilinear forms.
 
@@ -552,60 +592,72 @@ class Model(ABC):
 
         Returns:
             Tuple[CoefficientFunction, CoefficientFunction]:
-                - a: The time derivative terms for the bilinear form.
-                - L: The time derivative terms for the linear form.
+                - a: The time derivative terms for the bilinear forms.
+                - L: The time derivative terms for the linear forms.
         """
         U, V = self.get_trial_and_test_functions()
 
         # List of indices to ignore for the purpose of calculating time derivative
-        ignore_indices: List[int] = []
+        ignore_indices: List[List[int]] = [[] for _ in range(self.num_weak_forms)]
 
         # Populate the list
         # NOTE: We assume that if a model component has it's error calculated
         #       it should also be added to the time derivative
         if len(U) > 1:
-            for val in self.time_derivative_components:
-                if not self.time_derivative_components[val]:
-                    index = self.model_components[val]
-                    if index is None:
-                        raise ValueError("Variable \"{}\" was not expected to have an index of \"None\""
-                                         "since it's not the lone variable for the model.".format(val))
-                    else:
-                        ignore_indices.append(cast(int, index))
+            for form in range(len(self.time_derivative_components)):
+                ignore_indices.append([])
+                for val in self.time_derivative_components[form]:
+                    if not self.time_derivative_components[form][val]:
+                        index = self.model_components[val]
+                        if index is None:
+                            raise ValueError("Variable \"{}\" was not expected to have an index of \"None\""
+                                             "since it's not the lone variable for the model.".format(val))
+                        else:
+                            ignore_indices[form].append(cast(int, index))
 
         # Create the terms for the linear and bilinear form into which to add the time derivative
-        a = ngs.CoefficientFunction(0.0)
-        L = ngs.CoefficientFunction(0.0)
+        a: List[CoefficientFunction] = []
+        L: List[CoefficientFunction] = []
 
-        for i in range(len(U)):
-            if i not in ignore_indices:
-                # TODO: Figure out a better way to do this so that the string is stored elsewhere. Maybe a named tuple.
-                if scheme == 'explicit euler':
-                    a += U[i] * V[i]
-                    L += gfu_lst[1][i] * V[i]
-                elif scheme == 'implicit euler':
-                    a += U[i] * V[i]
-                    L += gfu_lst[1][i] * V[i]
-                elif scheme == 'crank nicolson':
-                    a += U[i] * V[i]
-                    L += gfu_lst[1][i] * V[i]
-                elif scheme == 'adaptive imex pred':
-                    a += U[i] * V[i]
-                    L += gfu_lst[1][i] * V[i]
-                elif scheme == 'CNLF':
-                    a += U[i] * V[i]
-                    L += gfu_lst[2][i] * V[i]
-                elif scheme == 'SBDF':
-                    a += (11/6) * U[i] * V[i]
-                    L += (3 * gfu_lst[1][i] - 1.5 * gfu_lst[2][i] + 1/3 * gfu_lst[3][i]) * V[i]
-                elif scheme == 'RK 222':
-                    a += U[i] * V[i]
-                    L += gfu_lst[step][i] * V[i]
-                elif scheme == 'RK 232':
-                    a += U[i] * V[i]
-                    L += gfu_lst[step][i] * V[i]
-                else:
-                    raise ValueError("Scheme \"{}\" is not implemented".format(scheme))
+        # Loop over each weak form
+        for j in range(self.num_weak_forms):
+            a_tmp = ngs.CoefficientFunction(0.0)
+            L_tmp = ngs.CoefficientFunction(0.0)
+
+            # Loop over each trial function
+            for i in range(len(U)):
+                # TODO: WHY DOES THIS GET OUT OF BOUNDS
+                if i not in ignore_indices[j]:
+                    # TODO: Figure out a better way to do this so that the string is stored elsewhere. Maybe a named tuple.
+                    if scheme == 'explicit euler':
+                        a_tmp += U[i] * V[i]
+                        L_tmp += gfu_lst[1][i] * V[i]
+                    elif scheme == 'implicit euler':
+                        a_tmp += U[i] * V[i]
+                        L_tmp += gfu_lst[1][i] * V[i]
+                    elif scheme == 'crank nicolson':
+                        a_tmp += U[i] * V[i]
+                        L_tmp += gfu_lst[1][i] * V[i]
+                    elif scheme == 'adaptive imex pred':
+                        a_tmp += U[i] * V[i]
+                        L_tmp += gfu_lst[1][i] * V[i]
+                    elif scheme == 'CNLF':
+                        a_tmp += U[i] * V[i]
+                        L_tmp += gfu_lst[2][i] * V[i]
+                    elif scheme == 'SBDF':
+                        a_tmp += (11/6) * U[i] * V[i]
+                        L_tmp += (3 * gfu_lst[1][i] - 1.5 * gfu_lst[2][i] + 1/3 * gfu_lst[3][i]) * V[i]
+                    elif scheme == 'RK 222':
+                        a_tmp += U[i] * V[i]
+                        L_tmp += gfu_lst[step][i] * V[i]
+                    elif scheme == 'RK 232':
+                        a_tmp += U[i] * V[i]
+                        L_tmp += gfu_lst[step][i] * V[i]
+                    else:
+                        raise ValueError("Scheme \"{}\" is not implemented".format(scheme))
+
+            a.append(a_tmp)
+            L.append(L_tmp)
 
         return a, L
 
@@ -683,10 +735,9 @@ class Model(ABC):
     def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
                                     dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
         """
-        Function to construct a portion of the bilinear form.
+        Function to construct a portion of the bilinear form for model variables WITH time derivaties.
 
-        A given model with multiple model variables may not include time derivatives of all of its model variables. This
-        function constructs the portions of the bilinear form specific to model variables with time derivatives.
+        A given model with multiple model variables may not include time derivatives of all of its model variables.
         It is necessary to split the bilinear form into two portions as some time discretization schemes use different
         coefficients for terms with and without time derivatives.
 
@@ -706,10 +757,9 @@ class Model(ABC):
     def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction],
                                     dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
         """
-        Function to construct a portion of the bilinear form.
+        Function to construct a portion of the bilinear form for model variables WITHOUT time derivaties.
 
-        A given model with multiple model variables may not include time derivatives of all of its model variables. This
-        function constructs the portions of the bilinear form specific to model variables without time derivatives.
+        A given model with multiple model variables may not include time derivatives of all of its model variables.
         It is necessary to split the bilinear form into two portions as some time discretization schemes use different
         coefficients for terms with and without time derivatives.
 
@@ -762,15 +812,15 @@ class Model(ABC):
         """
 
     @abstractmethod
-    def single_iteration(self, a: BilinearForm, L: LinearForm, precond: Preconditioner, gfu: GridFunction,
-                         time_step: int = 0) -> None:
+    def single_iteration(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
+                         precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
         """
         Function to solve a single iteration (if time stepping) of the model.
 
         Args:
-            a: The bilinear form.
-            L: The linear form.
-            precond: Preconditioner to use.
+            a_lst: A list of the bilinear forms.
+            L_lst: A list of the linear forms.
+            precond_lst: A list of preconditioners to use.
             gfu: The gridfunction to store the solution from the current iteration.
             time_step: What time step values to use if _apply_dirichlet_bcs_to must be called.
         """
