@@ -22,7 +22,7 @@ from helpers.io import create_and_load_gridfunction_from_file
 import numpy as np
 import ngsolve as ngs
 from ngsolve import Mesh, Parameter
-from typing import List
+from typing import List, Dict
 
 
 class DIM:
@@ -56,8 +56,8 @@ class DIM:
         self.multiple_bcs = self.config.get_item(['DIM BOUNDARY CONDITIONS', 'multiple_bcs'], bool)
 
         # Initialize the mask dictionaries.
-        self.mask_arr_dict = {}
-        self.mask_gfu_dict = {}
+        self.mask_arr_dict: Dict = {}
+        self.mask_gfu_dict: Dict = {}
 
         # Determine if the phase fields and masks should be loaded from files or generated.
         self.load_method = self.config.get_item(['PHASE FIELDS', 'load_method'], str)
@@ -154,7 +154,7 @@ class DIM:
 
             # Make sure N, scale, and offset are known, even if the phase fields are being loaded from file.
             try:
-                tmp = self.N
+                self.N
             except AttributeError:
                 self._load_nonconformal_parameters()
 

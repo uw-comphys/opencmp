@@ -93,7 +93,8 @@ class ICFunctions(ConfigFunctions):
             update_gridfunction_from_files(gfu_IC, file_dict)
 
     def update_initial_conditions(self, t_param: List[Parameter],
-                                  updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]]) \
+                                  updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]],
+                                  mesh: Mesh) \
             -> None:
         """
         Function to update the initial conditions with new values of the model_variables.
@@ -102,8 +103,9 @@ class ICFunctions(ConfigFunctions):
             t_param: List of parameters representing the current time and previous time steps.
             updated_variables: List of dictionaries containing any new model variables and their values at each time
                 step used in the time discretization scheme.
+            mesh: Mesh used by the model
         """
 
         for k1, v1 in self.ic_re_parse_dict.items():
             for k2, v2 in self.ic_re_parse_dict[k1].items():
-                self.ic_dict[k1][k2] = self.re_parse(self.ic_dict[k1][k2], self.ic_re_parse_dict[k1][k2], t_param, updated_variables)
+                self.ic_dict[k1][k2] = self.re_parse(self.ic_dict[k1][k2], self.ic_re_parse_dict[k1][k2], t_param, updated_variables, mesh)

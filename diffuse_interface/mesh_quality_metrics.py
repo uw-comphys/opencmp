@@ -64,33 +64,33 @@ def line_segments_intersect_2d(p1: List[float], p2: List[float], p3: List[float]
         if (p2[0] <= max(p3[0], p4[0])) and (p2[0] >= min(p3[0], p4[0])) and (p2[1] <= max(p3[1], p4[1])) and (
                 p2[1] >= max(p3[1], p4[1])):
             return True
-    else:
-        # The line segments do not intersect.
-        return False
+
+    # The line segments do not intersect.
+    return False
 
 
-def line_segment_face_intersect_3d(p1: List[float], p2: List[float], v1: List[float], v2: List[float], v3: List[float],
-                                   n: List[float]) -> bool:
+def line_segment_face_intersect_3d(p1_tmp: List[float], p2_tmp: List[float], v1_tmp: List[float], v2_tmp: List[float],
+                                   v3_tmp: List[float], n_tmp: List[float]) -> bool:
     """
     Check if line segment p1-p2 intersects face v1-v2-v3.
 
     Args:
-        p1: [x,y,z] coordinate of a boundary point of the line segment.
-        p2: [x,y,z] coordinate of a boundary point of the line segment.
-        v1: [x,y,z] coordinate of a vertex of the face.
-        v2: [x,y,z] coordinate of a vertex of the face.
-        v3: [x,y,z] coordinate of a vertex of the face.
+        p1_tmp: [x,y,z] coordinate of a boundary point of the line segment.
+        p2_tmp: [x,y,z] coordinate of a boundary point of the line segment.
+        v1_tmp: [x,y,z] coordinate of a vertex of the face.
+        v2_tmp: [x,y,z] coordinate of a vertex of the face.
+        v3_tmp: [x,y,z] coordinate of a vertex of the face.
 
     Returns:
         True if the line segment intersects the face, otherwise False.
     """
 
-    p1 = np.array(p1)
-    p2 = np.array(p2)
-    v1 = np.array(v1)
-    v2 = np.array(v2)
-    v3 = np.array(v3)
-    n = np.array(n)
+    p1 = np.array(p1_tmp)
+    p2 = np.array(p2_tmp)
+    v1 = np.array(v1_tmp)
+    v2 = np.array(v2_tmp)
+    v3 = np.array(v3_tmp)
+    n = np.array(n_tmp)
 
     # Use signed volumes to check if the line segment intersects the plane of 
     # the face or not. If either endpoint lies on the plane of the face, use 
@@ -369,10 +369,10 @@ def get_chords_3d(boundary_lst: List, face_lst: List, crossing: bool = True) -> 
             if not crossing:
                 # Only allow chords that are fully contained within the polygon's boundary.
                 for face in face_lst:
-                    n = tuple(face[:3])
-                    v3 = tuple(face[3:6])
-                    v4 = tuple(face[6:9])
-                    v5 = tuple(face[9:12])
+                    n = face[:3]
+                    v3 = face[3:6]
+                    v4 = face[6:9]
+                    v5 = face[9:12]
 
                     if (v3 == v1) or (v3 == v2) or (v4 == v1) or (v4 == v2) or (v5 == v1) or (v5 == v2):
                         # Ignore any boundary faces connected to v1 or v2. They don't count as intersections.

@@ -19,7 +19,7 @@ import ngsolve as ngs
 from config_functions import ConfigParser, BCFunctions, ICFunctions, ModelFunctions, RefSolFunctions
 from config_functions.load_config import parse_str
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Union, cast
+from typing import Dict, List, Optional, Tuple, Union, cast, Sequence
 from ngsolve.comp import ProxyFunction, FESpace, DifferentialSymbol
 from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner, CoefficientFunction
 from diffuse_interface import DIM
@@ -61,7 +61,7 @@ class Model(ABC):
         if not self.model_components:
             # This line needs to be here to satisfy mypy and Pycharm's checker
             # Otherwise it complains that Model has no attribute model_components.
-            self.model_components: Dict[str, Optional[int]] = {}
+            self.model_components = {}
             raise ValueError('Forgot to set self.model_components')
 
         # Create a list of dictionaries to hold the values of any model variables or parameters that are variables in
@@ -75,7 +75,7 @@ class Model(ABC):
         #       Value must be set in the __init__ of a subclass, and must be set before calling super().
         self.model_local_error_components: Dict[str, bool]
         if not self.model_local_error_components:
-            self.model_local_error_components: Dict[str, bool] = {}
+            self.model_local_error_components = {}
             raise ValueError('Forgot to set self.model_local_error_components')
 
         # List of dictionaries to specify if a particular component should have a time derivative.
@@ -84,7 +84,7 @@ class Model(ABC):
         #       Value must be set in the __init__ of a subclass, and must be set before calling super().
         self.time_derivative_components: List[Dict[str, bool]]
         if not self.time_derivative_components:
-            self.time_derivative_components: List[Dict[str, bool]] = []
+            self.time_derivative_components = []
             raise ValueError('Forgot to set self.time_derivative_components.')
 
         # The number of weak forms used by the model. E.g. the drift-flux model has two separate weak forms
@@ -102,7 +102,7 @@ class Model(ABC):
                == len(self.model_local_error_components)
         # Ensure that each weak form has derivatives associated with it
         assert self.num_weak_forms == len(self.time_derivative_components)
-        # Ensure that every variable is specified for the time derivate terms for each weak form
+        # Ensure that every variable is specified for the time derivative terms for each weak form
         for form in self.time_derivative_components:
             assert len(self.model_components) == len(form)
 
@@ -391,7 +391,7 @@ class Model(ABC):
                 # re-parsing the string expression.
                 re_parse_expression = self.model_functions.model_parameters_re_parse_dict[parameter][var]
                 if callable(re_parse_expression):
-                    val_lst = [re_parse_expression(self.t_param[i], self.update_variables[i], self.mesh) for i in range(len(self.t_param))]
+                    val_lst = [re_parse_expression(self.t_param, self.update_variables, self.mesh, i) for i in range(len(self.t_param))]
 
                 else:
                     val_lst, _ = parse_str(self.model_functions.model_parameters_re_parse_dict[parameter][var],
@@ -426,13 +426,13 @@ class Model(ABC):
 
         if ic_update:
             # Update the initial conditions.
-            self.ic_functions.update_initial_conditions(self.t_param, self.update_variables)
+            self.ic_functions.update_initial_conditions(self.t_param, self.update_variables, self.mesh)
             self.IC = self.construct_gfu()
             self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components)
 
         if ref_sol_update:
             # Update the reference solutions.
-            self.ref_sol_functions.update_ref_solutions(self.t_param, self.update_variables)
+            self.ref_sol_functions.update_ref_solutions(self.t_param, self.update_variables, self.mesh)
             self.ref_sol = self.ref_sol_functions.set_ref_solution(self.fes, self.model_components)
 
     def apply_dirichlet_bcs_to(self, gfu: GridFunction, time_step: int = 0) -> None:

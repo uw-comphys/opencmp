@@ -16,26 +16,27 @@
 ########################################################################################################################
 
 from ngsolve import Mesh, Parameter, CoefficientFunction, GridFunction
-from typing import List, Optional, Dict, Tuple, Union
+from typing import List, Optional, Dict, Tuple, Union, Any, Callable
 from . import parse_arithmetic
 
 
 def parse_str(string: str, import_dir: str, t_param: Optional[List[Parameter]],
-              new_variables: List[Dict[str, Optional[int]]] = [{}], filetypes: List[str] = ['.vol', '.sol', '.vtk'],
-              mesh: Optional[Mesh] = None) -> Tuple[Union[str, float, CoefficientFunction, list], Union[str, bool]]:
+              new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction]]] = [{}],
+              filetypes: List[str] = ['.vol', '.sol', '.vtk'], mesh: Optional[Mesh] = None) \
+        -> Tuple[Union[str, float, CoefficientFunction, list], Union[str, bool, Callable]]:
     """
     Checks if a string appears to be a path to a file and if not parses the string into Python code.
 
     Args:
         string: The string.
         import_dir: The path to the main run directory containing the file from which to import any Python functions.
-        mesh: Mesh used by the model
         t_param: List of parameters representing the current time and previous time steps. If None, the parsed values
             have no possible time dependence and one single value is returned instead of a list of values corresponding
             to the parsed value at each time step.
         new_variables: List of dictionaries containing any new model variables and their values at each time step used
             in the time discretization scheme.
         filetypes: List of possible filetypes to consider.
+        mesh: Mesh used by the model.
 
     Returns:
         Tuple[List[Union[str, float, CoefficientFunction]], Union[str, bool]]:
@@ -65,20 +66,20 @@ def parse_str(string: str, import_dir: str, t_param: Optional[List[Parameter]],
     # each time step. However, variable_eval will remain the same for each time step since it has nothing to do with the
     # time value.
     if t_param is None:
-        parsed_str, variable_eval = parse_arithmetic.eval_python(string, import_dir, mesh, new_variables[0], t_param)
+        parsed_str, variable_eval = parse_arithmetic.eval_python(string, import_dir, mesh, new_variables, t_param, None)
     else:
         parsed_str = []
         for i in range(len(t_param)):
-            tmp_parsed_str, variable_eval = parse_arithmetic.eval_python(string, import_dir, mesh, new_variables[i],
-                                                                         t_param[i])
+            tmp_parsed_str, variable_eval = parse_arithmetic.eval_python(string, import_dir, mesh, new_variables,
+                                                                         t_param, i)
             parsed_str.append(tmp_parsed_str)
 
     return parsed_str, variable_eval
 
 
 def convert_str_to_dict(string: str, import_dir: str, t_param: Optional[List[Parameter]], mesh: Mesh,
-                        new_variables: List[Dict[str, Optional[int]]] = [{}],
-                        filetypes: List[str] = ['.vol', '.sol', '.vtk'], all_str=False) -> Tuple[Dict, Dict]:
+                        new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction]]] = [{}],
+                        filetypes: List[str] = ['.vol', '.sol', '.vtk'], all_str: bool = False) -> Tuple[Dict, Dict]:
     """
     Function to convert a string into a dict. The values of the dict may be parsed into Python
     code or left as strings.
@@ -107,16 +108,18 @@ def convert_str_to_dict(string: str, import_dir: str, t_param: Optional[List[Par
 
     # See if param_tmp has multiple values.
     try:
-        param_tmp = param_tmp.split('\n')
+        param_tmp_lst = param_tmp.split('\n')
         # Remove any empty strings resulting from extraneous newlines.
-        param_tmp = [item for item in param_tmp if item != '']
+        param_tmp_lst = [item for item in param_tmp_lst if item != '']
     except:
-        pass
+        param_tmp_lst = [param_tmp]
 
     # Split by the delimiting character and stick the results in a dictionary.
     param_dict = {}
     re_parse_dict = {}
-    for item in param_tmp:
+    val: Union[List[Any], Any] # Just for type-hinting.
+    variable_eval: Union[str, bool, Callable] # Just for type-hinting.
+    for item in param_tmp_lst:
         key, val_tmp = item.split('->')
         if all_str:
             # Don't bother parsing if the values should all be kept as strings.

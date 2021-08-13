@@ -18,10 +18,10 @@
 import configparser
 from .load_config import parse_str, convert_str_to_dict
 from os.path import isfile
-from typing import Any, Dict, List, Type, TypeVar, Union, cast, Optional, Tuple
-from ngsolve import CoefficientFunction, Mesh, Parameter
+from typing import Any, Dict, List, Type, TypeVar, Union, cast, Optional, Tuple, Callable
+from ngsolve import CoefficientFunction, Mesh, Parameter, GridFunction
 
-T = TypeVar('T')
+T = TypeVar('T', bool, str, int, float)
 
 config_defaults: Dict = {
     'MESH': {'filename': 'REQUIRED',
@@ -97,9 +97,12 @@ class ConfigParser(configparser.ConfigParser):
 
         self.read(config_file_path)
 
-    def get_one_level_dict(self, config_section: str, import_dir: str, mesh: Mesh, t_param: Optional[List[Parameter]] = None,
-                           new_variables: List[Dict[str, Optional[int]]] = [{}], all_str: bool = False) \
-            -> Tuple[Dict, Dict]:
+    def get_one_level_dict(self, config_section: str, import_dir: str, mesh: Mesh,
+                           t_param: Optional[List[Parameter]] = None,
+                           new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction,
+                                                               None]]]
+                           = [{}],
+                           all_str: bool = False) -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a single-level dictionary.
 
@@ -130,7 +133,8 @@ class ConfigParser(configparser.ConfigParser):
         """
 
         dict_one: Dict[str, Union[str, float, CoefficientFunction, list]] = {}
-        re_parse_dict: Dict[str, Union[str, callable]] = {}
+        re_parse_dict: Dict[str, Union[str, Callable]] = {}
+        val_str: Union[str, List] # Just for type-hinting.
         for key in self[config_section]:
             if all_str:
                 # If all_str option is passed none of the parameters should ever need to be re-parsed.
@@ -153,8 +157,12 @@ class ConfigParser(configparser.ConfigParser):
 
         return dict_one, re_parse_dict
 
-    def get_two_level_dict(self, config_section: str, import_dir: str, mesh: Mesh, t_param: Optional[List[Parameter]] = None,
-                           new_variables: List[Dict[str, Optional[int]]] = [{}]) -> Tuple[Dict, Dict]:
+    def get_two_level_dict(self, config_section: str, import_dir: str, mesh: Mesh,
+                           t_param: Optional[List[Parameter]] = None,
+                           new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction,
+                                                               None]]]
+                           = [{}]) \
+            -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a two-level dictionary. 
         
@@ -197,7 +205,10 @@ class ConfigParser(configparser.ConfigParser):
         return dict_one, re_parse_dict
 
     def get_three_level_dict(self, import_dir: str, mesh: Mesh, t_param: Optional[List[Parameter]] = None,
-                             new_variables: List[Dict[str, Optional[int]]] = [{}], ignore=[]) -> Tuple[Dict, Dict]:
+                             new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction,
+                                                                 None]]]
+                             = [{}],
+                             ignore=[]) -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a three-level dictionary.
 
@@ -271,7 +282,7 @@ class ConfigParser(configparser.ConfigParser):
             param = self[section][key]
         except:
             try:
-                param = config_defaults.get(section).get(key)
+                param = config_defaults[section][key]
             except:
                 raise ValueError('{0}, {1} is not a valid parameter.'.format(section, key))
 
@@ -305,7 +316,7 @@ class ConfigParser(configparser.ConfigParser):
             param_tmp = self[section][key].split(', ')
         except:
             try:
-                param_tmp = config_defaults.get(section).get(key)
+                param_tmp = config_defaults[section][key]
             except:
                 raise ValueError('{0}, {1} is not a valid parameter.'.format(section, key))
 
@@ -334,7 +345,7 @@ class ConfigParser(configparser.ConfigParser):
                             # If it can't be converted to a number, do nothing
                             pass
 
-                if val_type is bool:
+                if issubclass(val_type, bool):
                     if isinstance(item, str):
                         param.append(item == 'True')
                     elif isinstance(item, bool):

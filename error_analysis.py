@@ -21,6 +21,7 @@ from solvers import Solver
 from ngsolve import GridFunction
 import tabulate
 import math
+from typing import List, Union
 
 
 def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: str) -> None:
@@ -71,7 +72,7 @@ def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
         print('L2 norm at refinement {0}: {1}'.format(n+1, err))
 
     # Display the results nicely.
-    convergence_table = [['Refinement Level', 'Mesh Elements', 'Error', 'Convergence Rate']]
+    convergence_table: List[List[Union[str, float, int]]] = [['Refinement Level', 'Mesh Elements', 'Error', 'Convergence Rate']]
     convergence_table.append([1, num_dofs_lst[0], error_lst[0], 0])
 
     for n in range(num_refinements):
@@ -108,12 +109,12 @@ def p_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
 
     # Track the convergence information.
     num_dofs_lst = [solver.model.fes.ndof]
-    interp_ord_lst = [solver.model.interp_ord[var]]
+    interp_ord_lst = [solver.model.interp_ord]
     error_lst = [err]
 
     # Then run through a series of interpolant refinements.
     for n in range(num_refinements):
-        solver.model.interp_ord = {key: val + 1 for key, val in solver.model.interp_ord.items()}
+        solver.model.interp_ord += 1
         solver.model.load_mesh_fes(mesh=False, fes=True)
         solver.reset_model()
         sol = solver.solve()
@@ -125,13 +126,13 @@ def p_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
                        solver.model.mesh, solver.model.fes.components[component], average)
 
         num_dofs_lst.append(solver.model.fes.ndof)
-        interp_ord_lst.append(solver.model.interp_ord[var])
+        interp_ord_lst.append(solver.model.interp_ord)
         error_lst.append(err)
 
         print('L2 norm at refinement {0}: {1}'.format(n+1, err))
 
     # Display the results nicely.
-    convergence_table = [['Interpolant Order', 'DOFs', 'Error', 'Convergence Rate']]
+    convergence_table: List[List[Union[str, float, int]]] = [['Interpolant Order', 'DOFs', 'Error', 'Convergence Rate']]
     convergence_table.append([interp_ord_lst[0], num_dofs_lst[0], error_lst[0], 0])
 
     for n in range(num_refinements):

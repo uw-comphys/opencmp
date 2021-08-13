@@ -179,6 +179,27 @@ There are also two local error estimators.
 
 A time step's solution is accepted if either local error estimate is below the user-specified tolerance. The next time step is chosen using the highest local error estimate that satisfies the tolerance. The time step's solution is taken as :math:`u_p^{n+1}` if :math:`e_1` is the highest still-acceptable local error estimate or :math:`u_c^{n+1}` if :math:`e_2` is the highest still-acceptable local error estimate.
 
+Models with Multiple Variables
+------------------------------
+
+Many models implemented in OpenCMP include dependent variables some of which may not have time derivatives. For example, the incompressible Navier-Stokes equations have a time derivative for velocity but not for pressure:
+
+.. math::
+   &\int_{\Omega} \left( \bm{v} \cdot \frac{\partial \bm{u}}{\partial t} - \bm{u} \bm{w} : \bm{\nabla} \bm{v} + \nu \bm{\nabla} \bm{u} : \bm{\nabla} \bm{v} - p \left( \bm{\nabla} \cdot \bm{v} \right) - q \left( \bm{\nabla} \cdot \bm{u} \right) \right) \: dx \\
+   + &\int_{\Gamma_S} \bm{v} \cdot \left( \bm{h} + \max \left( \bm{w} \cdot \bm{n}, 0 \right) \bm{u} \right) \: ds \\
+   = &\int_{\Omega} \bm{v} \cdot \bm{f} \: dx
+   
+where the above formulation uses Oseen-style linearization.
+   
+Because of this, pressure should not be included in the main time discretization scheme. This is apparent with the use of second-order or higher time discretization schemes. Consider, for example, the Crank-Nicolson scheme:
+
+.. math::
+   \int_{\Omega} \bm{v} \cdot \left( \frac{\bm{u}^{n+1} - \bm{u}^n}{\Delta t} \right) \: dx &= \int_{\Omega} \left( p^{n+1} \left( \bm{\nabla} \cdot \bm{v} \right) + q \left( \bm{\nabla} \cdot \bm{u}^{n+1} \right) \right) \: dx \\
+   &+ \frac{1}{2} \int_{\Omega} \left( \bm{u}^{n+1} \bm{w}^{n+1} : \bm{\nabla} \bm{v} - \nu \bm{\nabla} \bm{u}^{n+1} : \bm{\nabla} \bm{v} + \bm{v} \cdot \bm{f}^{n+1} \right) \: dx - \frac{1}{2} \int_{\Gamma} \bm{v} \cdot \left( \bm{h}^{n+1} + \max \left( \bm{w}^{n+1} \cdot \bm{n}, 0 \right) \bm{u}^{n+1} \right) \: ds \\
+   &+ \frac{1}{2} \int_{\Omega} \left( \bm{u}^{n} \bm{w}^{n} : \bm{\nabla} \bm{v} - \nu \bm{\nabla} \bm{u}^{n} : \bm{\nabla} \bm{v} + \bm{v} \cdot \bm{f}^{n} \right) \: dx - \frac{1}{2} \int_{\Gamma} \bm{v} \cdot \left( \bm{h}^{n} + \max \left( \bm{w}^{n} \cdot \bm{n}, 0 \right) \bm{u}^{n} \right) \: ds
+   
+Terms involving solely velocity or boundary conditions are discretized following the standard Crank-Nicolson scheme, but terms involving pressure are effectively discretized with the implicit Euler scheme.
+
 References
 ----------
 

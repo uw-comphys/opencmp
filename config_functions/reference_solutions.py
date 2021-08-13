@@ -103,7 +103,8 @@ class RefSolFunctions(ConfigFunctions):
         return self.ref_sol_dict
 
     def update_ref_solutions(self, t_param: List[Parameter],
-                             updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]]) \
+                             updated_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]],
+                             mesh: Mesh) \
             -> None:
         """
         Function to update the reference solutions with new values of the model_variables.
@@ -112,8 +113,9 @@ class RefSolFunctions(ConfigFunctions):
             t_param: List of parameters representing the current time and previous time steps.
             updated_variables: List of dictionaries containing any new model variables and their values at each time
                 step used in the time discretization scheme.
+            mesh: Mesh used by the model
         """
 
         for k1, v1 in self.ref_sol_re_parse_dict.items():
-            self.ref_sol_dict[k1] = self.re_parse(self.ref_sol_dict[k1], self.ref_sol_re_parse_dict[k1], t_param, updated_variables)
+            self.ref_sol_dict[k1] = self.re_parse(self.ref_sol_dict[k1], self.ref_sol_re_parse_dict[k1], t_param, updated_variables, mesh)
 

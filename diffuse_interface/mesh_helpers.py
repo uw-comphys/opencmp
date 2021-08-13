@@ -41,23 +41,25 @@ def index_sublist(lst: List, val: Any) -> int:
         if val in lst[i]:
             return i
 
+    raise RuntimeError('lst does not contain val.')
 
-def angle_between(p1: List[float], p2: List[float], p3: List[float]) -> float:
+
+def angle_between(p1_tmp: List[float], p2_tmp: List[float], p3_tmp: List[float]) -> float:
     """
     Calculate the angle formed by p1-p2-p3.
 
     Args:
-        p1: [x,y] or [x,y,z] coordinate.
-        p2: [x,y] or [x,y,z] coordinate.
-        p3: [x,y] or [x,y,z] coordinate.
+        p1_tmp: [x,y] or [x,y,z] coordinate.
+        p2_tmp: [x,y] or [x,y,z] coordinate.
+        p3_tmp: [x,y] or [x,y,z] coordinate.
 
     Returns:
         Calculated angle in radians rescaled to [0,2*pi].
     """
 
-    p1 = np.array(p1)
-    p2 = np.array(p2)
-    p3 = np.array(p3)
+    p1 = np.array(p1_tmp)
+    p2 = np.array(p2_tmp)
+    p3 = np.array(p3_tmp)
 
     v1 = p1 - p2
     v2 = p3 - p2
@@ -87,12 +89,12 @@ def move_vertex(vertex: List, vertex_lst: List, vertex_coords: List) \
     """
 
     index = index_sublist(vertex_lst, vertex)
-    if vertex_lst[index, 0] == vertex:
-        v_prime = vertex_lst[index, 1]
-        p_prime = vertex_coords[index, 2:]
-    elif vertex_lst[index, 1] == vertex:
-        v_prime = vertex_lst[index, 0]
-        p_prime = vertex_coords[index, :2]
+    if vertex_lst[index][0] == vertex:
+        v_prime = vertex_lst[index][1]
+        p_prime = vertex_coords[index][2:]
+    elif vertex_lst[index][1] == vertex:
+        v_prime = vertex_lst[index][0]
+        p_prime = vertex_coords[index][:2]
 
     return v_prime, p_prime, index
 
@@ -141,7 +143,7 @@ def signed_area(points_lst: List) -> float:
         Signed area of polygon.
     """
 
-    area = 0
+    area = 0.0
 
     for i in range(len(points_lst) - 1):
         x1, y1 = points_lst[i]
@@ -435,9 +437,9 @@ def get_stl_faces(filename: str) -> Tuple[ndarray, List]:
             data_lst.append(line)
 
     face_lst = np.empty((len(data_lst) // 7, 12))
-    x_bounds = []
-    y_bounds = []
-    z_bounds = []
+    x_bounds: List = []
+    y_bounds: List = []
+    z_bounds: List = []
     for i in range(0, len(data_lst), 7):
         # Assumes that the .stl file was generated from a mesh with all
         # outwards facing surface normals.
@@ -524,7 +526,7 @@ def get_Netgen_nonconformal(N: List[int], scale: List[float], offset: List[float
             for j in range(N[0] + 1):
                 x = -offset[0] + scale[0] * j / N[0]
                 y = -offset[1] + scale[1] * i / N[1]
-                z = 0
+                z = 0.0
                 points.append(ngmesh.Add(ngmsh.MeshPoint(ngmsh.Pnt(x, y, z))))
                 coords.append((x, y, z))
 
@@ -741,8 +743,8 @@ def get_mesh_boundary_2d(filename: str) -> Tuple[List, List]:
         data = f.readlines()
 
     data_lst = []
-    x_bounds = []
-    y_bounds = []
+    x_bounds: List = []
+    y_bounds: List = []
     for line in data:
         if line.strip() and ('vertex' in line):
             v = tuple([float(num) for num in line.split()[1:3]])
@@ -860,13 +862,13 @@ def get_mesh_boundary_3d(filename: str) -> Tuple[List, List]:
 
         all_v_pairs = []
         for item in face_lst:
-            v1 = (item[3], item[4], item[5])
-            v2 = (item[6], item[7], item[8])
-            v3 = (item[9], item[10], item[11])
+            v1_tup = (item[3], item[4], item[5])
+            v2_tup = (item[6], item[7], item[8])
+            v3_tup = (item[9], item[10], item[11])
 
-            all_v_pairs.append(set([v1, v2]))
-            all_v_pairs.append(set([v2, v3]))
-            all_v_pairs.append(set([v1, v3]))
+            all_v_pairs.append(set([v1_tup, v2_tup]))
+            all_v_pairs.append(set([v2_tup, v3_tup]))
+            all_v_pairs.append(set([v1_tup, v3_tup]))
 
         # all_v_pairs contains a separate instance of each edge for each face 
         # that contains it. edge_lst should only contain one instance of each 
@@ -893,7 +895,7 @@ def get_mesh_boundary_3d(filename: str) -> Tuple[List, List]:
     return edge_lst, boundary_lst
 
 
-def get_mesh_edges_vertices_3d(filename: str) -> Tuple[List, List, List, List]:
+def get_mesh_edges_vertices_3d(filename: str) -> Tuple[ndarray, List, List, List]:
     """
     Get the edges and vertices of a 3D .stl file.
 

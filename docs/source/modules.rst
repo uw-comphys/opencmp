@@ -1,5 +1,5 @@
-opencmp
-=======
+Module Documentation
+====================
 
 .. toctree::
    :maxdepth: 4

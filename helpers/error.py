@@ -15,7 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from typing import Union, Tuple, Optional, Dict, List, TYPE_CHECKING
+from typing import Union, Tuple, Optional, Dict, List, TYPE_CHECKING, Any
 
 # Sphinx runs into a circular import with `from models import Model`, so only 
 # import Model for type checking.
@@ -189,8 +189,9 @@ def _surface_traction(sol: GridFunction, model: Model, marker: Optional[str]) ->
     # Need some of the special ngsolve helper functions.
     n, h, alpha, I_mat = get_special_functions(model.mesh, model.nu)
 
-    # Also need the kinematic viscosity at the current time step. Any model with fluid flow should have a kv parameter,
-    # so don't both checking for it.
+    # Also need the kinematic viscosity at the current time step. Any model that involves flow should have a kinematic
+    # viscosity. Otherwise throw an error, surface traction is nonsensical for the model.
+    assert hasattr(model, 'kv')
     kv = model.kv[0]
 
     # If using L2 spaces for pressure need to use a special type of coefficient function to be able to evaluate boundary
@@ -260,7 +261,7 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> List:
     average_lst = config.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
     norm_lst = ['l1_norm', 'l2_norm', 'linfinity_norm']
 
-    error_lst = []
+    error_lst: List[Any] = []
 
     if model.ref_sol['metrics']:
         for metric, var_lst in model.ref_sol['metrics'].items():

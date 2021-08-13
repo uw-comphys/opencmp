@@ -20,7 +20,7 @@ from numpy import ndarray
 import scipy.ndimage as spimg
 import scipy.special as spec
 import edt
-from typing import List, Tuple, Union, Dict
+from typing import List, Tuple, Union, Dict, Optional
 from . import mesh_helpers
 
 
@@ -175,7 +175,7 @@ def get_phi(binary: ndarray, lmbda: float, N: List[int], scale: List[float], off
 
 
 def nonconformal_subdomain_2d(boundary_lst: List, vertices: List, N: List[int], scale: List[float], offset: List[float],
-                              lmbda_overlap: Union[float, bool] = False, centroid: Union[Tuple[float], None] = None) \
+                              lmbda_overlap: Union[float, bool] = False, centroid: Optional[Tuple[float, float]] = None) \
         -> ndarray:
     """
     Function to generate a 2D BC mask.
@@ -229,11 +229,11 @@ def nonconformal_subdomain_2d(boundary_lst: List, vertices: List, N: List[int], 
     x2 = int(round((x2 + offset[0]) * N[0] / scale[0]))
     y2 = int(round((y2 + offset[1]) * N[1] / scale[1]))
 
-    angle12 = mesh_helpers.angle_between((x1, y1), (cx, cy), (x2, y2))
+    angle12 = mesh_helpers.angle_between([x1, y1], [cx, cy], [x2, y2])
     mask = np.zeros(shape)
     for j in range(shape[0]):
         for k in range(shape[1]):
-            angle1p = mesh_helpers.angle_between((x1, y1), (cx, cy), (j, k))
+            angle1p = mesh_helpers.angle_between([x1, y1], [cx, cy], [j, k])
             if angle1p < angle12:
                 mask[j, k] = 1.0
 
@@ -310,8 +310,8 @@ def split_nonconformal_subdomains_2d(boundary_lst: List, vertices: Dict, N: List
 
 
 def nonconformal_subdomain_3d(face_lst: ndarray, vertices: str, N: List[int], scale: List[float], offset: List[float],
-                              lmbda_overlap: Union[float, bool] = False, centroid: Union[Tuple[float], None] =None) \
-        -> ndarray:
+                              lmbda_overlap: Union[float, bool] = False,
+                              centroid: Optional[Tuple[float, float, float]] = None) -> ndarray:
     """
     Function to generate a 3D BC mask.
 
@@ -445,7 +445,7 @@ def split_nonconformal_subdomains_3d(face_lst: List, vertices: Dict[str, str], N
 
     if remainder:
         mask = np.ones(shape)
-        for marker, m in mask_dict:
+        for marker, m in mask_dict.items():
             mask -= m
 
         mask *= (mask > 0.0)

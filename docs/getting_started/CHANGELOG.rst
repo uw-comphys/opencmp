@@ -1,6 +1,11 @@
 OpenCMP Changelog
 =================
 
+August 13
+
+* Added documentation, particularly notes for contributors on how to add new models and time discretization schemes.
+* When specifying parameter values through an "IMPORT" the imported function now takes as arguments the model variable and parameter values at each time step in the time discretization scheme.
+
 July 23
 
 * Added ability for a model to have multiple weak forms. This is necessary for highly nonlinear models which solve each model variable separately (with different linearized forms of the weak form) during the overall solve at each time step.

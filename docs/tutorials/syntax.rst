@@ -148,8 +148,9 @@ IMPORT indicates that the boundary condition value will be obtained by importing
        # Some code
        return u_left_value
        
-The function to call must have the name given within IMPORT, must take the three indicated arguments, and must return a grid function. The arguments passed to the function are as follows:
+The function to call must have the name given within IMPORT, must take the four indicated arguments, and must return a grid function. The arguments passed to the function are as follows:
 
 * t_param - A list of time parameters for each time step in the time discretization scheme in reverse order. For example, if the implicit Euler time discretization scheme is being used t_param = [t^n+1, t^n] where t^n+1 is the time parameter for the time step being solved for and t^n is the time parameter for the last solved time step.
 * model_variables - A list of dictionaries where each dictionary contains the value of each model variable. These values are given for the time step associated with the order in the list. For example, if the implicit Euler time discretization scheme is being used with the Poisson equation model_variables = [{'u': u^n+1}, {'u': u^n}]. Note that model_variables will contain any parameters with variable value given by the "parameter_names" parameter in the main configuration file (see :ref:`example_config`).
 * mesh - The mesh used by the simulation.
+* time_step - An integer indicating which time step the returned value should be calculated for. For example, time_step = 0 means the returned value should be calculated for time t_param[0].

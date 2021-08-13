@@ -18,19 +18,19 @@ Drawing inspiration from packages like OpenFOAM and SU2, OpenCMP's user interfac
    |
    +-- "bc_dir"
    |      |
-   |      +-- bc_config
+   |      +-- "bc_config"
    |
    +-- "ic_dir"
    |      |
-   |      +-- ic_config
+   |      +-- "ic_config"
    |
    +-- "model_dir"
    |      |
-   |      +-- model_config
+   |      +-- "model_config"
    |
    +-- "ref_sol_dir"
    |      |
-   |      +-- ref_sol_config
+   |      +-- "ref_sol_config"
    |
    +-- output
 

@@ -18,7 +18,7 @@
 from .base_config_functions import ConfigFunctions
 import ngsolve as ngs
 from ngsolve import Parameter, CoefficientFunction, GridFunction, FESpace, Mesh
-from typing import Dict, Tuple, Union, List
+from typing import Dict, Tuple, Union, List, Optional
 
 
 class BCFunctions(ConfigFunctions):
@@ -48,6 +48,9 @@ class BCFunctions(ConfigFunctions):
             The input dict now, where appropriate, holding gridfunctions in place of strings holding the paths to those
             gridfunctions.
         """
+
+        component: Optional[int] # Just for type-hinting.
+
         for bc_type in bc_dict.keys():
             for var in bc_dict[bc_type].keys():
                 if var in ['u', 'p']:
@@ -97,7 +100,7 @@ class BCFunctions(ConfigFunctions):
 
         # Need to modify a different dict than BC or there are conflicts between the conformal and DIM boundary
         # condition dictionaries.
-        BC_full = {key: {} for key in BC.keys()}
+        BC_full: Dict[str, Dict[str, Dict[str, ngs.CoefficientFunction]]] = {key: {} for key in BC.keys()}
 
         # Only use pre-defined BC types.
         for bc_type in BC:
@@ -128,8 +131,9 @@ class BCFunctions(ConfigFunctions):
         return BC_full, dirichlet_names
 
     def set_dirichlet_boundary_conditions(self,
-                                          bc_dict: Dict[str, Dict[str, Dict[str, Union[CoefficientFunction, list,
-                                                                                       float, GridFunction]]]],
+                                          bc_dict: Dict[str, Dict[str, Dict[str, Union[List[CoefficientFunction],
+                                                                                       List[list], List[float],
+                                                                                       List[GridFunction]]]]],
                                           mesh: Mesh, gfu: GridFunction, model_components: Dict) \
             -> Dict[str, List[CoefficientFunction]]:
         """
@@ -154,7 +158,7 @@ class BCFunctions(ConfigFunctions):
             for var in bc_dict['dirichlet']:
 
                 # List of values for Dirichlet BCs for each variable
-                dirichlet_lst = [[] for _ in self.t_param]
+                dirichlet_lst: List = [[] for _ in self.t_param]
 
                 if var == 'p':
                     # Pressure BCs are weakly imposed, thus we skip them.
@@ -167,6 +171,8 @@ class BCFunctions(ConfigFunctions):
 
                         # TODO: This is a hack. There should be a better way of doing this, but ngs.FESpace doesn't seem
                         #  to have a dim argument that corresponds to the dimension of the space.
+                        alternate: Union[List[float], List[Tuple]] # Just for type-hinting.
+
                         if component is None:
                             if gfu.dim == 1:
                                 alternate = [0.0 for _ in self.t_param]
@@ -195,7 +201,7 @@ class BCFunctions(ConfigFunctions):
                                      'also pin the value of {0} at a point.'.format(var))
 
                 # List of values for pinned BCs for each variable
-                pinned_lst = [[] for _ in self.t_param]
+                pinned_lst: List = [[] for _ in self.t_param]
 
                 for marker in mesh.GetBoundaries():
                     # Get the pinned BC value for this marker, or default to 0.0 if there isn't one. The 0.0

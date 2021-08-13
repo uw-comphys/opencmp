@@ -92,7 +92,7 @@ class ConfigFunctions:
 
     def re_parse(self, param_dict: Dict[str, Union[str, float, CoefficientFunction, GridFunction, list]],
                  re_parse_dict: Dict[str, str], t_param: Optional[List[Parameter]],
-                 updated_variables: List[Dict[str, Union[str, float, CoefficientFunction, GridFunction]]],
+                 updated_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction]]],
                  mesh: Mesh) -> Dict:
         """
         Iterates through a parameter dictionary and re-parses any expressions containing model variables to use the
@@ -115,9 +115,12 @@ class ConfigFunctions:
 
         for key, val in re_parse_dict.items():
             if callable(val):
+                # Need t_param to actually be a list of time parameters to be able to call an imported Python function.
+                assert t_param is not None
+
                 # The expression is an imported Python function, so just re-evaluate it with the new time and model
                 # variable values.
-                param_dict[key] = [val(t_param[i], updated_variables[i], mesh) for i in range(len(t_param))]
+                param_dict[key] = [val(t_param, updated_variables, mesh, i) for i in range(len(t_param))]
             else:
                 # Re-parse the string expression and use to replace the parameter value in dict.
                 re_parse_val, variable_eval = parse_str(val, self.import_dir, t_param, updated_variables, mesh=mesh)

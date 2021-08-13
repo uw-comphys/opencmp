@@ -27,7 +27,8 @@ class ModelFunctions(ConfigFunctions):
     """
 
     def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = [Parameter(0.0)],
-                 new_variables: List[Dict[str, Optional[int]]] = [{}]) -> None:
+                 new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction, None]]] = [{}])\
+            -> None:
         super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the model functions/parameters/components dict from the main config file.

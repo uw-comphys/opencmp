@@ -16,7 +16,7 @@
 ########################################################################################################################
 
 import ngsolve as ngs
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Callable
 from ngsolve.comp import ProxyFunction
 from ngsolve import CoefficientFunction, Mesh, GridFunction, Parameter
 import numpy as np
@@ -106,7 +106,6 @@ def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[fl
             for j in range(N[1] + 1):
                 x = -offset[0] + scale[0] * i / N[0]
                 y = -offset[1] + scale[1] * j / N[1]
-                z = 0
 
                 mip = mesh(x, y)
                 val = gfu(mip)
@@ -213,7 +212,7 @@ def inverse_rigid_body_motion(new_coords: ndarray, inv_R: ndarray, b: ndarray, c
     return np.matmul(inv_R, (new_coords - c)) + b
 
 
-def gridfunction_rigid_body_motion(t: Parameter, orig_gfu: GridFunction, gfu: GridFunction, inv_R: callable, mesh: Mesh,
+def gridfunction_rigid_body_motion(t: Parameter, orig_gfu: GridFunction, gfu: GridFunction, inv_R: Callable, mesh: Mesh,
                                    N: List[int], scale: List[float], offset: List[float]) -> GridFunction:
     """
     Construct a gridfunction following rigid body motion of an original field.
