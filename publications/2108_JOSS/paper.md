@@ -44,7 +44,7 @@ However, there are several barriers to more wide spread use of simulations. One 
 
 A second barrier is the complex geometries inherent to many real-world problems. Conformal meshing of these complex geometries is time and labour intensive and frequently requires user-interaction, making conformal mesh-based simulations infeasible for high-throughput design screening of many industrially-relevant processes [@Yu2015]. A possible solution is the use of immersed boundary methods [@Mittal2005] to allow the use of non-conforming structured meshes - simple and fast to generate - for any geometry. Use of structured meshes can also potentially improve simulation stability compared to unstructured meshes [@Yu2015]. The diffuse interface method, a form of immersed boundary method, has been shown by Monte *et al* [@Monte2021] to significantly speed up inherently low accuracy simulations - such as those used for preliminary design screening and optimisation - compared to conformal mesh-based simulations. Providing an easy-to-use publicly available implementation of said method would enable broader use by the research community and further development.
 
-The goal of OpenCMP is to fill this evident need for an open-source computational multiphysics package which is user friendly, based on the finite element method, and which includes the diffuse interface method. OpenCMP is built on top of the NGSolve finite element library [@ngsolve] to take advantage of its extensive finite element spaces and high performance solvers and preconditioners. OpenCMP provides pre-implemented models and a configuration file-based user interface in order to be accessible to the general simulation community, not just finite element experts. The user interface is designed to be intuitive and readable and requires no programming experience. On the whole, OpenCMP requires minimal programming experience - solely knowledge of the command line interface. Users must choose the model that suites their application, but need no experience with the actual numerical implementation of said model. Finally, OpenCMP provides the only publicly available implementation of the diffuse interface method.
+The goal of OpenCMP is to fill this evident need for an open-source computational multiphysics package which is user friendly, based on the finite element method, and which includes the diffuse interface method. OpenCMP is built on top of the NGSolve finite element library [@ngsolve] to take advantage of its extensive finite element spaces and high performance solvers and preconditioners. OpenCMP provides pre-implemented models and a configuration file-based user interface in order to be accessible to the general simulation community, not just finite element experts. The user interface is designed to be intuitive, readable, and requires no programming experience - solely knowledge of the command line interface. Users must choose the model that suites their application, but need no experience with the actual numerical implementation of said model. Finally, OpenCMP provides the only publicly available implementation of the diffuse interface method.
 
 # Features
 
@@ -52,7 +52,7 @@ The table below summarises the current capabilities of OpenCMP. Future work on O
 
 | Feature           | Description                                                  |
 | ----------------- | ------------------------------------------------------------ |
-| Meshing           | Accepts Netgen[@ngsolve] or Gmsh [@Geuzaine2009] meshes      |
+| Meshing           | Accepts Netgen [@ngsolve] or Gmsh [@Geuzaine2009] meshes      |
 | Numerical Methods | Standard continuous Galerkin finite element method           |
 |                   | Discontinuous Galerkin finite element method                 |
 |                   | Diffuse interface method                                     |
@@ -73,6 +73,6 @@ The table below summarises the current capabilities of OpenCMP. Future work on O
 
 # Acknowledgements
 
-This research was supported by the Natural Sciences and Engineering Research Council (NSERC) of Canada.
+The authors would like to thank Prof. Sander Rhebergen for useful discussions regarding the discontinuous Galerkin method and Prof. Joachim Schöberl for useful discussions regarding IMEX time integration, preconditioning, and usage of the NGSolve finite element library. This research was supported by the Natural Sciences and Engineering Research Council (NSERC) of Canada and Compute Canada.
 
 # References
