@@ -18,3 +18,5 @@ OpenCMP uses Python 3.7+ and requires the following libraries:
 * tabulate (:code:`pip install tabulate`)
 * meshio (:code:`pip install meshio`)
 * pytest (:code:`pip install pytest`)
+
+.. warning:: OpenCMP is primarily tested on Linux (Ubuntu 20.04-21.01) and MacOS. The main functionality should work on Windows but users may have issues exporting results to .vtk.
