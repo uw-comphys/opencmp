@@ -138,8 +138,7 @@ class TestTransient:
     #   # Run
     #   automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
 
-    def test_sinusoidal_imex_euler_cg(self, capsys: CaptureFixture,
-                                                sinusoidal_transient: ConfigParser) -> None:
+    def test_sinusoidal_imex_euler_cg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
         # Change time discretization scheme
@@ -147,8 +146,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
-    def test_sinusoidal_imex_euler_dg(self, capsys: CaptureFixture,
-                                                sinusoidal_transient: ConfigParser) -> None:
+    def test_sinusoidal_imex_euler_dg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
         # Change time discretization scheme
@@ -160,8 +158,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 5e-11])
 
-    def test_sinusoidal_imex_cnlf_cg(self, capsys: CaptureFixture,
-                                                sinusoidal_transient: ConfigParser) -> None:
+    def test_sinusoidal_imex_cnlf_cg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
         # Change time discretization scheme
@@ -169,8 +166,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
-    def test_sinusoidal_imex_cnlf_dg(self, capsys: CaptureFixture,
-                                                sinusoidal_transient: ConfigParser) -> None:
+    def test_sinusoidal_imex_cnlf_dg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
         # Change time discretization scheme
@@ -182,8 +178,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
 
-    def test_sinusoidal_imex_sbdf_cg(self, capsys: CaptureFixture,
-                                                sinusoidal_transient: ConfigParser) -> None:
+    def test_sinusoidal_imex_sbdf_cg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
         # Change time discretization scheme
@@ -191,8 +186,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
-    def test_sinusoidal_imex_sbdf_dg(self, capsys: CaptureFixture,
-                                                sinusoidal_transient: ConfigParser) -> None:
+    def test_sinusoidal_imex_sbdf_dg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
         # Change linearization scheme
         sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
         # Change time discretization scheme
@@ -203,3 +197,46 @@ class TestTransient:
         sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 5e-11])
+
+    # TODO: Turn on once RK 222 and RK 232 are working properly
+    # def test_sinusoidal_imex_rk_222_cg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
+    #     # Change linearization scheme
+    #     sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
+    #     # Change time discretization scheme
+    #     sinusoidal_transient['TRANSIENT']['scheme'] = 'RK 222'
+    #     # Run
+    #     automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
+    #
+    # def test_sinusoidal_imex_rk_222_dg(self, capsys: CaptureFixture,
+    #                                             sinusoidal_transient: ConfigParser) -> None:
+    #     # Change linearization scheme
+    #     sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
+    #     # Change time discretization scheme
+    #     sinusoidal_transient['TRANSIENT']['scheme'] = 'RK 222'
+    #     # Change from CG to DG
+    #     sinusoidal_transient['DG']['DG'] = 'True'
+    #     # Change elements
+    #     sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
+    #     # Run
+    #     automated_output_check(capsys, sinusoidal_transient, [1e-4, 5e-11])
+    #
+    # def test_sinusoidal_imex_rk_232_cg(self, capsys: CaptureFixture, sinusoidal_transient: ConfigParser) -> None:
+    #     # Change linearization scheme
+    #     sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
+    #     # Change time discretization scheme
+    #     sinusoidal_transient['TRANSIENT']['scheme'] = 'RK 232'
+    #     # Run
+    #     automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
+    #
+    # def test_sinusoidal_imex_rk_232_dg(self, capsys: CaptureFixture,
+    #                                             sinusoidal_transient: ConfigParser) -> None:
+    #     # Change linearization scheme
+    #     sinusoidal_transient['SOLVER']['linearization_method'] = 'IMEX'
+    #     # Change time discretization scheme
+    #     sinusoidal_transient['TRANSIENT']['scheme'] = 'RK 232'
+    #     # Change from CG to DG
+    #     sinusoidal_transient['DG']['DG'] = 'True'
+    #     # Change elements
+    #     sinusoidal_transient['FINITE ELEMENT SPACE']['elements'] = 'u -> HDiv\np -> L2'
+    #     # Run
+    #     automated_output_check(capsys, sinusoidal_transient, [1e-4, 5e-11])

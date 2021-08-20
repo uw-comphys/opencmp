@@ -10,5 +10,5 @@ The following document some tips and tricks for software commonly used with Open
    
    Using Sphinx
    Using Gmsh with NGSolve
-   writing_documentation
+   writing_docstrings
 

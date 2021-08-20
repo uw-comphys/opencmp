@@ -35,7 +35,7 @@ class BCFunctions(ConfigFunctions):
                                                                                new_variables,
                                                                                ignore=['VERTICES', 'CENTROIDS'])
 
-    def load_bc_gridfunctions(self, bc_dict: Dict, fes: FESpace, model_components: Dict[str, int]) -> Dict:
+    def load_bc_gridfunctions(self, bc_dict: Dict, fes: FESpace, model_components: Dict[str, Optional[int]]) -> Dict:
         """
         Function to load any saved gridfunctions that should be used to specify BCs.
 
@@ -49,15 +49,14 @@ class BCFunctions(ConfigFunctions):
             gridfunctions.
         """
 
-        component: Optional[int] # Just for type-hinting.
-
         for bc_type in bc_dict.keys():
             for var in bc_dict[bc_type].keys():
-                if var in ['u', 'p']:
+                if var in model_components:
                     component = model_components[var]
                 else:
-                    # For things like stress, no_backflow, all...
-                    component = None
+                    # For things like stress... All of these flux-type boundary conditions use the same finite element
+                    # space as the velocity component.
+                    component = model_components['u']
                 for marker, val_lst in bc_dict[bc_type][var].items():
                     for val in val_lst:
                         if isinstance(val, str):
@@ -66,14 +65,10 @@ class BCFunctions(ConfigFunctions):
                             # Check that the file exists.
                             val = self._find_rel_path_for_file(val)
 
-                            if component is None:
-                                # Use the full finite element space.
-                                gfu_val = ngs.GridFunction(fes)
-                                gfu_val.Load(val)
-                            else:
-                                # Use a component of the finite element space.
-                                gfu_val = ngs.GridFunction(fes.components[component])
-                                gfu_val.Load(val)
+                            # Use a component of the finite element space.
+                            gfu_val = ngs.GridFunction(fes.components[component])
+
+                            gfu_val.Load(val)
 
                             # Replace the value in the BC dictionary.
                             bc_dict[bc_type][var][marker] = gfu_val
@@ -84,13 +79,14 @@ class BCFunctions(ConfigFunctions):
 
         return bc_dict
 
-    def set_boundary_conditions(self, BC: Dict) -> Tuple[Dict, Dict]:
+    def set_boundary_conditions(self, BC: Union[List[str], Dict[str, str]])\
+            -> Tuple[Dict[str, Dict[str, Dict[str, ngs.CoefficientFunction]]], Dict[str, str]]:
         """
         Function to load the BC dictionary and to generate the list of Dirichlet BC markers for use when constructing
         the finite element space.
 
         Args:
-            BC: The model's BC dictionary (contains information about which types of BC are allowed).
+            BC: The model's BC list (contains information about which types of BC are allowed).
 
         Returns:
             Tuple[Dict, Dict]:
@@ -100,7 +96,7 @@ class BCFunctions(ConfigFunctions):
 
         # Need to modify a different dict than BC or there are conflicts between the conformal and DIM boundary
         # condition dictionaries.
-        BC_full: Dict[str, Dict[str, Dict[str, ngs.CoefficientFunction]]] = {key: {} for key in BC.keys()}
+        BC_full: Dict[str, Dict[str, Dict[str, ngs.CoefficientFunction]]] = {key: {} for key in BC}
 
         # Only use pre-defined BC types.
         for bc_type in BC:
@@ -148,7 +144,7 @@ class BCFunctions(ConfigFunctions):
 
         Returns:
             Dictionary of coefficientfunctions used to set the strongly imposed Dirichlet BCs. Each dictionary entry
-                holds a list, which gives the coefficientfunction for each time step in the time discretization scheme.
+            holds a list, which gives the coefficientfunction for each time step in the time discretization scheme.
         """
 
         # Initialize empty
@@ -173,16 +169,10 @@ class BCFunctions(ConfigFunctions):
                         #  to have a dim argument that corresponds to the dimension of the space.
                         alternate: Union[List[float], List[Tuple]] # Just for type-hinting.
 
-                        if component is None:
-                            if gfu.dim == 1:
-                                alternate = [0.0 for _ in self.t_param]
-                            else:
-                                alternate = [tuple([0.0] * gfu.dim) for _ in self.t_param]
+                        if gfu.components[component].dim == 1:
+                            alternate = [0.0 for _ in self.t_param]
                         else:
-                            if gfu.components[component].dim == 1:
-                                alternate = [0.0 for _ in self.t_param]
-                            else:
-                                alternate = [tuple([0.0] * gfu.components[component].dim) for _ in self.t_param]
+                            alternate = [tuple([0.0] * gfu.components[component].dim) for _ in self.t_param]
 
                         val_lst = bc_dict['dirichlet'][var].get(marker, alternate)
 
@@ -210,16 +200,10 @@ class BCFunctions(ConfigFunctions):
 
                     # TODO: This is a hack. There should be a better way of doing this, but ngs.FESpace doesn't seem
                     #  to have a dim argument that corresponds to the dimension of the space.
-                    if component is None:
-                        if gfu.dim == 1:
-                            alternate = [0.0 for _ in self.t_param]
-                        else:
-                            alternate = [tuple([0.0] * gfu.dim) for _ in self.t_param]
+                    if gfu.components[component].dim == 1:
+                        alternate = [0.0 for _ in self.t_param]
                     else:
-                        if gfu.components[component].dim == 1:
-                            alternate = [0.0 for _ in self.t_param]
-                        else:
-                            alternate = [tuple([0.0] * gfu.components[component].dim) for _ in self.t_param]
+                        alternate = [tuple([0.0] * gfu.components[component].dim) for _ in self.t_param]
 
                     val_lst = bc_dict['pinned'][var].get(marker, alternate)
 

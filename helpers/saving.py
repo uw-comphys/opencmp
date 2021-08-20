@@ -77,7 +77,7 @@ class SolutionFileSaver:
 
         Args:
             gfu: GridFunction or CoefficientFunction to save
-            timestep: the current time step, used for naming the file
+            timestep: The current time step, used for naming the file
             DIM: If True, a phase field is being saved so should be saved to the phi_sol directory.
         """
 

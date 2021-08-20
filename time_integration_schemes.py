@@ -497,21 +497,21 @@ def RK_222(model: Model, gfu_0: List[GridFunction], dt: List[Parameter], step: i
 
         # Construct the bilinear forms
         a_lst   = model.construct_bilinear_time_coefficient(U, V, tmp_dt, 0)
-        a_ode   = gamma * model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)
+        a_ode   = model.construct_bilinear_time_ODE(U, V, tmp_dt, 0)
         for i in range(model.num_weak_forms):
             a_tmp = BilinearForm(model.fes)
 
             a_tmp += a_lst[i]
-            a_tmp += a_ode
+            a_tmp += gamma * a_ode[i]
 
             a.append(a_tmp)
 
         # Construct the linear form
         L_lst_0     = model.construct_linear(V, gfu_lst[0], tmp_dt, 0)
         L_lst_1     = model.construct_linear(V, gfu_lst[1], tmp_dt, 1)
-        L_imex_1 = model.construct_imex_explicit(V, gfu_lst[1], tmp_dt, 1)
+        L_imex_1    = model.construct_imex_explicit(V, gfu_lst[1], tmp_dt, 1)
         L_imex_2    = model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)
-        L_ode = model.construct_bilinear_time_ODE(gfu_lst[1], V, tmp_dt, 1)
+        L_ode       = model.construct_bilinear_time_ODE(gfu_lst[1], V, tmp_dt, 1)
         for i in range(model.num_weak_forms):
             L_tmp = LinearForm(model.fes)
 
@@ -607,8 +607,8 @@ def RK_232(model: Model, gfu_0: List[GridFunction], dt: List[Parameter], step: i
         # Construct the linear form
         L_lst_1     = model.construct_linear(V, None, tmp_dt, 1)
         L_lst_2     = model.construct_linear(V, gfu_lst[2], tmp_dt, 2)
-        L_imex_2    = (1.0 - delta) * model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)
-        L_imex_3    = delta * model.construct_imex_explicit(V, gfu_lst[3], tmp_dt, 3)
+        L_imex_2    = model.construct_imex_explicit(V, gfu_lst[2], tmp_dt, 2)
+        L_imex_3    = model.construct_imex_explicit(V, gfu_lst[3], tmp_dt, 3)
         L_ode       = model.construct_bilinear_time_ODE(gfu_lst[2], V, tmp_dt, 2)
         for i in range(model.num_weak_forms):
             L_tmp = LinearForm(model.fes)
@@ -698,7 +698,7 @@ def _split_gfu(gfu: List[GridFunction]) -> List[List[GridFunction]]:
         gfu: List of gridfunctions to split up
 
     Returns:
-        gfu_lst: [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
+        [[component 0, component 1...] at t^n, [component 0, component 1...] at t^n-1, ...]
     """
 
     # NOTE: First entry is supposed to be None, see function docstring

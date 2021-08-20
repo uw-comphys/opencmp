@@ -2,4 +2,4 @@
 kinematic_viscosity = all -> 1.0
 
 [FUNCTIONS]
-source = all -> [0.0, 0.0]
+source = u -> [0.0, 0.0]

@@ -11,26 +11,35 @@ To add a new model construct an appropriate subclass with the following methods.
 Initialization
 --------------
 
-Prior to initialization from the parent class, several model-specific attributes must be defined.
+:code:`_define_model_components`
+--------------------------------
 
-* :code:`self.model_components` is a dictionary containing the names of the model variables and their ordering in the finite element space. Convention for flow models is for velocity to be first followed by pressure and any extra components.
-* :code:`self.model_local_error_components` is a dictionary noting which model variables are included in local error calculations for adaptive time-stepping. Generally all model variables should be included.
-* :code:`self.time_derivative_components` is a dictionary noting which model variables have time derivatives.
-* :code:`self.num_weak_form` indicates how many different weak forms are used when solving the model. This will only be greater than one for highly nonlinear models that require iterating solves between different model variables (ex: solve velocity holding phase fraction constant then solve phase fraction holding velocity constant all during one single time step).
-* If the exact number of model variables must be specified by the user (see for example "models/multi_component_ins"), run :code:`self.add_multiple_components(config)` to read in all model variables from the main configuration file. Then construct the :code:`self.extra_components_inverted` dictionary.
-* :code:`self.BC_init` is a dictionary noting the types of boundary conditions available for the model.
+This method returns a a dictionary containing the names of the model variables and their ordering in the finite element space. Convention for flow models is for velocity to be first followed by pressure and any extra components.
 
-Post-initialization, if the model is nonlinear, :code:`self.linearize` and various other linearization parameters must be loaded from the main configuration file (see for example "models/ins").
+:code:`_define_time_derivative_components`
+--------------------------------
 
-:code:`allows_explicit_schemes`
--------------------------------
+This method returns a list of dictionaries, keys are variable names and values are bool, indicating which varibles have a time derivative in each
 
-Certain models are unsuited to fully explicit schemes. This method dictates whether or not OpenCMP will allow the use of a fully explicit scheme for the model.
+:code:`_define_model_local_error_components`
+--------------------------------
 
-:code:`_set_model_parameters`
------------------------------
+This method returns a dictionary noting which model variables are included in local error calculations for adaptive time-stepping. Generally all model variables should be included.
 
-This method loads the model parameters and model functions from the "model_config" configuration file. In general, consistent naming should be used across models (ex: all flow models should use "kinematic_viscosity" as the configuration file parameter name). Configuration file parameter names should also be long and descriptive to prevent user confusion (ex: "kv" would be a very unclear configuration file parameter name but is fine as a variable name within the model code).
+:code:`_define_num_weak_forms`
+--------------------------------
+
+This function returns an integer indicating how many different weak forms are used when solving the model. This will only be greater than one for highly nonlinear models that require iterating solves between different model variables (ex: solve velocity holding phase fraction constant then solve phase fraction holding velocity constant all during one single time step).
+
+:code:`_pre_init`
+--------------------------------
+
+This function is called AFTER :code:`_define_num_weak_forms`, :code:`_define_model_components`, :code:`_define_model_local_error_components`, and :code:`_define_time_derivative_components` but BEFORE the rest of __init__(). This is used for setting up model-specific things, such as loading the extra components in mcins.
+
+:code:`_post_init`
+--------------------------------
+
+This function is for doing any final model-specific setup after the entire __init__() function has run. For a non-linear model this may include loading :code:`self.linearize` and various other linearization parameters from the main configuration file (see for example "models/ins").
 
 :code:`_add_multiple_components`
 --------------------------------
@@ -46,6 +55,23 @@ This method constructs the finite element space for the model. Note that the ord
 --------------------------------------
 
 Any nonlinear models must be linearized in order to be solved by the linear solvers available in OpenCMP. Currently Oseen-style linearization and IMEX-style linearization are used (see for example "models/ins.py"). This method defines the known fields used by Oseen-style linearization.
+
+:code:`_define_bc_types`
+--------------------------------
+
+This method returns a list containing the names of all allowable BC types for this model.
+
+:code:`_set_model_parameters`
+-----------------------------
+
+This method loads the model parameters and model functions from the "model_config" configuration file. In general, consistent naming should be used across models (ex: all flow models should use "kinematic_viscosity" as the configuration file parameter name). Configuration file parameter names should also be long and descriptive to prevent user confusion (ex: "kv" would be a very unclear configuration file parameter name but is fine as a variable name within the model code).
+
+
+:code:`allows_explicit_schemes`
+-------------------------------
+
+Certain models are unsuited to fully explicit schemes. This method dictates whether or not OpenCMP will allow the use of a fully explicit scheme for the model.
+
 
 :code:`update_linearization_terms`
 ----------------------------------
@@ -96,8 +122,8 @@ Furthermore, some models will have multiple weak forms that they cycle through d
 
 This method constructs the portion of the linear form added due to IMEX-style linearization. It is only used by nonlinear models. Like the methods for constructing the bilinear form and linear form this method must account for standard Galerkin finite element, discontinuous Galerkin, and diffuse interface model formulations as well as potentially multiple model weak forms.
 
-:code:`single_iteration`
-------------------------
+:code:`solve_single_step`
+-------------------------
 
-This method runs one single time step of the model possibly including iterations for Oseen-style linearization or iterations between different model weak forms.
+This method runs one single time step of the model possibly including iterations for Oseen-style linearization or iterations between different model weak forms. In the case of a stationary solve, this method solves for the steady state solution.
 

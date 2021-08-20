@@ -60,7 +60,7 @@ def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union
         output_dir_path: The path to the folder in which the .sol files are, and where the .vtu files will be saved.
         model: The model that generated the .sol files.
         delete_sol_file: Bool to indicate whether or not to delete the original .sol files after converting to .vtu,
-                         Default is False.
+            Default is False.
 
     """
 

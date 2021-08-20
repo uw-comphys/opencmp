@@ -40,11 +40,7 @@ def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
     average = component in average_lst
 
     # First solve used the default settings.
-    if component is None:
-        err = norm('l2_norm', sol, solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
-                   solver.model.mesh, solver.model.fes, average)
-    else:
-        err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
+    err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
                    solver.model.mesh, solver.model.fes.components[component], average)
 
     # Track the convergence information.
@@ -59,11 +55,7 @@ def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
         solver.reset_model()
         sol = solver.solve()
 
-        if component is None:
-            err = norm('l2_norm', sol, solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
-                       solver.model.mesh, solver.model.fes, average)
-        else:
-            err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
+        err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
                        solver.model.mesh, solver.model.fes.components[component], average)
 
         num_dofs_lst.append(solver.model.mesh.ne)
@@ -100,11 +92,7 @@ def p_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
     average = component in average_lst
 
     # First solve used the default settings.
-    if component is None:
-        err = norm('l2_norm', sol, solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
-                   solver.model.mesh, solver.model.fes, average)
-    else:
-        err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
+    err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
                    solver.model.mesh, solver.model.fes.components[component], average)
 
     # Track the convergence information.
@@ -118,11 +106,8 @@ def p_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
         solver.model.load_mesh_fes(mesh=False, fes=True)
         solver.reset_model()
         sol = solver.solve()
-        if component is None:
-            err = norm('l2_norm', sol, solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
-                       solver.model.mesh, solver.model.fes, average)
-        else:
-            err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
+
+        err = norm('l2_norm', sol.components[component], solver.model.ref_sol['ref_sols'][var][0], # Assuming the t^n+1 value of the reference solution should always be used.
                        solver.model.mesh, solver.model.fes.components[component], average)
 
         num_dofs_lst.append(solver.model.fes.ndof)

@@ -83,17 +83,12 @@ class RefSolFunctions(ConfigFunctions):
                     val = self._find_rel_path_for_file(val)
 
                     component = model_components[var]
-                    if component is None:
-                        # Solution for entire finite element space.
-                        gfu_val = ngs.GridFunction(fes)
-                        gfu_val.Load(val)
 
-                    else:
-                        # Use a component of the finite element space.
-                        gfu_val = ngs.GridFunction(fes.components[component])
-                        gfu_val.Load(val)
+                    # Use a component of the finite element space.
+                    gfu_val = ngs.GridFunction(fes.components[component])
+                    gfu_val.Load(val)
 
-                    # Replace the value in the BC dictionary.
+                    # Replace the value in the ref_sol dictionary.
                     self.ref_sol_dict['ref_sols'][var][i] = gfu_val
 
             else:

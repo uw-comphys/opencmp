@@ -28,15 +28,11 @@ def create_and_load_gridfunction_from_file(filename: str, fes: FESpace, current_
     """
     Function to create a gridfunction and load the contents of a file into it.
 
-    | The gridfunction will be constructed from the same finite element space that the file data is assumed to come
-    | from. The file data must also fit the exact same dimensions and number of components as the given finite element
-    | space.
-    |
-    | NOTE: It is assumed that the gridfunction in the file is from the same FES and mesh as the one passed in,
-    |       there is no way for the code to check.
-    |
-    | NOTE: If the FES and mesh are not the same, NGSolve will not necessarily crash,
-    |       it will instead silently return garbage.
+    The gridfunction will be constructed from the same finite element space that the file data is assumed to come
+    from. The file data must also fit the exact same dimensions and number of components as the given finite element
+    space. NOTE: It is assumed that the gridfunction in the file is from the same FES and mesh as the one passed in,
+    there is no way for the code to check. SECOND NOTE: If the FES and mesh are not the same, NGSolve will not
+    necessarily crash, it will instead silently return garbage.
 
     Args:
         filename: Path to the file to load.
@@ -118,11 +114,9 @@ def update_gridfunction_from_files(gfu: GridFunction, file_dict: Dict[Optional[i
     """
     Function to take an existing gridfunction and load data into it from one or more files.
 
-    | NOTE: It is assumed that the save data in the files is from the same FES and mesh as the existing grid function.
-    |       There is no way to check this in code.
-    |
-    | NOTE: If the FES and mesh are not the same, NGSolve will not necessarily crash, it will instead silently return
-    | garbage.
+    NOTE: It is assumed that the save data in the files is from the same FES and mesh as the existing grid function.
+    There is no way to check this in code. SECOND NOTE: If the FES and mesh are not the same, NGSolve will not
+    necessarily crash, it will instead silently return garbage.
 
     Args:
         file_dict: Dict containing the paths to the files

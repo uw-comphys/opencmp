@@ -16,11 +16,14 @@
 ########################################################################################################################
 
 # Superclass
+# Expanded ConfigParser
 from .expanded_config_parser import ConfigParser
 
-# Implemented subclasses
-from .base_config_functions import ConfigFunctions
+# Superclass
 from .boundary_conditions import BCFunctions
+
+# Implemented subclasses
 from .initial_conditions import ICFunctions
 from .model_functions import ModelFunctions
 from .reference_solutions import RefSolFunctions
+from .controller_functions import ControllerFunctions

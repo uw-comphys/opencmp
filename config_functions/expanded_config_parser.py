@@ -80,7 +80,8 @@ config_defaults: Dict = {
     'DIM BOUNDARY CONDITIONS': {'multiple_bcs': False,
                                 'overlap_interface_parameter': -1,
                                 'remainder': False},
-    'RIGID BODY MOTION': {'rotation_speed': [1.0, 0.25]}
+    'RIGID BODY MOTION': {'rotation_speed': [1.0, 0.25]},
+    'CONTROLLER': {'active': False}
 }
 
 
@@ -106,12 +107,12 @@ class ConfigParser(configparser.ConfigParser):
         """
         Function to load parameters from a config file into a single-level dictionary.
 
-        | The values in the lowest level dictionary are either parsed into Python code or kept as strings if
-        | they represent paths to .sol files. All keys are kept as strings.
-        |
-        | Ex: model_params_dict = {'density': float,
-        |                          'viscosity': float,
-        |                          'source': CoefficientFunction}
+        The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
+        represent paths to .sol files. All keys are kept as strings. ::
+
+           Ex: model_params_dict = {'density': float,
+                                    'viscosity': float,
+                                    'source': CoefficientFunction}
 
         Args:
             config_section: The section of the config file to load parameters from.
@@ -129,7 +130,7 @@ class ConfigParser(configparser.ConfigParser):
             Tuple[Dict, Dict]
                 - dict_one: Dictionary containing the config file values.
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
-                    future.
+                  future.
         """
 
         dict_one: Dict[str, Union[str, float, CoefficientFunction, list]] = {}
@@ -166,13 +167,12 @@ class ConfigParser(configparser.ConfigParser):
         """
         Function to load parameters from a config file into a two-level dictionary. 
         
-        | The values in the lowest level dictionary are either parsed into Python code or
-        | kept as strings if they represent paths to .sol files. All other keys and values
-        | are kept as strings.
-        |
-        | Ex: model_functions_dict = {'source': {'c1': CoefficientFunction,
-        |                                        'c2': CoefficientFunction}
-        |                             }
+        The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
+        represent paths to .sol files. All other keys and values are kept as strings. ::
+
+           Ex: model_functions_dict = {'source': {'c1': CoefficientFunction,
+                                                  'c2': CoefficientFunction}
+                                       }
 
         Args:
             config_section: The section of the config file to load parameters from.
@@ -188,7 +188,7 @@ class ConfigParser(configparser.ConfigParser):
             Tuple[Dict, Dict]
                 - dict_one: Dictionary containing the config file values.
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
-                    future.
+                  future.
         """
 
         # Top level dictionaries.
@@ -212,16 +212,16 @@ class ConfigParser(configparser.ConfigParser):
         """
         Function to load parameters from a config file into a three-level dictionary.
 
-        | The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
-        | represent paths to .sol files. All other keys and values are kept as strings.
-        |
-        | Ex: bc_dict = {'dirichlet': {'u': {marker1: CoefficientFunction,
-        |                                    marker2: CoefficientFunction},
-        |                              'p': {marker3: CoefficientFunction}
-        |                              },
-        |                'neumann':   {'p': {marker4: CoefficientFunction}
-        |                              }
-        |                }
+        The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
+        represent paths to .sol files. All other keys and values are kept as strings. ::
+
+           Ex: bc_dict = {'dirichlet': {'u': {marker1: CoefficientFunction,
+                                              marker2: CoefficientFunction},
+                                        'p': {marker3: CoefficientFunction}
+                                        },
+                          'neumann':   {'p': {marker4: CoefficientFunction}
+                                        }
+                          }
 
         Args:
             import_dir: The path to the main run directory containing the file from which to import any Python
@@ -237,7 +237,7 @@ class ConfigParser(configparser.ConfigParser):
             Tuple[Dict, Dict]:
                 - dict_one: Dictionary containing the config file values.
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
-                    future.
+                  future.
         """
 
         # Keys for the top level dictionaries

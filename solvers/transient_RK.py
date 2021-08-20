@@ -28,6 +28,7 @@ from typing import List, Tuple
 Module for the Runge Kutta transient solver class.
 """
 
+
 class TransientRKSolver(Solver):
     """
     Transient Runge Kutta solver with a fixed time step.
@@ -99,7 +100,7 @@ class TransientRKSolver(Solver):
     def _single_solve(self) -> None:
         # Have already assembled the weak form and set the boundary conditions for the first intermediate step.
         # Solve the first intermediate step.
-        self.model.single_iteration(self.a_list[-1], self.L_list[-1], self.preconditioner_list[-1], self.gfu, self.scheme_order - 1)
+        self.model.solve_single_step(self.a_list[-1], self.L_list[-1], self.preconditioner_list[-1], self.gfu, self.scheme_order - 1)
 
         # Update self.gfu_0_list and self.step.
         self._update_intermediate_step()
@@ -112,7 +113,7 @@ class TransientRKSolver(Solver):
             self._re_assemble()
 
             # Solve the next intermediate step.
-            self.model.single_iteration(self.a_list[-self.step], self.L_list[-self.step], self.preconditioner_list[-self.step], self.gfu, self.scheme_order - self.step)
+            self.model.solve_single_step(self.a_list[-self.step], self.L_list[-self.step], self.preconditioner_list[-self.step], self.gfu, self.scheme_order - self.step)
 
             # Update self.gfu_0_list and self.step.
             self._update_intermediate_step()
@@ -125,7 +126,7 @@ class TransientRKSolver(Solver):
         self._re_assemble()
 
         # Solve the time step.
-        self.model.single_iteration(self.a_list[0], self.L_list[0], self.preconditioner_list[0], self.gfu, 0)
+        self.model.solve_single_step(self.a_list[0], self.L_list[0], self.preconditioner_list[0], self.gfu, 0)
 
     def _update_time_step(self) -> Tuple[bool, float, float, str]:
         # Set all intermediate step solutions to the current solution. Set all dt values to the next dt (may vary to

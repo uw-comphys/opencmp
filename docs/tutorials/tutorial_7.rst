@@ -35,7 +35,7 @@ The specific example used in this tutorial is the Sch\"{a}fer-Turek benchmark fo
           -+- +-----------------------+
       0.21 |  |                       | 
            |  |                       |
-          -+- |   * "r = 0.05"        |
+          -+- |      * "r = 0.05"     |
        0.2 |  |                       |
            |  |                       |
           -+- +-----------------------+

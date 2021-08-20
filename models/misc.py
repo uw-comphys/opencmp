@@ -16,10 +16,10 @@
 ########################################################################################################################
 
 import models
-from models import Model
+from .base_model import Model
 
 from sys import modules
-from typing import Type
+from typing import Dict, Type
 
 """
 Module containing helper functions related to models.

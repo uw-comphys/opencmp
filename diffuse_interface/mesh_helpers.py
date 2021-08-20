@@ -806,14 +806,11 @@ def get_mesh_boundary_3d(filename: str) -> Tuple[List, List]:
     """
     Get the edges and boundary edges of a 3D .msh or .stl file.
 
-    | This function should only be used for surface meshes since the boundary edges are considered to be edges with only
-    | one face. Volume meshes do not have such boundary edges.
-    |
-    | !!! IMPORTANT NOTE !!!
-    | Using a .msh file does not always give a comprehensive edge_lst since for some unknown reason ngmesh.Elements1D()
-    | does not always give all of the edges in the mesh. This is not necessarily a problem if edge_lst is only being
-    | used to produce BC masks (but always check!). However, using a .stl file should always give the full boundary_lst
-    | and edge_lst.
+    This function should only be used for surface meshes since the boundary edges are considered to be edges with only
+    one face. Volume meshes do not have such boundary edges. NOTE: Using a .msh file does not always give a
+    comprehensive edge_lst since for some unknown reason ngmesh.Elements1D() does not always give all of the edges in
+    the mesh. This is not necessarily a problem if edge_lst is only being used to produce BC masks (but always check!).
+    However, using a .stl file should always give the full boundary_lst and edge_lst.
 
     Args:
         filename: Path to .msh or .stl file.

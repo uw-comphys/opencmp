@@ -41,9 +41,9 @@ def parse_str(string: str, import_dir: str, t_param: Optional[List[Parameter]],
     Returns:
         Tuple[List[Union[str, float, CoefficientFunction]], Union[str, bool]]:
             - parsed_str: List containing the value of the parsed string at every time, or just the single value of the
-                parsed string if it has no possible time dependence.
+              parsed string if it has no possible time dependence.
             - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
-                re-parsed if their values change).
+              re-parsed if their values change).
     """
 
     if not isinstance(string, str):
