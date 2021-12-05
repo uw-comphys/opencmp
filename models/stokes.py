@@ -21,7 +21,8 @@ from helpers.dg import jump, grad_avg
 from models import INS
 from ngsolve.comp import ProxyFunction
 from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
-from typing import List, Union, Optional
+from typing import Dict, Tuple, List, Union, Optional
+from config_functions import ConfigParser
 
 
 class Stokes(INS):
@@ -36,12 +37,44 @@ class Stokes(INS):
         # TODO: see if this override is still needed when transient tests are added
         # Added to explicitly override
 
-        # NOTE: Does not change the weak form in any way.
-        # Created in order to keep function signatures the same as INS, and to leverage it's code
-        self.linearize = 'IMEX'
+        # NOTE: Does not get used. Created in order to keep function signatures the same
+        self.W = self._construct_linearization_terms()
 
-    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
-                                dt: Parameter, time_step: int) -> List[LinearForm]:
+    def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
+                                    dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
+        if self.DIM:
+            # Use the diffuse interface method.
+            a = self._bilinear_time_ODE_DIM(U, V, self.W[0], dt, time_step)
+        else:
+            # Solve on a standard conformal mesh.
+            a = self._bilinear_time_ODE_no_DIM(U, V, self.W[0], dt, time_step)
+
+        return [a]
+
+    def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction],
+                                            dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
+        if self.DIM:
+            # Use the diffuse interface method.
+            a = self._bilinear_time_coefficient_DIM(U, V, self.W[0], dt, time_step)
+        else:
+            # Solve on a standard conformal mesh.
+            a = self._bilinear_time_coefficient_no_DIM(U, V, self.W[0], dt, time_step)
+
+        return [a]
+
+    def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
+                         dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
+        if self.DIM:
+            # Use the diffuse interface method.
+            L = self._linear_DIM(V, self.W[0],  dt, time_step)
+        else:
+            # Solve on a standard conformal mesh.
+            L = self._linear_no_DIM(V, self.W[0], dt, time_step)
+
+        return [L]
+
+    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
+                                dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
         # The Stokes equations are linear and have no need for IMEX schemes.
         pass
 
@@ -55,16 +88,15 @@ class Stokes(INS):
 ########################################################################################################################
 
     def _bilinear_time_ODE_DIM(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
-                               w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
+                               w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
-
         This is the portion of the bilinear form which contains variables WITH time derivatives.
 
         Args:
             U: A list of trial functions for the model's finite element space, or a list of grid functions containing
                 the previous time step's solution.
-            V: A list of test (weighting) functions for the model's finite element space.
+            V: A list of testing (weighting) functions for the model's finite element space.
             w: Velocity linearization term if using Oseen linearization, None otherwise.
             dt: Time step parameter (in the case of a stationary solve is just one).
             time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
@@ -112,15 +144,14 @@ class Stokes(INS):
         return a
 
     def _bilinear_time_coefficient_DIM(self, U: List[ProxyFunction], V: List[ProxyFunction],
-                                       w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
+                                       w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
-
         This is the portion of the bilinear form which contains variables WITHOUT time derivatives.
 
         Args:
             U: A list of trial functions for the model's finite element space.
-            V: A list of test (weighting) functions for the model's finite element space.
+            V: A list of testing (weighting) functions for the model's finite element space.
             w: Velocity linearization term if using Oseen linearization, None otherwise.
             dt: Time step parameter (in the case of a stationary solve is just one).
             time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
@@ -165,16 +196,15 @@ class Stokes(INS):
         return a
 
     def _bilinear_time_ODE_no_DIM(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
-                                  w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
+                                  w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is NOT being used. Handles both CG and DG.
-
         This is the portion of the bilinear form which contains variables WITH time derivatives.
 
         Args:
             U: A list of trial functions for the model's finite element space, or a list of grid functions containing
                 the previous time step's solution.
-            V: A list of test (weighting) functions for the model's finite element space.
+            V: A list of testing (weighting) functions for the model's finite element space.
             w: Velocity linearization term if using Oseen linearization, None otherwise.
             dt: Time step parameter (in the case of a stationary solve is just one).
             time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
@@ -207,15 +237,14 @@ class Stokes(INS):
         return a
 
     def _bilinear_time_coefficient_no_DIM(self, U: List[ProxyFunction], V: List[ProxyFunction],
-                                          w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
+                                          w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is NOT being used. Handles both CG and DG.
-
         This is the portion of the bilinear form which contains variables WITHOUT time derivatives.
 
         Args:
             U: A list of trial functions for the model's finite element space.
-            V: A list of test (weighting) functions for the model's finite element space.
+            V: A list of testing (weighting) functions for the model's finite element space.
             w: Velocity linearization term if using Oseen linearization, None otherwise.
             dt: Time step parameter (in the case of a stationary solve is just one).
             time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
@@ -255,13 +284,12 @@ class Stokes(INS):
 
         return a
 
-    def _linear_DIM(self, V: List[ProxyFunction], w: Optional[GridFunction], dt: Parameter, time_step: int)\
-            -> LinearForm:
+    def _linear_DIM(self, V: List[ProxyFunction], w: GridFunction, dt: Parameter, time_step: int) -> LinearForm:
         """
         Linear form when the diffuse interface method is being used. Handles both CG and DG.
 
         Args:
-            V: A list of test (weighting) functions for the model's finite element space.
+            V: A list of testing (weighting) functions for the model's finite element space.
             w: Velocity linearization term if using Oseen linearization, None otherwise.
             dt: Time step parameter (in the case of a stationary solve is just one).
             time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
@@ -316,13 +344,12 @@ class Stokes(INS):
 
         return L
 
-    def _linear_no_DIM(self, V: List[ProxyFunction], w: Optional[GridFunction], dt: Parameter, time_step: int)\
-            -> LinearForm:
+    def _linear_no_DIM(self, V: List[ProxyFunction], w: GridFunction, dt: Parameter, time_step: int) -> LinearForm:
         """
         Linear form when the diffuse interface method is NOT being used. Handles both CG and DG.
 
         Args:
-            V: A list of test (weighting) functions for the model's finite element space.
+            V: A list of testing (weighting) functions for the model's finite element space.
             w: Velocity linearization term if using Oseen linearization, None otherwise.
             dt: Time step parameter (in the case of a stationary solve is just one).
             time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
