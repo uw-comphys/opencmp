@@ -12,11 +12,12 @@ Dependencies
 OpenCMP uses Python 3.7+ and requires the following libraries:
 
 * NGSolve version 6.2.2101 or later
-* configparser (:code:`pip install configparser`)
-* pyparsing (:code:`pip install pyparsing`)
 * edt (:code:`pip install edt`)
-* tabulate (:code:`pip install tabulate`)
 * meshio (:code:`pip install meshio`)
-* pytest (:code:`pip install pytest`)
+* numpy (:code:`pip install numpy`)
+* pyparsing (:code:`pip install pyparsing`)
+* pytest >= 6.2 (:code:`pip install pytest`)
+* scipy (:code:`pip install scipy`)
+* tabulate (:code:`pip install tabulate`)
 
-.. warning:: OpenCMP is primarily tested on Linux (Ubuntu 20.04-21.01) and MacOS. The main functionality should work on Windows but users may have issues exporting results to .vtk.
+.. warning:: OpenCMP is primarily tested on Linux (Ubuntu 20.04-21.01). The main functionality should work on Windows but users may have issues exporting results to .vtk.
