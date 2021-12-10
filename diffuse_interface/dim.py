@@ -223,7 +223,13 @@ class DIM:
             bc_config: The DIM BC config file (or the config file containing [VERTICES] and [CENTROIDS]).
             quiet: If True suppresses warnings about using default parameter values.
         """
-        self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None) # There should be no reason to ever re-parse vertices.
+        if self.dim == 2:
+            # In 2D vertices is a list of coordinates.
+            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None) # There should be no reason to ever re-parse vertices.
+        else:
+            # In 3D vertices is a list of stl file names that contain the points of the planes that separate the
+            # various boundary conditions.
+            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None, all_str=True)  # There should be no reason to ever re-parse vertices.
 
         try:
             self.centroid, _ = bc_config.get_one_level_dict('CENTROIDS', self.import_dir, None) # There should be no reason to ever re-parse centroid.
@@ -322,7 +328,6 @@ class DIM:
                 arr = mesh_helpers.crop_to_mesh_bounds(tmp_arr, self.N, self.scale, self.offset, self.tmp_N,
                                                        self.tmp_scale, self.tmp_offset)
                 self.mask_arr_dict[marker] = arr
-
         return
 
     def get_DIM_gridfunctions(self, mesh: Mesh, interp_ord: int):

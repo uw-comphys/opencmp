@@ -1,0 +1,13 @@
+[VERTICES]
+bottom = Examples/DIM/dim_dir/bc_dir/led_bottom.msh
+
+[CENTROIDS]
+bottom = <0.0, 0.0, 2.0>
+
+[DIRICHLET]
+
+[NEUMANN]
+u = bottom -> Examples/DIM/dim_dir/bc_dir/bottom_bc.sol
+
+[ROBIN]
+u = remainder -> 0.00124, 0.0

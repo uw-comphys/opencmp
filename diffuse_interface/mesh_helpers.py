@@ -820,7 +820,6 @@ def get_mesh_boundary_3d(filename: str) -> Tuple[List, List]:
             - edge_lst: List of coordinates of edge vertices.
             - boundary_lst: List of coordinates of boundary edge vertices.
     """
-
     if not os.path.isfile(filename):
         raise FileNotFoundError('The given mesh file does not exist.')
 
