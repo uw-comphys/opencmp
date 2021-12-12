@@ -19,6 +19,7 @@ The beginner user is advised to follow the tutorials in order at least until the
    tutorial_7
    tutorial_8
    tutorial_9
+   tutorial_10
    syntax
    example_config
 
