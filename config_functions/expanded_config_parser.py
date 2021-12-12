@@ -142,7 +142,7 @@ class ConfigParser(configparser.ConfigParser):
                 val_str = self.get_list([config_section, key], str)
 
                 if t_param is None:
-                    dict_one[key] = val_str
+                    dict_one[key] = val_str[0]
                 else:
                     dict_one[key] = [val_str for _ in t_param]
             else:
