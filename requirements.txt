@@ -1,7 +1,0 @@
-edt
-meshio
-numpy
-pyparsing
-pytest>=6.2
-scipy
-tabulate
