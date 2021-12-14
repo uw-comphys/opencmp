@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/channel_3bcs.vol 
+filename = pytests/mesh_files/channel_3bcs.vol 
 
 [DIM]
 diffuse_interface_method = False

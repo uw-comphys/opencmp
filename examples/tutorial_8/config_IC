@@ -1,0 +1,24 @@
+[MESH]
+filename = channel_w_cyl.vol 
+curved_elements = True
+
+[FINITE ELEMENT SPACE]
+elements = u -> HDiv
+           p -> L2
+interpolant_order = 3
+
+[DG]
+DG = True
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = default
+preconditioner = default
+
+[VISUALIZATION]
+save_to_file = True
+
+[OTHER]
+num_threads = 2
+model = Stokes
+run_dir = .

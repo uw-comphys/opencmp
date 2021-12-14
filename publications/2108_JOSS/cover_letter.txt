@@ -1,0 +1,19 @@
+Dear Editor,
+    Please find our manuscript entitled "OpenCMP: An Open-Source Computational Multiphysics Package" that we are submitting for consideration as a new submission to the Journal of Open Source Software. OpenCMP is a computational multiphysics software package based on the finite element method and is primarily intended for physicochemical processes in which fluid convection plays a significant role. OpenCMP uses the NGSolve finite element library for spatial discretization and provides a configuration file-based interface for pre-implemented models and time discretization schemes. It also integrates with Netgen and Gmsh for geometry construction and meshing. Additionally, it provides users with built-in functionality for post-processing, error analysis, and data export for visualisation using Netgen or ParaView.
+
+Please note that, until recently, only one of the authors (E.J. Monte) has been committing to the public Github repository due to our research group primarily using internally-hosted version control. All listed authors have made significant contributions to the software and we are able to provide proof through our internal (Mercurial) version control logs, if needed.
+
+We confirm that the submitted work is original and unpublished/unsubmitted to another peer-reviewed publication venue.
+
+We look forward to hearing from you at your earliest convenience,
+
+Sincerely,
+
+-- 
+Nasser Mohieddin Abukhdeir, PEng
+Associate Professor
+Department of Chemical Engineering
+Department of Physics and Astronomy
+University of Waterloo, Waterloo, Ontario, Canada
+(P) 519.888.4567 x31306 (F) 519.888.4347
+http://chemeng.uwaterloo.ca/abukhdeir

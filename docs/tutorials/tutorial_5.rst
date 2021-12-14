@@ -4,7 +4,7 @@
 Tutorial 5 - Transient Solves
 =============================
 
-The files for this tutorial can be found in "Examples/tutorial_5".
+The files for this tutorial can be found in "examples/tutorial_5".
 
 Governing Equations
 -------------------
@@ -19,9 +19,9 @@ This tutorial will demonstrate how to solve the transient Stokes equations. The 
    \bm{u} &= \bm{0} \mbox{ on the walls} \\
    \bm{u} &= \mbox{ramp}\left(t, 0, 50 y (0.2 - y) \hat{x}, 0.5\right) \mbox{ at the inlet} \\
    \bm{n} \cdot \left(p \mathbb{I} - 0.1 \bm{\nabla} \bm{u} \right) &= \bm{0} \mbox{ at the outlet}
-   
+
 Note that the inlet boundary condition ramps from zero to the steady-state boundary condition in 0.5s following a cosine profile.
-   
+
 At steady-state, the exact solution is as follows:
 
 .. math::
@@ -45,7 +45,7 @@ In addition to an error analysis of the final steady-state results, results will
    save_to_file = True
    save_type = .vtu
    save_frequency = 0.1, time
-   
+
 The Boundary Condition Configuration File
 -----------------------------------------
 
@@ -54,7 +54,7 @@ The boundary condition are similar to those used in :ref:`tutorial_4` with the e
    [DIRICHLET]
    u = inlet -> [ramp(t, 0.0, 50*y*(0.2 - y), 0.5), 0.0]
        wall  -> [0.0, 0.0]
-       
+
    [STRESS]
    stress = outlet -> [0.0, 0.0]
 
@@ -66,13 +66,14 @@ Since this is a transient simulation an initial condition is needed. Initial con
    [STOKES]
    u = all -> [0.0, 0.0]
    p = all -> 0.0
-   
+
 Running the Simulation
 ----------------------
 
-The simulation can be run from the command line. Within the main OpenCMP directory call :code:`python3 run.py Examples/tutorial_5/config`. 
+The simulation can be run from the command line; within the directory examples/tutorial_5/ execute :code:`python3 -m opencmp config`.
 
-This simulation will take longer to run than the previous tutorials. Its progress can be tracked by print outs of the current time and time step value at each time step. 
+
+This simulation will take longer to run than the previous tutorials. Its progress can be tracked by print outs of the current time and time step value at each time step.
 
 .. image:: ../_static/tutorial_5_a.png
    :width: 125
@@ -87,7 +88,3 @@ Once the simulation has finished the values of the error metrics will also be pr
    :alt: Output of error analysis.
 
 The results match the known exact solution well, the incompressibility constraint is well satisfied, and the final velocity and pressure fields are more-or-less continuous as expected.
-
-
-
-

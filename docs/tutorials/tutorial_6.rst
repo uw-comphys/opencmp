@@ -4,12 +4,12 @@
 Tutorial 6 - Adaptive Time-Stepping
 ===================================
 
-The files for this tutorial can be found in "Examples/tutorial_6".
+The files for this tutorial can be found in "examples/tutorial_6".
 
 Governing Equations
 -------------------
 
-This tutorial will demonstrate how to solve the transient Stokes equation using an adaptive time-stepping scheme. The governing equations are the same as those used in :ref:`tutorial_5`. 
+This tutorial will demonstrate how to solve the transient Stokes equation using an adaptive time-stepping scheme. The governing equations are the same as those used in :ref:`tutorial_5`.
 
 The Main Configuration File
 ---------------------------
@@ -32,7 +32,7 @@ In this tutorial, the adaptive two step scheme will be used. This is a first ord
 Running the Simulation
 ----------------------
 
-The simulation can be run from the command line. Within the main OpenCMP directory call :code:`python3 run.py Examples/tutorial_6/config`. 
+The simulation can be run from the command line; within the directory "examples/tutorial_6/" execute :code:`python3 -m opencmp config`.
 
 After each time step a print out gives the current time, whether or not the time step was accepted, estimates of the maximum local error at the time step, and the size of the next time step.
 
@@ -42,14 +42,14 @@ The first several time steps flip back and forth between accepting (or keeping) 
    :width: 225
    :align: center
    :alt: Time step progression for the first few time steps.
-   
+
 After ~0.015s a reasonable time step size has been found and all subsequent time steps are accepted. However, the time step size continues to slowly decrease as the local error in the pressure is still very close to the specified tolerance.
 
 .. image:: ../_static/tutorial_6_b.png
    :width: 225
    :align: center
    :alt: Time step progression while local error is levelling out.
-   
+
 By ~0.5s the inlet ramp has finished and the time step size can rapidly increase.
 
 .. image:: ../_static/tutorial_6_c.png
@@ -63,8 +63,3 @@ The error metrics for the final solution again match the known exact solution we
    :width: 400
    :align: center
    :alt: Output of error analysis.
-
-
-
-
-

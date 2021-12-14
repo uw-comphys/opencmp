@@ -17,7 +17,7 @@
 
 from pytest import CaptureFixture, fixture
 from pytests.full_system.helpers import automated_output_check
-from config_functions import ConfigParser
+from opencmp.config_functions import ConfigParser
 
 # TODO: Figure out how quickly the poisson model should reach SS.
 

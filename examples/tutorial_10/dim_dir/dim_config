@@ -1,0 +1,21 @@
+[DIM]
+mesh_dimension = 3
+num_mesh_elements = x -> 80
+                    y -> 80
+                    z -> 80
+mesh_scale = x -> 5
+             y -> 5
+             z -> 2.6
+mesh_offset = x -> 2.5
+              y -> 2.5
+              z -> 0.2
+interface_width_parameter = 0.01
+
+[DIM BOUNDARY CONDITIONS]
+multiple_bcs = True
+remainder = True
+
+[PHASE FIELDS]
+load_method = generate
+stl_filename = dim_dir/led.stl
+save_to_file = False

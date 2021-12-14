@@ -16,9 +16,8 @@
 ########################################################################################################################
 
 import pytest
-from configparser import ConfigParser
+from opencmp.config_functions import ConfigParser,ConfigFunctions
 import os
-from config_functions.base_config_functions import ConfigFunctions
 import ngsolve as ngs
 
 
@@ -49,9 +48,8 @@ class TestInitialization:
         test_config_functions = ConfigFunctions('pytests/config_functions/example_config', 'import_functions.py', None,
                                                 ngs.Parameter(1.5))
 
-        expected_config = ConfigParser()
-        expected_config.read('pytests/config_functions/example_config')
-
+        expected_config = ConfigParser('pytests/config_functions/example_config')
+        
         assert test_config_functions.config == expected_config
 
     def test_4(self):

@@ -16,8 +16,8 @@
 ########################################################################################################################
 
 from pytest import CaptureFixture, fixture
-from config_functions import ConfigParser
-import helpers.io as io
+from opencmp.config_functions import ConfigParser
+import opencmp.helpers.io as io
 from ngsolve import Mesh
 
 
@@ -79,7 +79,7 @@ class TestLoadMesh:
             empty_config: Config parser initialized with empty config file.
         """
         # Add required options to empty config file
-        empty_config['MESH'] = {'filename': 'mesh_files/channel_1bcs.vol'}
+        empty_config['MESH'] = {'filename': 'pytests/mesh_files/channel_3bcs.vol'}
 
         try:
             io.load_mesh(empty_config)
@@ -95,7 +95,7 @@ class TestLoadMesh:
             empty_config: Config parser initialized with empty config file.
         """
         # Add required options to empty config file
-        empty_config['MESH'] = {'filename': 'mesh_files/channel_3bcs.vol'}
+        empty_config['MESH'] = {'filename': 'pytests/mesh_files/channel_3bcs.vol'}
 
         # Load mesh
         mesh = io.load_mesh(empty_config)
@@ -104,7 +104,7 @@ class TestLoadMesh:
         assert type(mesh) is Mesh
         assert mesh.dim == 2
         for boundary in mesh.GetBoundaries():
-            assert boundary in ('wall', 'outlet', 'wall', 'inlet')
+            assert boundary in ('wall', 'outlet', 'inlet')
         assert mesh.nedge == 1137
         assert mesh.nface == 726
         assert mesh.nfacet == 1137
@@ -117,7 +117,7 @@ class TestLoadMesh:
             empty_config: Config parser initialized with empty config file.
         """
         # Add required options to empty config file
-        empty_config['MESH'] = {'filename': 'mesh_files/square.msh'}
+        empty_config['MESH'] = {'filename': 'pytests/mesh_files/square.msh'}
 
         mesh = io.load_mesh(empty_config)
 
@@ -137,7 +137,7 @@ class TestLoadMesh:
             empty_config: Config parser initialized with empty config file.
         """
         # Test curve = 1
-        empty_config['MESH'] = {'filename': 'mesh_files/channel_3bcs.vol',
+        empty_config['MESH'] = {'filename': 'pytests/mesh_files/channel_3bcs.vol',
                                 'curved_elements': 'True'}
         empty_config['FINITE ELEMENT SPACE'] = {'interpolant_order': '1'}
         mesh = io.load_mesh(empty_config)
@@ -166,7 +166,7 @@ class TestLoadMesh:
             empty_config: Config parser initialized with empty config file.
         """
         # Test curve = 1
-        empty_config['MESH'] = {'filename': 'mesh_files/square.msh',
+        empty_config['MESH'] = {'filename': 'pytests/mesh_files/square.msh',
                                 'curved_elements': 'True'}
         empty_config['FINITE ELEMENT SPACE'] = {'interpolant_order': '1'}
         mesh = io.load_mesh(empty_config)

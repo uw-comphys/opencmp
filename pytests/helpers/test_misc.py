@@ -15,7 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from helpers.misc import merge_bc_dict
+from opencmp.helpers.misc import merge_bc_dict
 
 
 class TestMergeBCDict:

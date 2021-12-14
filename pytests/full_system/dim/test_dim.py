@@ -16,7 +16,7 @@
 ########################################################################################################################
 
 from pytests.full_system.helpers import run_example
-from config_functions import ConfigParser
+from opencmp.config_functions import ConfigParser
 
 
 class TestStationary:

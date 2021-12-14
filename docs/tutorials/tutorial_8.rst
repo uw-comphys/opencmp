@@ -4,7 +4,7 @@
 Tutorial 8 - IMEX Schemes
 =========================
 
-The files for this tutorial can be found in "Examples/tutorial_8".
+The files for this tutorial can be found in "examples/tutorial_8".
 
 Governing Equations
 -------------------
@@ -30,10 +30,15 @@ The time discretization scheme must also be changed to an IMEX scheme. For this 
    scheme = euler IMEX
    time_range = 0.0, 1.0
    dt = 1e-2
-   
+
 Running the Simulation
 ----------------------
 
-The simulation can be run from the command line. First run the Stokes solve by calling :code:`python3 run.py Examples/tutorial_8/config_IC`, then run the incompressible Navier-Stokes solve by calling :code:`python3 run.py Examples/tutorial_8/config`. 
+The simulation can be run from the command line; within the directory examples/tutorial_2/ execute :code:`python3 -m opencmp config`.
 
-As usual, the progress of the transient simulation can be tracked from the print outs at each time step. Once the simulation has finished the results can be visualized in ParaView. They should be identical to those obtained in :ref:`tutorial_7`. 
+The simulation can be run from the command line; within the directory "examples/tutorial_8/::
+
+1) Run the Stokes solve by calling :code:`python3 -m opencmp config_IC`
+2) Run the incompressible Navier-Stokes solve by calling :code:`python3 -m opencmp config`. 
+
+As usual, the progress of the transient simulation can be tracked from the print outs at each time step. Once the simulation has finished the results can be visualized in ParaView. They should be identical to those obtained in :ref:`tutorial_7`.

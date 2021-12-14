@@ -15,6 +15,6 @@ multiple_bcs = False
 
 [PHASE FIELDS]
 load_method = generate
-stl_filename = mesh_files/circle_nd.stl
+stl_filename = pytests/mesh_files/circle_nd.stl
 save_to_file = False
 invert_phi = True

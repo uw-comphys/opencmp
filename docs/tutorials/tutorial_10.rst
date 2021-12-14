@@ -9,7 +9,13 @@ The files for this tutorial can be found in "Examples/tutorial_10".
 Governing Equations
 -------------------
 
-This tutorial will demonstrate how to use the diffuse interface method to approximate complex geometries with structured quadrilateral/hexahedral meshes. 
+This tutorial will demonstrate how to use the diffuse interface method to approximate complex geometries with structured quadrilateral/hexahedral meshes.
+
+.. image:: ../_static/tutorial_10_geometry.png
+   :width: 300
+   :align: center
+   :alt: Perspective view of complex 3D heat sink geometry.
+
 
 The Main Configuration File
 ---------------------------
@@ -19,11 +25,11 @@ The main configuration file now includes and additional section to activate the 
    [DIM]
    diffuse_interface_method = True
    dim_dir = Examples/tutorial_10/dim_dir
-   
+
 The Diffuse Interface Method Configuration File
 -----------------------------------------------
 
-Within the diffuse interface method directory is the main configuration file for the diffuse interface method parameters - "dim_config". 
+Within the diffuse interface method directory is the main configuration file for the diffuse interface method parameters - "dim_config".
 
 The first section of this configuration file governs the construction of the encompassing mesh and the diffuse interface. "mesh_dimension" is 3 since this is a 3-dimensional problem and "num_mesh_elements" controls the size of the mesh in each dimension. The spatial dimensions of the mesh come from "mesh_scale" and "mesh_offset" and should be slightly larger than the complex geometry being encompassed. In this case, the encompassing mesh extends from -2.5-2.5 in x and y and from -0.2-2.4 in z. Finally, "interface_width_parameter" controls the diffuseness of the diffuse interface approximation to the boundary of the complex geometry, with smaller values producing sharper interfaces for a given mesh element size. ::
 
@@ -45,14 +51,14 @@ The second section controls how boundary conditions are applied at the diffuse i
    [DIM BOUNDARY CONDITIONS]
    multiple_bcs = True
    remainder = True
-   
+
 The third section contains additional information for the construction of the diffuse interface. "load_method" has three options, "generate", "combine", and "file" for the cases of (a) a diffuse interface that is constructed from an STL file of a complex geometry, (b) a diffuse interface that is constructed by combining multiple STL files at specified locations, and (c) a pregenerated diffuse interface that is loaded from a file. In this case, the diffuse interface will be generated on the spot from an STL file whose name must also be specified. Finally, the "save_to_file" option allows the diffuse interface and mesh to be saved to file after generation so they can later just be loaded. ::
 
      [PHASE FIELDS]
      load_method = generate
      stl_filename = Examples/tutorial_10/dim_dir/led.stl
      save_to_file = False
-   
+
 The Boundary Condition Configuration Files
 ------------------------------------------
 
@@ -79,7 +85,7 @@ No initial condition is needed for this steady-state problem. ::
 
    [Poisson]
    u = all -> None
-   
+
 The Model Configuration File
 ----------------------------
 
@@ -90,13 +96,23 @@ The model configuration file contains the usual model parameters and model funct
 
    [FUNCTIONS]
    source = all -> 0.0
-   
+
 The Error Analysis Subdirectory
 -------------------------------
 
-In this case, the exact solution is not known, so the error analysis configuration file is left empty. 
-   
+In this case, the exact solution is not known, so the error analysis configuration file is left empty.
+
 Running the Simulation
 ----------------------
 
-The simulation can be run from the command line by calling :code:`python3 run.py Examples/tutorial_10/config`. 
+The simulation can be run from the command line; within the directory "examples/tutorial_4/":
+
+1) Execute :code:`python3 -m opencmp config`, note that this is a computationally intensive simulation and :code:`num_threads` is set to 4, but should be increased to your physical core count.
+2) Execute :code:`python3 visualization` to see a sample visualization (below).
+
+Below is a cross section of the temperature field:
+
+.. image:: ../_static/tutorial_10_cross_section.png
+   :width: 600
+   :align: center
+   :alt: Steady-state temperature distribution cross-sections.

@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/unit_square_coarse.vol
+filename = pytests/mesh_files/unit_square_coarse.vol
 
 [DIM]
 diffuse_interface_method = False
