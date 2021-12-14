@@ -17,10 +17,10 @@
 
 import ngsolve as ngs
 from ngsolve import Preconditioner
-from models import Model
+from ...models import Model
 from typing import Tuple, Type, List, Optional
-from config_functions import ConfigParser
-from time_integration_schemes import implicit_euler, crank_nicolson
+from ...config_functions import ConfigParser
+from ...time_integration_schemes import implicit_euler, crank_nicolson
 from .base_adaptive_transient_multistep import BaseAdaptiveTransientMultiStepSolver
 
 
@@ -75,8 +75,8 @@ class AdaptiveTwoStep(BaseAdaptiveTransientMultiStepSolver):
         self._assemble()
 
     def _single_solve(self) -> None:
-        self.model.single_iteration(self.a_pred, self.L_pred, self.preconditioner_pred, self.gfu_pred)
-        self.model.single_iteration(self.a_corr, self.L_corr, self.preconditioner_corr, self.gfu)
+        self.model.solve_single_step(self.a_pred, self.L_pred, self.preconditioner_pred, self.gfu_pred)
+        self.model.solve_single_step(self.a_corr, self.L_corr, self.preconditioner_corr, self.gfu)
 
     def _calculate_local_error(self) -> Tuple[List[float], List[float], List[str]]:
         # Include any variables specified by the model as included in local error.

@@ -11,7 +11,7 @@ Dependencies
 
 OpenCMP uses Python 3.7+ and requires the following libraries:
 
-* NGSolve version 6.2.2101 or later
+* NGSolve version 6.2.2101 or later (`link <https://ngsolve.org/downloads>`_)
 * configparser (:code:`pip install configparser`)
 * pyparsing (:code:`pip install pyparsing`)
 * edt (:code:`pip install edt`)

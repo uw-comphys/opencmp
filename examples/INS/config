@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/coarse_large_square_4bcs.vol 
+filename = coarse_large_square_4bcs.vol 
 
 [DIM]
 diffuse_interface_method = False
@@ -38,6 +38,6 @@ check_error = True
 error_average = p
 
 [OTHER]
-num_threads = 6
+num_threads = 2
 model = INS
-run_dir = Examples/INS
+run_dir = .

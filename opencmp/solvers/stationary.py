@@ -16,7 +16,7 @@
 ########################################################################################################################
 
 import ngsolve as ngs
-from ngsolve import Preconditioner
+from ngsolve import Parameter, Preconditioner
 from typing import List, Optional
 from .base_solver import Solver
 from typing import Tuple
@@ -41,12 +41,11 @@ class StationarySolver(Solver):
         self._update_preconditioners()
 
     def _create_linear_and_bilinear_forms(self) -> None:
-        # TODO: Add something to handle a model with multiple coupled solves.
         U, V = self.model.get_trial_and_test_functions()
 
         # Bilinear form
         self.a = []
-        a_coeff_terms = self.model.construct_bilinear_time_coefficient(U, V)
+        a_coeff_terms = self.model.construct_bilinear_time_coefficient(U, V, Parameter(1.0), 0)
         a_ode_terms = self.model.construct_bilinear_time_ODE(U, V)
 
         for i in range(self.model.num_weak_forms):
@@ -58,7 +57,7 @@ class StationarySolver(Solver):
         # Linear form
         # NOTE: No IMEX terms since IMEX should only be used with transient solves.
         self.L = []
-        L_terms = self.model.construct_linear(V)
+        L_terms = self.model.construct_linear(V, None, Parameter(1.0), 0)
 
         for i in range(self.model.num_weak_forms):
             L = ngs.LinearForm(self.model.fes)
@@ -74,8 +73,7 @@ class StationarySolver(Solver):
                 preconditioner.Update()
 
     def _load_and_apply_initial_conditions(self) -> None:
-        # Nothing to do since it's a stationary solve
-        pass
+        self.gfu_0_list: List[ngs.GridFunction] = [self.model.construct_gfu()]
 
     def _log_timestep(self, accepted: bool, error_abs: float, error_rel: float, component: str) -> None:
         # Print nothing since it's a single iteration
@@ -85,7 +83,7 @@ class StationarySolver(Solver):
         self._assemble()
 
     def _single_solve(self) -> None:
-        self.model.single_iteration(self.a, self.L, self.preconditioners, self.gfu)
+        self.model.solve_single_step(self.a, self.L, self.preconditioners, self.gfu)
 
     def _startup(self) -> None:
         # Not applicable.

@@ -1,0 +1,46 @@
+[MESH]
+filename = pytests/mesh_files/unit_square_coarse.vol
+
+[DIM]
+diffuse_interface_method = False
+
+[FINITE ELEMENT SPACE]
+elements = u -> H1
+interpolant_order = 3
+
+[DG]
+DG = False
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = default
+preconditioner = default
+
+[TRANSIENT]
+transient = True
+scheme = explicit euler
+time_range = 0.0, 8.0
+dt = 0.002
+dt_tolerance = relative -> 1e-6
+               absolute -> 1e-4
+dt_range = 1e-15, 0.5
+
+[VISUALIZATION]
+save_to_file = False
+save_type = .vtu
+save_frequency = 1, numit
+subdivision = 3
+
+[ERROR ANALYSIS]
+check_error = True
+
+[CONTROLLER]
+active = True
+type = PID
+config = config_1
+
+[OTHER]
+num_threads = 6
+model = Poisson
+run_dir = pytests/full_system/control/pid_poisson_1d
+messaging_level = 0

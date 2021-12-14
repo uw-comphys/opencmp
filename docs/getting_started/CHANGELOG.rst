@@ -1,6 +1,15 @@
 OpenCMP Changelog
 =================
 
+August 20
+
+* Added the ability to also modeller controllers within the system (e.g. PID). Currently only a PID controller is implemented, MPC to come next.
+* Simplified Stokes and MCINS by taking better advantage inheritance and moving more common code into INS
+* Changed the signature for the internal weak form-generating functions of INS, Stokes, and MCINS in order to make them congruent
+* Changed how Model.model_components, Model.model_local_error_components, Model.time_derivative_components, and Model.BCs are created in order to make it more clear where and how they need to be defined for custom models
+* Fixed some bugs with RK 222 and RK 232, thought they are still not working properly
+* Added more tests
+
 August 13
 
 * Added documentation, particularly notes for contributors on how to add new models and time discretization schemes.

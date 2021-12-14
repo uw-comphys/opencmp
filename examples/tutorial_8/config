@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/channel_w_cyl.vol 
+filename = channel_w_cyl.vol 
 curved_elements = True
 
 [FINITE ELEMENT SPACE]
@@ -29,5 +29,5 @@ save_frequency = 0.1, time
 
 [OTHER]
 model = INS
-run_dir = Examples/tutorial_8
-num_threads = 6
+run_dir = .
+num_threads = 2

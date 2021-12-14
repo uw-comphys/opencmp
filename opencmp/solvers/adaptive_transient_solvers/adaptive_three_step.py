@@ -17,10 +17,10 @@
 
 import ngsolve as ngs
 from ngsolve import Preconditioner
-from models import Model
+from ...models import Model
 from typing import Tuple, Type, List, Optional
-from config_functions import ConfigParser
-from time_integration_schemes import implicit_euler
+from ...config_functions import ConfigParser
+from ...time_integration_schemes import implicit_euler
 from .base_adaptive_transient_RK import BaseAdaptiveTransientRKSolver
 
 
@@ -80,7 +80,7 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
 
     def _single_solve(self) -> None:
         # Single solve for the full time step.
-        self.model.single_iteration(self.a_long, self.L_long, self.preconditioner_long, self.gfu_long, 0)
+        self.model.solve_single_step(self.a_long, self.L_long, self.preconditioner_long, self.gfu_long, 0)
 
         # Update the linearization terms back to their t^n values.
         # gfu_short needs to be solved with the same values for W as gfu_long since they have the same initial time
@@ -92,7 +92,7 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
             self.L_short[i].Assemble()
 
         self._update_preconditioners(self.preconditioner_short)
-        self.model.single_iteration(self.a_short, self.L_short, self.preconditioner_short, self.gfu_short, 1)
+        self.model.solve_single_step(self.a_short, self.L_short, self.preconditioner_short, self.gfu_short, 1)
 
         # Update the model component values at t^n+1/2 now that they have been solved for.
         # The linearization terms do not need to be updated since they are now for t^n+1/2 as expected.
@@ -104,7 +104,7 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
             self.L[i].Assemble()
 
         self._update_preconditioners(self.preconditioner)
-        self.model.single_iteration(self.a, self.L, self.preconditioner, self.gfu, 0)
+        self.model.solve_single_step(self.a, self.L, self.preconditioner, self.gfu, 0)
 
     def _calculate_local_error(self) -> Tuple[List[float], List[float], List[str]]:
         # Include any variables specified by the model as included in local error.

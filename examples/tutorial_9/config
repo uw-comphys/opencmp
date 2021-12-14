@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/reaction.vol 
+filename = reaction.vol 
 curved_elements = True
 
 [FINITE ELEMENT SPACE]
@@ -38,5 +38,5 @@ component_in_error_calc = a -> True
                           b -> True
 component_in_time_deriv = a -> True
                           b -> True
-run_dir = Examples/tutorial_9
+run_dir = .
 num_threads = 6

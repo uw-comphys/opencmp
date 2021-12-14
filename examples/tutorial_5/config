@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/coarse_channel_3bcs.vol 
+filename = coarse_channel_3bcs.vol 
 
 [FINITE ELEMENT SPACE]
 elements = u -> HDiv
@@ -30,5 +30,5 @@ check_error = True
 
 [OTHER]
 model = Stokes
-run_dir = Examples/tutorial_5
-num_threads = 6
+run_dir = .
+num_threads = 2

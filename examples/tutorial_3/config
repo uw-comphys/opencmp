@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/coarse_unit_square_1bc.msh
+filename = coarse_unit_square_1bc.msh
 
 [FINITE ELEMENT SPACE]
 elements = u -> H1
@@ -21,5 +21,5 @@ num_refinements = 5
 
 [OTHER]
 model = Poisson
-run_dir = Examples/tutorial_3
-num_threads = 6
+run_dir = .
+num_threads = 2

@@ -18,8 +18,8 @@
 from numpy import isclose
 from multiprocessing import Process
 from pytest import CaptureFixture
-from config_functions import ConfigParser
-from run import main
+from opencmp.config_functions import ConfigParser
+from opencmp.run import run
 from typing import Callable, List, Tuple
 
 
@@ -30,7 +30,7 @@ def run_example(config: ConfigParser) -> None:
     Args:
         config: An initialized config parser holding the relevant information for the simulation
     """
-    return main("", config)
+    return run("", config)
 
 
 # TODO: rename to something better

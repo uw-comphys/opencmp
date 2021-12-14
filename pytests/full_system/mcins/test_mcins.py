@@ -17,7 +17,7 @@
 
 from pytest import CaptureFixture, fixture
 from pytests.full_system.helpers import automated_output_check, manual_output_check
-from config_functions import ConfigParser
+from opencmp.config_functions import ConfigParser
 
 # TODO: https://stackoverflow.com/questions/45603930/pytest-parameterize-only-certain-permutations
 
@@ -550,4 +550,3 @@ class TestFirstOrderRxnCoupled:
     #     # Run
     #     expected_errors = [0.0, 2e-4, 7e-3, 0.0]
     #     automated_output_check(capsys, 'Example Runs/MultiComponentINS/mcins_5/config', expected_errors)
-

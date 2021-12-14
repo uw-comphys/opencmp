@@ -18,7 +18,7 @@
 from . import *
 from .adaptive_transient_solvers import *
 from typing import Type
-from config_functions import ConfigParser
+from ..config_functions import ConfigParser
 
 """
 Module containing helper functions related to solvers.

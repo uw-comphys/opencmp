@@ -16,21 +16,22 @@
 ########################################################################################################################
 
 from __future__ import annotations
-from models import Model
+from ..models import Model
 import ngsolve as ngs
 from ngsolve import CoefficientFunction, GridFunction, Preconditioner
 import math
 from typing import Dict, List, Optional, Tuple, Type, Union
 from abc import ABC, abstractmethod
-from config_functions import ConfigParser
+from ..config_functions import ConfigParser
 import sys
-from helpers.saving import SolutionFileSaver
-from helpers.error import calc_error
-from helpers.ngsolve_ import gridfunction_rigid_body_motion
+from ..helpers.saving import SolutionFileSaver
+from ..helpers.error import calc_error
+from ..helpers.ngsolve_ import gridfunction_rigid_body_motion
 import numpy as np
 from pathlib import Path
 import os
 import contextlib
+from ..controllers.controller_group import ControllerGroup
 
 """
 Module for the base solver class.
@@ -80,6 +81,8 @@ class Solver(ABC):
 
         self.transient = self.config.get_item(['TRANSIENT', 'transient'], bool)
 
+        self.gfu_0_list: List[ngs.GridFunction] = []
+
         if self.transient:
             self.scheme = self.config.get_item(['TRANSIENT', 'scheme'], str)
             self.scheme_order = scheme_order[self.scheme]
@@ -117,6 +120,8 @@ class Solver(ABC):
                         tmp -= self.dt_param[j].Get()
                     self.t_param.append(ngs.Parameter(tmp))
 
+            self.has_controller = self.config.get_item(['CONTROLLER', 'active'], bool)
+
             if 'adaptive' in self.scheme:
                 self.adaptive = True
 
@@ -130,7 +135,6 @@ class Solver(ABC):
                     # Make sure dt_range is in the order [min_dt, max_dt]
                     self.dt_range = [self.dt_range[1], self.dt_range[0]]
                 self.max_rejects = self.config.get_item(['TRANSIENT', 'maximum_rejected_solves'], int, quiet=True)
-
             else:
                 self.adaptive = False
 
@@ -160,6 +164,10 @@ class Solver(ABC):
                 header = [metric + '_' + var for metric, var_lst in self.model.ref_sol['metrics'].items() for var in var_lst]
                 header.insert(0, 'time')
                 f.write(', '.join(header) + '\n')
+
+        # This needs to be here since it needs a model, and the model needs the t_param
+        if self.transient and self.has_controller:
+            self.controller_group = ControllerGroup(self.t_param, self.model, self.config)
 
         # Check that the linearization method is consistent with the time integration scheme chosen.
         if self.transient:
@@ -209,7 +217,7 @@ class Solver(ABC):
         if self.save_to_file:
             if hasattr(self, 'gfu_0_list'):
                 self.saver.save(self.gfu_0_list[0], self.t_param[0].Get())
-                
+
             if self.model.DIM:
                 self.saver.save(self.model.DIM_solver.phi_gfu_orig, self.t_param[0].Get(), DIM=True)
 
@@ -241,6 +249,10 @@ class Solver(ABC):
 
             times.append(time_for_next_save)
             times.append(time_for_next_next_save)
+
+        # Add the next time from the controller
+        if self.has_controller:
+            times += self.controller_group.get_time_for_next_two_control_actions()
 
         dts = np.array(times) - self.t_param[0].Get()
 
@@ -303,7 +315,7 @@ class Solver(ABC):
                                                    self.model.DIM_solver.phi_gfu, self.model.DIM_solver.inv_R,
                                                    self.model.mesh, self.model.DIM_solver.N,
                                                    self.model.DIM_solver.scale, self.model.DIM_solver.offset)
-                    
+
             self._apply_boundary_conditions()
 
             self._re_assemble()
@@ -337,14 +349,13 @@ class Solver(ABC):
                             tmp = (self.t_param[0].Get() - self.t_range[0]) % self.save_freq[0]
                         if math.isclose(tmp, 0.0, abs_tol=self.dt_param[0].Get() * 1e-2):
                             self.saver.save(self.gfu, self.t_param[0].Get())
-                            
+
                             if self.model.DIM:
                                 self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
-
                     elif self.save_freq[1] == 'numit':
                         if self.num_iters % self.save_freq[0] == 0:
                             self.saver.save(self.gfu, self.t_param[0].Get())
-                            
+
                             if self.model.DIM:
                                 self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
 
@@ -371,7 +382,7 @@ class Solver(ABC):
                     sys.exit('At t = {0} the maximum number of rejected time steps has been exceeded. Saving current '
                              'solution to file and ending the run.'.format(self.t_param[0].Get()))
 
-    def _update_bcs(self, bc_dict_patch: Dict[str, Dict[str, Dict[str, Union[float, CoefficientFunction]]]]) -> None:
+    def _update_bcs(self, bc_dict_patch: Dict[str, Dict[str, Dict[str, List[Optional[CoefficientFunction]]]]]) -> None:
         """
         Function to update the model's BCs to arbitrary values, and then recreate the linear/bilinear forms and the
         preconditioner.
@@ -411,6 +422,9 @@ class Solver(ABC):
                     for j in range(i + 1):
                         tmp -= self.dt_param[j].Get()
                     self.t_param[i+1].Set(tmp)
+
+            if self.has_controller:
+                self.controller_group = ControllerGroup(self.t_param, self.model, self.config)
 
             if self.adaptive:
                 dt_tol = self.config.get_dict(['TRANSIENT', 'dt_tolerance'], '', None)
@@ -479,10 +493,20 @@ class Solver(ABC):
 
         self._assemble()
 
+        # Directly after initialization all elements of gfu_0_list contain the initial condition.
+        self.gfu.vec.data = self.gfu_0_list[0].vec
+
         if self.transient:
             # Iterate over time steps.
             # NOTE: The first part of the and is somewhat redundant, but it ensures we don't go beyond the final time.
             while (self.t_param[0].Get() < self.t_range[1]) and not np.isclose(self.t_param[0].Get(), self.t_range[1]):
+                # If there are controllers, calculate their control action
+                # This runs BEFORE _solve so that it also calculates a control action based on the IC
+                if self.has_controller:
+                    control_bc_dict = self.controller_group.calculate_control_all_actions(self.gfu,
+                                                                                          rk_scheme=self.scheme_type == "RK")
+                    self._update_bcs(control_bc_dict)
+
                 self._solve()
 
                 if self.check_error and self.save_error:
@@ -501,13 +525,13 @@ class Solver(ABC):
                 elif self.save_error:
                     # Only saving the error metrics to file at each time step, so need to suppress the print statements
                     # from calc_error.
-                    with open(os.devnull, 'w') as f_tmp, contextlib.redirect_stdout(f_tmp):
-                        error_lst = calc_error(self.config, self.model, self.gfu)
-                        error_lst.insert(0, str(self.t_param[0].Get()))
+                    #with open(os.devnull, 'w') as f_tmp, contextlib.redirect_stdout(f_tmp):
+                    error_lst = calc_error(self.config, self.model, self.gfu)
+                    error_lst.insert(0, str(self.t_param[0].Get()))
 
-                        # Write the calculated error metrics at the given time step to file.
-                        with open(self.save_error_filename, 'a') as f:
-                            f.write(', '.join([str(item) for item in error_lst]) + '\n')
+                    # Write the calculated error metrics at the given time step to file.
+                    with open(self.save_error_filename, 'a') as f:
+                        f.write(', '.join([str(item) for item in error_lst]) + '\n')
 
         else:
             # Perform a stationary solve
@@ -585,8 +609,8 @@ class Solver(ABC):
         If the model is stationary, this does nothing.
 
         Returns:
-            Tuple containing a bool, a float, and a string. The bool indicates whether or not the result of the current iteration
-                was accepted based on all of the criteria established by the individual solver. NOTE: a stationary solver
-                MUST return True. The float indicates the current local error. The string contains the variable name for the 
-                variable with the highest local error.
+            Tuple containing a bool, a float, and a string. The bool indicates whether or not the result of the current
+            iteration was accepted based on all of the criteria established by the individual solver (a stationary
+            solver MUST return True). The float indicates the current local error. The string contains the variable name
+            for the variable with the highest local error.
         """

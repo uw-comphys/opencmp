@@ -16,11 +16,10 @@
 ########################################################################################################################
 
 import ngsolve as ngs
-from helpers.ngsolve_ import get_special_functions
-from helpers.dg import jump, grad_avg
-from config_functions import ConfigParser
-from models import Model
-from typing import Tuple, List, Union, Optional
+from ..helpers.ngsolve_ import get_special_functions
+from ..helpers.dg import jump, grad_avg
+from . import Model
+from typing import Dict, List, Union, Optional
 from ngsolve.comp import FESpace, ProxyFunction
 from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
 
@@ -30,28 +29,39 @@ class Poisson(Model):
     A poisson model.
     """
 
-    def __init__(self, config: ConfigParser, t_param: List[Parameter]) -> None:
-        # Specify information about the model components
-        # NOTE: These MUST be set before calling super(), since it's needed in superclass' __init__
-        self.model_components               = {'u':  None}
-        self.model_local_error_components   = {'u':  True}
-        self.time_derivative_components     = [{'u': True}]
-        self.num_weak_forms                 = 1
+    def _pre_init(self) -> None:
+        # Nothing needs to be done
+        pass
 
-        # Pre-define which BCs are accepted for this model, all others are thrown out.
-        self.BC_init = {'robin':     {},
-                        'dirichlet': {},
-                        'neumann':   {}}
+    def _post_init(self) -> None:
+        # Nothing needs to be done
+        pass
 
-        super().__init__(config, t_param)
+    def _define_model_components(self) -> Dict[str, Optional[int]]:
+        return {'u': 0}
+
+    def _define_model_local_error_components(self) -> Dict[str, bool]:
+        return {'u': True}
+
+    def _define_time_derivative_components(self) -> List[Dict[str, bool]]:
+        return [{'u': True}]
+
+    def _define_num_weak_forms(self) -> int:
+        return 1
+
+    def _define_bc_types(self) -> List[str]:
+        return ['robin', 'dirichlet', 'neumann']
 
     @staticmethod
     def allows_explicit_schemes() -> bool:
         return True
 
     def _construct_fes(self) -> FESpace:
-        return getattr(ngs, self.element['u'])(self.mesh, order=self.interp_ord,
+        fes = getattr(ngs, self.element['u'])(self.mesh, order=self.interp_ord,
                                              dirichlet=self.dirichlet_names.get('u', ''), dgjumps=self.DG)
+        compound_fes = ngs.FESpace([fes])
+
+        return compound_fes
 
     def _set_model_parameters(self) -> None:
         self.dc = self.model_functions.model_parameters_dict['diffusion_coefficient']['all']
@@ -72,8 +82,8 @@ class Poisson(Model):
 
         return [a]
 
-    def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction],
-                                    dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
+    def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction], dt: Parameter,
+                                            time_step: int) -> List[BilinearForm]:
         # Split up the trial (weighting) and test functions
         u = U[0]
         v = V[0]
@@ -87,8 +97,8 @@ class Poisson(Model):
 
         return [a]
 
-    def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
-                         dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
+    def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
+                         dt: Parameter, time_step: int) -> List[LinearForm]:
         # V is a list of length 1 for Poisson, get just the first element
         v = V[0]
 
@@ -101,18 +111,12 @@ class Poisson(Model):
 
         return [L]
 
-    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
-                                dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
+    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
+                                dt: Parameter, time_step: int) -> List[LinearForm]:
         # The Poisson equation is linear and has no need for IMEX schemes.
         pass
 
-    def get_trial_and_test_functions(self) -> Tuple[List[ProxyFunction], List[ProxyFunction]]:
-        u = self.fes.TrialFunction()
-        v = self.fes.TestFunction()
-
-        return [u], [v]
-
-    def single_iteration(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
+    def solve_single_step(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
                          precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
 
         self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
@@ -125,7 +129,19 @@ class Poisson(Model):
                                time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
+
         This is the portion of the bilinear form for model variables with time derivatives.
+
+        Args:
+            u: The trial function for the model's finite element space, or a grid function containing the previous time
+                step's solution.
+            v: The test (weighting) function for the model's finite element space.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
         # Define the special DG functions.
@@ -173,7 +189,18 @@ class Poisson(Model):
             -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
+
         This is the portion of the bilinear form for model variables without time derivatives.
+
+        Args:
+            u: The trial function for the model's finite element space.
+            v: The test (weighting) function for the model's finite element space.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
         # Define the special DG functions.
@@ -202,7 +229,19 @@ class Poisson(Model):
                                   time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is not being used. Handles both CG and DG.
+
         This is the portion of the bilinear form for model variables with time derivatives.
+
+        Args:
+            u: The trial function for the model's finite element space, or a grid function containing the previous time
+                step's solution.
+            v: The test (weighting) function for the model's finite element space.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
         # Laplacian term
@@ -232,7 +271,18 @@ class Poisson(Model):
             -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is not being used. Handles both CG and DG.
+
         This is the portion of the bilinear form for model variables without time derivatives.
+
+        Args:
+            u: The trial function for the model's finite element space.
+            v: The test (weighting) function for the model's finite element space.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
         if self.DG:
@@ -260,6 +310,15 @@ class Poisson(Model):
     def _linear_DIM(self, v: ProxyFunction, dt: Parameter, time_step: int) -> LinearForm:
         """
         Linear form when the diffuse interface method is being used. Handles both CG and DG.
+
+        Args:
+            v: The test (weighting) function for the model's finite element space.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The linear form.
         """
 
         # Define the special DG functions.
@@ -313,6 +372,15 @@ class Poisson(Model):
     def _linear_no_DIM(self, v: ProxyFunction, dt: Parameter, time_step: int) -> LinearForm:
         """
         Linear form when the diffuse interface method is not being used. Handles both CG and DG.
+
+        Args:
+            v: The test (weighting) function for the model's finite element space.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The linear form.
         """
 
         # Source term

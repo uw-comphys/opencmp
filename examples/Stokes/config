@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/channel_3bcs.vol 
+filename = channel_3bcs.vol 
 
 [DIM]
 diffuse_interface_method = False
@@ -28,6 +28,6 @@ check_error = True
 error_average = p
 
 [OTHER]
-num_threads = 6
+num_threads = 2
 model = Stokes
-run_dir = Examples/Stokes
+run_dir = .

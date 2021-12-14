@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/unit_square_coarse.vol
+filename = unit_square_coarse.vol
 
 [DIM]
 diffuse_interface_method = False
@@ -27,6 +27,6 @@ convergence_test = h -> u
 num_refinements = 5
 
 [OTHER]
-num_threads = 6
+num_threads = 2
 model = Poisson
-run_dir = Examples/Poisson
+run_dir = .

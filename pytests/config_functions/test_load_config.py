@@ -16,7 +16,7 @@
 ########################################################################################################################
 
 import pytest
-from config_functions.load_config import parse_str, convert_str_to_dict, load_coefficientfunction_into_gridfunction
+from opencmp.config_functions.load_config import parse_str, convert_str_to_dict, load_coefficientfunction_into_gridfunction
 import pyparsing
 import ngsolve as ngs
 from ngsolve import Mesh, FESpace

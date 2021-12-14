@@ -15,20 +15,19 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
 from typing import Dict, Optional, cast
 
-from models import get_model_class
-from solvers import get_solver_class
-from error_analysis import h_convergence, p_convergence
-from helpers.error import calc_error
-from config_functions import ConfigParser
+from .models import get_model_class
+from .solvers import get_solver_class
+from .error_analysis import h_convergence, p_convergence
+from .helpers.error import calc_error
+from .config_functions import ConfigParser
 import pyngcore as ngcore
 from ngsolve import ngsglobals
-from helpers.post_processing import sol_to_vtu, PhaseFieldModelMimic
+from .helpers.post_processing import sol_to_vtu, PhaseFieldModelMimic
 
 
-def main(config_file_path: str, config_passed: Optional[ConfigParser] = None) -> None:
+def run(config_file_path: str, config_passed: Optional[ConfigParser] = None) -> None:
     """
     Main function that runs OpenCMP.
 
@@ -106,7 +105,3 @@ def main(config_file_path: str, config_passed: Optional[ConfigParser] = None) ->
                 sol_to_vtu(config, output_dir_phi_path, phi_model)
 
     return
-
-
-if __name__ == '__main__':
-    main(sys.argv[1])

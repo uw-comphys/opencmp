@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/channel_w_cyl.vol 
+filename = channel_w_cyl.vol
 curved_elements = True
 
 [FINITE ELEMENT SPACE]
@@ -19,6 +19,6 @@ preconditioner = default
 save_to_file = True
 
 [OTHER]
-num_threads = 6
+num_threads = 2
 model = Stokes
-run_dir = Examples/tutorial_7
+run_dir = .

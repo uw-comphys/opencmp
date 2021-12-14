@@ -14,6 +14,6 @@ remainder = False
 
 [PHASE FIELDS]
 load_method = combine
-stl_filename = dim_1 -> mesh_files/offset_circle_1.stl
-               dim_2 -> mesh_files/offset_circle_2.stl
+stl_filename = dim_1 -> pytests/mesh_files/offset_circle_1.stl
+               dim_2 -> pytests/mesh_files/offset_circle_2.stl
 save_to_file = False

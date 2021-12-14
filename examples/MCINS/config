@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/unit_square_coarse.vol
+filename = unit_square_coarse.vol
 
 [DIM]
 diffuse_interface_method = False
@@ -42,4 +42,4 @@ component_in_error_calc = a -> True
                           b -> True
 component_in_time_deriv = a -> True
                           b -> True
-run_dir = Examples/MCINS
+run_dir = .

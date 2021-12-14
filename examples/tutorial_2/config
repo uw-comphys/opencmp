@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/unit_square_4bcs.vol
+filename = unit_square_4bcs.vol
 
 [FINITE ELEMENT SPACE]
 elements = u -> H1
@@ -15,6 +15,6 @@ save_type = .vtu
 
 [OTHER]
 model = Poisson
-run_dir = Examples/tutorial_2
-num_threads = 6
+run_dir = .
+num_threads = 2
 

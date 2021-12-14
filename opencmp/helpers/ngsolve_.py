@@ -86,12 +86,12 @@ def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[fl
         scale: Extent of the meshed domain in each direction ([-2,2] square -> scale=[4,4]).
         offset: Centers the meshed domain in each direction ([-2,2] square -> offset=[2,2]).
         dim: Dimension of the domain (must be 2 or 3).
-        binary (None or numpy array): If exists, arr is multiplied by binary to zero out any array elements outside of
+        binary: If exists, arr is multiplied by binary to zero out any array elements outside of
             the approximated complex geometry.
 
     Returns:
         List of arrays containing the values in gfu. Since gfu may be vector-valued, the arrays in arr_vec correspond to
-            the various components of gfu.
+        the various components of gfu.
     """
 
     if dim == 2:

@@ -1,0 +1,31 @@
+[MESH]
+
+[DIM]
+diffuse_interface_method = True
+dim_dir = dim_dir
+
+[FINITE ELEMENT SPACE]
+elements = u -> H1
+interpolant_order = 2
+
+[DG]
+DG = False
+
+[SOLVER]
+solver = GMRes
+preconditioner = None
+
+[TRANSIENT]
+transient = False
+
+[ERROR ANALYSIS]
+check_error = False
+
+[OTHER]
+num_threads = 4
+model = Poisson
+run_dir = .
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .sol

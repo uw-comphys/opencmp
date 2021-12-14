@@ -9,7 +9,7 @@ tags:
  - diffuse interface method
  - immersed boundary method
 authors:
- - name: Elizabeth J. Monte
+ - name: Elizabeth Julia Monte
    orcid: 0000-0001-7328-775X
    affiliation: 1
  - name: Alexandru Andrei Vasile
@@ -34,7 +34,7 @@ bibliography: paper.bib
 
 OpenCMP is a computational multiphysics software package based on the finite element method [@Ferziger2002]. It is primarily intended for physicochemical processes in which fluid convection plays a significant role. OpenCMP uses the NGSolve finite element library [@ngsolve] for spatial discretization and provides a configuration file-based interface for pre-implemented models and time discretization schemes. It also integrates with Netgen [@ngsolve] and Gmsh [@Geuzaine2009] for geometry construction and meshing. Additionally, it provides users with built-in functionality for post-processing, error analysis, and data export for visualisation using Netgen [@ngsolve] or ParaView [@Ahrens2005]. 
 
-OpenCMP development follows the principles of ease of use, performance, and extensibility. The configuration file-based user interface is intended to be concise, readable, and intuitive. Furthermore, the code base is structured such that experienced users with appropriate background can add their own models with minimal modifications to existing code. The finite element method enables the use of high-order polynomial interpolants for increased simulation accuracy, however, continuous finite element methods suffer from stability and accuracy (conservation) for fluid convection-dominated problems. OpenCMP addresses this by providing discontinuous Galerkin method [@Cockburn2000] solvers, which are locally conservative and improve simulation stability for convection-dominated problems. Finally, OpenCMP implements the diffuse interface method [@Monte2021], an immersed boundary method [@Mittal2005], which allows complex simulation domains to be meshed by non-conforming structured meshes for improved simulation stability and reduced computational complexity (under certain conditions [@Monte2021]).
+OpenCMP development follows the principles of ease of use, performance, and extensibility. The configuration file-based user interface is intended to be concise, readable, and intuitive. Furthermore, the code base is structured such that experienced users with appropriate background can add their own models with minimal modifications to existing code. The finite element method enables the use of high-order polynomial interpolants for increased simulation accuracy, however, continuous finite element methods suffer from stability and accuracy (conservation) for fluid convection-dominated problems. OpenCMP addresses this by providing discontinuous Galerkin method [@Cockburn2000] solvers, which are locally conservative and improve simulation stability for convection-dominated problems. Finally, OpenCMP implements the diffuse interface method [@Monte2021,@Nguyen2018], an immersed boundary method [@Mittal2005], which allows complex simulation domains to be meshed by non-conforming structured meshes for improved simulation stability and reduced computational complexity (under certain conditions [@Monte2021]).
 
 # Statement of Need
 
@@ -52,14 +52,14 @@ The table below summarises the current capabilities of OpenCMP. Future work on O
 
 | Feature           | Description                                                  |
 | ----------------- | ------------------------------------------------------------ |
-| Meshing           | Accepts Netgen [@ngsolve] or Gmsh [@Geuzaine2009] meshes      |
+| Meshing           | Accepts Netgen [@ngsolve] or Gmsh [@Geuzaine2009] meshes     |
 | Numerical Methods | Standard continuous Galerkin finite element method           |
 |                   | Discontinuous Galerkin finite element method                 |
 |                   | Diffuse interface method                                     |
-| Models            | Poisson equation                                             |
+| Models            | Poisson (Heat) equation                                      |
 |                   | Stokes equations                                             |
-|                   | Single-component incompressible Navier-Stokes equations      |
-|                   | Multi-component reacting incompressible Navier-Stokes equations |
+|                   | Incompressible Navier-Stokes (INS) equations                 |
+|                   | Multicomponent Mixture INS equations                         |
 | Time Schemes      | First-, second-, and third- order discretizations            |
 |                   | Adaptive time-stepping                                       |
 | Solvers           | Direct or iterative solvers                                  |
@@ -70,6 +70,32 @@ The table below summarises the current capabilities of OpenCMP. Future work on O
 |                   | General simulation parameters (surface traction, divergence of velocity...) |
 |                   | Exports results to Netgen [@ngsolve] or ParaView [@Ahrens2005] format |
 | Performance       | Multi-threading                                              |
+
+Further information, including [installation instructions](https://opencmp.io/getting_started/installation_guide.html) and [tutorials](https://opencmp.io/tutorials/index.html) can be found on the OpenCMP [website](https://opencmp.io/). The tutorials are intended to guide new users through the various features offered in OpenCMP. Notes on the [mathematical foundations](https://opencmp.io/mathematical_notes/index.html) of the various models and [code documentation](https://opencmp.io/source/modules.html) are also provided. 
+
+Software testing is provided through integration tests, which confirm the accuracy of the implemented models and time discretization schemes, and unit tests which currently offer 72% line coverage.
+
+# User Interface
+
+Drawing inspiration from packages like [OpenFOAM](https://openfoam.org/) and [SU2](https://su2code.github.io/), OpenCMP’s user  interface is organized around configuration files and the command line.  Each simulation requires its own directory to hold its configuration  files and outputs. This is known as the run directory or `run_dir/`. The  standard layout of this directory is shown below.
+
+![](images/user_interface.svg)
+
+The main directory and each subdirectory contain a configuration file  `< >_config`. These are plaintext files that specify the  simulation parameters and run conditions.
+
+The configuration file in the main directory contains general information about the simulation including which model, mesh, finite  element spaces, and solver should be used. It also contains information about how the simulation should be executed such as the level of detail in the output messages and the number of threads to use.
+
+The `bc_dir/` subdirectory contains information about the boundary conditions. Its configuration file specifies the type and value of each  boundary condition. This subdirectory also contains files describing boundary condition data if a boundary condition value is to be loaded  from file instead of given in closed form.
+
+The `ic_dir` subdirectory holds information about the initial  conditions. Its configuration file specifies the value of the initial condition for each model variable. Like `bc_dir/`, `ic_dir/` may contain  additional files from which the initial condition data is loaded during  the simulation.
+
+The `model_dir/` subdirectory contains information about model parameters and model functions. Its configuration file specifies the values of any model parameters or functions for each model variable and the  subdirectory may hold additional data files to be loaded during the  simulation.
+
+The `ref_sol_dir/` subdirectory contains information about the error analysis to be conducted on the final simulation result. Its configuration file specifies what error metrics should be computed during post-processing. This configuration file also contains the  reference solutions the results should be compared against, either in closed form or as references to other files in the subdirectory that are loaded during post-processing.
+
+The `output/` subdirectory contains the saved simulation data. It  does not need to be created before running the simulation, it will be generated automatically if results should be saved to file.
+
+
 
 # Acknowledgements
 

@@ -80,7 +80,8 @@ config_defaults: Dict = {
     'DIM BOUNDARY CONDITIONS': {'multiple_bcs': False,
                                 'overlap_interface_parameter': -1,
                                 'remainder': False},
-    'RIGID BODY MOTION': {'rotation_speed': [1.0, 0.25]}
+    'RIGID BODY MOTION': {'rotation_speed': [1.0, 0.25]},
+    'CONTROLLER': {'active': False}
 }
 
 
@@ -106,12 +107,12 @@ class ConfigParser(configparser.ConfigParser):
         """
         Function to load parameters from a config file into a single-level dictionary.
 
-        | The values in the lowest level dictionary are either parsed into Python code or kept as strings if
-        | they represent paths to .sol files. All keys are kept as strings.
-        |
-        | Ex: model_params_dict = {'density': float,
-        |                          'viscosity': float,
-        |                          'source': CoefficientFunction}
+        The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
+        represent paths to .sol files. All keys are kept as strings. ::
+
+           Ex: model_params_dict = {'density': float,
+                                    'viscosity': float,
+                                    'source': CoefficientFunction}
 
         Args:
             config_section: The section of the config file to load parameters from.
@@ -129,24 +130,27 @@ class ConfigParser(configparser.ConfigParser):
             Tuple[Dict, Dict]
                 - dict_one: Dictionary containing the config file values.
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
-                    future.
+                  future.
         """
 
         dict_one: Dict[str, Union[str, float, CoefficientFunction, list]] = {}
         re_parse_dict: Dict[str, Union[str, Callable]] = {}
-        val_str: Union[str, List] # Just for type-hinting.
+        val_str_lst: Union[str, List] # Just for type-hinting.
         for key in self[config_section]:
             if all_str:
                 # If all_str option is passed none of the parameters should ever need to be re-parsed.
-                val_str = self.get_list([config_section, key], str)
+                val_str_lst = self.get_list([config_section, key], str)
 
                 if t_param is None:
-                    dict_one[key] = val_str
+                    if len(val_str_lst) == 1:
+                        dict_one[key] = val_str_lst[0]
+                    else:
+                        dict_one[key] = val_str_lst
                 else:
-                    dict_one[key] = [val_str for _ in t_param]
+                    dict_one[key] = [val_str_lst for _ in t_param]
             else:
-                val_str = self.load_param_simple([config_section, key])
-                val, variable_eval = parse_str(val_str, import_dir, t_param, mesh=mesh, filetypes=['.sol'],
+                val_str_lst = self.load_param_simple([config_section, key])
+                val, variable_eval = parse_str(val_str_lst, import_dir, t_param, mesh=mesh, filetypes=['.sol'],
                                                new_variables=new_variables)
                 dict_one[key] = val
 
@@ -166,13 +170,12 @@ class ConfigParser(configparser.ConfigParser):
         """
         Function to load parameters from a config file into a two-level dictionary. 
         
-        | The values in the lowest level dictionary are either parsed into Python code or
-        | kept as strings if they represent paths to .sol files. All other keys and values
-        | are kept as strings.
-        |
-        | Ex: model_functions_dict = {'source': {'c1': CoefficientFunction,
-        |                                        'c2': CoefficientFunction}
-        |                             }
+        The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
+        represent paths to .sol files. All other keys and values are kept as strings. ::
+
+           Ex: model_functions_dict = {'source': {'c1': CoefficientFunction,
+                                                  'c2': CoefficientFunction}
+                                       }
 
         Args:
             config_section: The section of the config file to load parameters from.
@@ -188,7 +191,7 @@ class ConfigParser(configparser.ConfigParser):
             Tuple[Dict, Dict]
                 - dict_one: Dictionary containing the config file values.
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
-                    future.
+                  future.
         """
 
         # Top level dictionaries.
@@ -212,16 +215,16 @@ class ConfigParser(configparser.ConfigParser):
         """
         Function to load parameters from a config file into a three-level dictionary.
 
-        | The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
-        | represent paths to .sol files. All other keys and values are kept as strings.
-        |
-        | Ex: bc_dict = {'dirichlet': {'u': {marker1: CoefficientFunction,
-        |                                    marker2: CoefficientFunction},
-        |                              'p': {marker3: CoefficientFunction}
-        |                              },
-        |                'neumann':   {'p': {marker4: CoefficientFunction}
-        |                              }
-        |                }
+        The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
+        represent paths to .sol files. All other keys and values are kept as strings. ::
+
+           Ex: bc_dict = {'dirichlet': {'u': {marker1: CoefficientFunction,
+                                              marker2: CoefficientFunction},
+                                        'p': {marker3: CoefficientFunction}
+                                        },
+                          'neumann':   {'p': {marker4: CoefficientFunction}
+                                        }
+                          }
 
         Args:
             import_dir: The path to the main run directory containing the file from which to import any Python
@@ -237,7 +240,7 @@ class ConfigParser(configparser.ConfigParser):
             Tuple[Dict, Dict]:
                 - dict_one: Dictionary containing the config file values.
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
-                    future.
+                  future.
         """
 
         # Keys for the top level dictionaries

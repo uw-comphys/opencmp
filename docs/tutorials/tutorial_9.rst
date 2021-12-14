@@ -4,7 +4,7 @@
 Tutorial 9 - Multi-Component Flow
 =================================
 
-The files for this tutorial can be found in "Examples/tutorial_9".
+The files for this tutorial can be found in "examples/tutorial_9".
 
 Governing Equations
 -------------------
@@ -21,7 +21,7 @@ This tutorial will demonstrate how to add convection, diffusion, and reaction of
    -\bm{n} \cdot \bm{\nabla} c_A = -\bm{n} \cdot \bm{\nabla} c_B &= 0 \mbox{ at walls} \\
    \left( \bm{n} \cdot \bm{u} \right) c_A - \mathcal{D}_A \bm{n} \cdot \bm{\nabla} c_A - \max \left( \bm{n} \cdot \bm{u}, 0 \right) c_A &= 0 \mbox{ at outlet} \\
    \left( \bm{n} \cdot \bm{u} \right) c_B - \mathcal{D}_B \bm{n} \cdot \bm{\nabla} c_B - \max \left( \bm{n} \cdot \bm{u}, 0 \right) c_B &= 0 \mbox{ at outlet}
-   
+
 The velocity profile comes from the solution of the incompressible Navier-Stokes equations, given below with Oseen-style linearization:
 
 .. math::
@@ -32,13 +32,13 @@ The velocity profile comes from the solution of the incompressible Navier-Stokes
    \bm{u} &= 4y \left( 0.5 - y \right) \bm{\delta}_x \mbox{ at inlet} \\
    \bm{u} &= \bm{0} \mbox{ on walls} \\
    \bm{n} \cdot \left(\bm{u} \bm{w} - \nu \bm{\nabla} \bm{u} + p \mathbb{I} \right) - \max (\bm{n} \cdot \bm{w}, 0) \bm{u} &= \bm{0} \mbox{ at outlet}
-   
+
 with a kinematic viscosity of 0.001.
 
 The Main Configuration Files
 ----------------------------
 
-The main configuration file is very similar to that used in :ref:`tutorial_7`. 
+The main configuration file is very similar to that used in :ref:`tutorial_7`.
 
 One major change is the addition of finite element spaces for components A and B. Note that the discontinuous Galerkin method is not used as it is not yet fully implemented for multi-component flows. Instead, the Taylor-Hood finite element pair is used for velocity and pressure and the additional components use the same scalar finite elements as the pressure field. ::
 
@@ -48,10 +48,10 @@ One major change is the addition of finite element spaces for components A and B
               a -> H1
               b -> H1
    interpolant_order = 3
-   
+
    [DG]
    DG = False
-   
+
 The transient solve parameters should also be modified to increase the simulation duration and ensure a steady flow is eventually achieved. ::
 
    [TRANSIENT]
@@ -69,9 +69,9 @@ Finally, the model type must be changed to "MultiComponentINS" and the model mus
                              b -> True
    component_in_time_deriv = a -> True
                              b -> True
-   run_dir = Examples/tutorial_9
-   num_threads = 6
-   
+   run_dir = .
+   num_threads = 2
+
 The Boundary Condition Configuration File
 -----------------------------------------
 
@@ -96,7 +96,7 @@ The boundary condition configuration file now must include boundary conditions f
    [SURFACE_RXN]
    a = circle -> -a
    b = circle -> a
-   
+
 Note that the surfaces of the catalyst particles have been marked "circle" on the mesh.
 
 The Initial Condition Configuration File
@@ -109,7 +109,7 @@ The initial conditions are simply zero throughout the domain. ::
    p = all -> 0.0
    a = all -> 0.0
    b = all -> 0.0
-   
+
 The Model Configuration File
 ----------------------------
 
@@ -124,16 +124,16 @@ The model configuration file contains the usual model parameters and model funct
    source = u -> [0.0, 0.0]
             a -> 0
             b -> 0
-   
+
 The Error Analysis Subdirectory
 -------------------------------
 
 In this case, the exact solution is not known, so the error analysis configuration file is left empty. Note that the divergence of the velocity and the velocity could be calculated -- it doesn't require a reference solution -- but aren't.
-   
+
 Running the Simulation
 ----------------------
 
-The simulation can be run from the command line by calling :code:`python3 run.py Examples/tutorial_9/config`. 
+The simulation can be run from the command line; within the directory "examples/tutorial_4/" execute :code:`python3 -m opencmp config`. 
 
 As usual, the progress of the transient simulation can be tracked from the print outs at each time step. Once the simulation has finished the results can be visualized by opening "output/transient.pvd" in ParaView. Below is the distribution of components A and B after 10s:
 
@@ -141,21 +141,20 @@ As usual, the progress of the transient simulation can be tracked from the print
    :width: 600
    :align: center
    :alt: Steady-state distribution of component A.
-   
+
 .. image:: ../_static/tutorial_9_b.png
    :width: 600
    :align: center
    :alt: Steady-state distribution of component B.
-   
+
 and the velocity and pressure distributions:
 
 .. image:: ../_static/tutorial_9_c.png
    :width: 600
    :align: center
    :alt: Steady-state velocity profile.
-   
+
 .. image:: ../_static/tutorial_9_d.png
    :width: 600
    :align: center
    :alt: Steady-state pressure profile.
-

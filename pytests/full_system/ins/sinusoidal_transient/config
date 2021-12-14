@@ -1,5 +1,5 @@
 [MESH]
-filename = mesh_files/coarse_large_square_4bcs.vol 
+filename = pytests/mesh_files/coarse_large_square_4bcs.vol 
 
 [DIM]
 diffuse_interface_method = False

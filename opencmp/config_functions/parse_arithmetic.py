@@ -30,7 +30,7 @@ import ngsolve as ngs
 from ngsolve import Mesh, Parameter, CoefficientFunction
 import operator
 from typing import List, Tuple, Union, Dict, Any, Optional, Callable
-from helpers.math import tanh, sig, H_s, ramp_cos
+from ..helpers.math import tanh, sig, H_s, ramp_cos
 import sys
 
 
@@ -120,7 +120,8 @@ def parse_to_arith(expr_stack: List[Union[str, Tuple[str, int]]]) -> Any:
 
 
 def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], import_dir: str, t_param: Optional[List[Parameter]],
-                         new_variables: List[Dict[str, Any]], mesh: Optional[Mesh] = None, time_step: Optional[int] = None)\
+                         new_variables: List[Dict[str, Any]], mesh: Optional[Mesh] = None,
+                         time_step: Optional[int] = None)\
         -> Tuple[Union[str, float, CoefficientFunction, bool, None], Union[bool, Callable]]:
     """
     Function to turn a list of strings corresponding to arithmetic operations into those operations as Python code.
@@ -137,8 +138,8 @@ def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], import_dir: s
         Tuple[Union[str, float, CoefficientFunction], Union[bool, callable]]:
             - val: The Python code.
             - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
-                re-parsed if their values change). If the expression involves importing a Python function return that 
-                Python function instead.
+              re-parsed if their values change). If the expression involves importing a Python function return that
+              Python function instead.
     """
 
     # Map operator symbols to corresponding arithmetic operations.
@@ -149,26 +150,26 @@ def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], import_dir: s
                                   '/': operator.truediv,
                                   '^': operator.pow}
 
-    funcs: Dict[str, Any] = {'sin': ngs.sin,
-                             'cos': ngs.cos,
-                             'tan': ngs.tan,
-                             'exp': ngs.exp,
-                             'tanh': tanh,
-                             'sig': sig,
-                             'H': H_s,
-                             'abs': abs,
-                             'trunc': int,
-                             'round': round,
-                             'sqrt': ngs.sqrt,
-                             'sgn': lambda a: -1 if a < -epsilon else 1 if a > epsilon else 0,
-                             'vec': lambda *a: ngs.CoefficientFunction(a),
-                             'ramp': ramp_cos}
+    funcs: Dict[str, Any] = {'sin':     ngs.sin,
+                             'cos':     ngs.cos,
+                             'tan':     ngs.tan,
+                             'exp':     ngs.exp,
+                             'tanh':    tanh,
+                             'sig':     sig,
+                             'H':       H_s,
+                             'abs':     abs,
+                             'trunc':   int,
+                             'round':   round,
+                             'sqrt':    ngs.sqrt,
+                             'sgn':     lambda a: -1 if a < -epsilon else 1 if a > epsilon else 0,
+                             'vec':     lambda *a: ngs.CoefficientFunction(a),
+                             'ramp':    ramp_cos}
 
-    constants: Dict[str, Any] = {'pi': math.pi,
-                                 'e': math.e,
-                                 'None': None,
-                                 'True': True,
-                                 'False': False}
+    constants: Dict[str, Any] = {'pi':      math.pi,
+                                 'e':       math.e,
+                                 'None':    None,
+                                 'True':    True,
+                                 'False':   False}
 
     variables: Dict[str, Any] = {'x': ngs.x,
                                  'y': ngs.y,
@@ -180,6 +181,16 @@ def evaluate_arith_stack(stack: List[Union[str, Tuple[str, int]]], import_dir: s
     variable_eval: Union[bool, Callable] = False
 
     # Need to be able to index into a new variables dictionary even if the parsed string is time-independent.
+    if t_param is None and time_step is not None:
+        raise ValueError('time_step must be None if t_param is None')
+
+    if t_param is not None and len(new_variables) != len(t_param):
+        if new_variables == [{}]:
+            new_variables = [{}] * len(t_param)
+        else:
+            raise ValueError('new_variables should match the length of t_param'
+                             'unless the default of an empty dictionary is being used.')
+
     if time_step is None:
         new_variables_tmp = new_variables[0]
     else:
@@ -275,9 +286,9 @@ def eval_item(string: str, import_dir: str, t_param: Optional[List[Parameter]], 
         Tuple[Union[str, float, CoefficientFunction], Union[str, bool, callable]]:
             - val: The Python code.
             - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
-                re-parsed if their values change). If variable_eval is True, the original string expression is returned
-                in its place. If the expression involved importing a Python function that Python function is returned in 
-                place of variable_eval.
+              re-parsed if their values change). If variable_eval is True, the original string expression is returned
+              in its place. If the expression involved importing a Python function that Python function is returned in
+              place of variable_eval.
     """
 
     # parse_to_arith sets up expr_stack to contain the parsed string as a nested list of strings corresponding to
@@ -313,9 +324,9 @@ def eval_python(string: str, import_dir: str, mesh: Optional[Mesh] = None, new_v
         Tuple[Union[str, float, CoefficientFunction], Union[str, bool, callable]]:
             - val: The Python code.
             - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
-                re-parsed if their values change). If variable_eval is True, the original string expression is returned
-                in its place. If the expression involved importing a Python function that Python function is returned in 
-                place of variable_eval.
+              re-parsed if their values change). If variable_eval is True, the original string expression is returned
+              in its place. If the expression involved importing a Python function that Python function is returned in
+              place of variable_eval.
     """
 
     # Remove whitespace in case the string ends up being parsed manually.

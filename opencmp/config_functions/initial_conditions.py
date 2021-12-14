@@ -17,7 +17,7 @@
 
 from .base_config_functions import ConfigFunctions
 from .load_config import load_coefficientfunction_into_gridfunction
-from helpers.io import update_gridfunction_from_files
+from ..helpers.io import update_gridfunction_from_files
 import ngsolve as ngs
 from ngsolve import Parameter, GridFunction, CoefficientFunction, Mesh
 from typing import Dict, Union, List

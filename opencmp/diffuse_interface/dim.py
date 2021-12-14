@@ -15,10 +15,10 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from config_functions import ConfigParser
+from ..config_functions import ConfigParser
 from . import interface, mesh_helpers
-from helpers.ngsolve_ import numpy_to_NGSolve
-from helpers.io import create_and_load_gridfunction_from_file
+from ..helpers.ngsolve_ import numpy_to_NGSolve
+from ..helpers.io import create_and_load_gridfunction_from_file
 import numpy as np
 import ngsolve as ngs
 from ngsolve import Mesh, Parameter
@@ -59,13 +59,14 @@ class DIM:
         self.mask_arr_dict: Dict = {}
         self.mask_gfu_dict: Dict = {}
 
+        # Load the nonconformal parameters.
+        self._load_nonconformal_parameters()
+
         # Determine if the phase fields and masks should be loaded from files or generated.
         self.load_method = self.config.get_item(['PHASE FIELDS', 'load_method'], str)
         if self.load_method == 'generate':
             # Generate from one .stl file.
             #
-            # Load the nonconformal parameters.
-            self._load_nonconformal_parameters()
 
             # Get the name of the .stl file holding the complex geometry.
             self.stl_filename = self.config.get_item(['PHASE FIELDS', 'stl_filename'], str)
@@ -83,8 +84,6 @@ class DIM:
         elif self.load_method == 'combine':
             # Generate phase fields from multiple .stl files and combine them into a single one.
             #
-            # Load the nonconformal parameters.
-            self._load_nonconformal_parameters()
 
             # Create the mesh.
             self._generate_DIM_mesh()
@@ -223,7 +222,13 @@ class DIM:
             bc_config: The DIM BC config file (or the config file containing [VERTICES] and [CENTROIDS]).
             quiet: If True suppresses warnings about using default parameter values.
         """
-        self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None) # There should be no reason to ever re-parse vertices.
+        if self.dim == 2:
+            # In 2D vertices is a list of coordinates.
+            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None) # There should be no reason to ever re-parse vertices.
+        else:
+            # In 3D vertices is a list of stl file names that contain the points of the planes that separate the
+            # various boundary conditions.
+            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None, all_str=True)  # There should be no reason to ever re-parse vertices.
 
         try:
             self.centroid, _ = bc_config.get_one_level_dict('CENTROIDS', self.import_dir, None) # There should be no reason to ever re-parse centroid.

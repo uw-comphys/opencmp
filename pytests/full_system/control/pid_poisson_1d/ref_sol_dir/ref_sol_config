@@ -1,0 +1,7 @@
+[REFERENCE SOLUTIONS]
+u = 9 - 3*x
+
+[METRICS]
+l2_norm = u
+l1_norm = u
+linfinity_norm = u

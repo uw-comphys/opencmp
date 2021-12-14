@@ -16,14 +16,13 @@
 ########################################################################################################################
 
 import ngsolve as ngs
-from helpers.ngsolve_ import get_special_functions
-from helpers.dg import avg, jump, grad_avg
-from models import Model
-from config_functions import ConfigParser
-from typing import List, Optional, Union
+from ..helpers.ngsolve_ import get_special_functions
+from ..helpers.dg import avg, jump, grad_avg
+from . import Model
+from typing import Dict, List, Optional, Union
 from ngsolve.comp import ProxyFunction
 from ngsolve import Parameter, GridFunction, FESpace, BilinearForm, LinearForm, Preconditioner
-from helpers.error import norm, mean
+from ..helpers.error import norm, mean
 
 
 class INS(Model):
@@ -31,22 +30,11 @@ class INS(Model):
     A single phase incompressible Navier-Stokes model.
     """
 
-    def __init__(self, config: ConfigParser, t_param: List[Parameter]) -> None:
-        # Specify information about the model components
-        # NOTE: These MUST be set before calling super(), since it's needed in superclass' __init__
-        self.model_components                   = {'u':  0,      'p': 1}
-        self.model_local_error_components       = {'u':  True,   'p': True}
-        self.time_derivative_components         = [{'u': True,   'p': False}]
-        self.num_weak_forms                     = 1
+    def _pre_init(self) -> None:
+        # Nothing needs to be done
+        pass
 
-        # Pre-define which BCs are accepted for this model, all others are thrown out.
-        self.BC_init = {'dirichlet':    {},
-                        'stress':       {},
-                        'parallel':     {},
-                        'pinned':       {}}
-
-        super().__init__(config, t_param)
-
+    def _post_init(self) -> None:
         # Load the solver parameters.
         self.linearize = self.config.get_item(['SOLVER', 'linearization_method'], str)
         if self.linearize not in ['Oseen', 'IMEX']:
@@ -62,6 +50,26 @@ class INS(Model):
                                  'at least 1.')
             self.W = self._construct_linearization_terms()
 
+    def _define_model_components(self) -> Dict[str, Optional[int]]:
+        return {'u': 0,
+                'p': 1}
+
+    def _define_model_local_error_components(self) -> Dict[str, bool]:
+        return {'u': True,
+                'p': True}
+
+    def _define_time_derivative_components(self) -> List[Dict[str, bool]]:
+        return [
+            {'u': True,
+             'p': False}
+        ]
+
+    def _define_num_weak_forms(self) -> int:
+        return 1
+
+    def _define_bc_types(self) -> List[str]:
+        return ['dirichlet', 'stress', 'parallel', 'pinned']
+
     @staticmethod
     def allows_explicit_schemes() -> bool:
         # INS cannot work with explicit schemes
@@ -69,9 +77,21 @@ class INS(Model):
 
     def _set_model_parameters(self) -> None:
         self.kv = self.model_functions.model_parameters_dict['kinematic_viscosity']['all']
-        self.f = self.model_functions.model_functions_dict['source']['all']
+        self.f = self.model_functions.model_functions_dict['source']
 
     def _construct_fes(self) -> FESpace:
+        return ngs.FESpace(self._contruct_fes_helper(), dgjumps=self.DG)
+
+    def _contruct_fes_helper(self) -> List[FESpace]:
+        """
+        Helper function for creating the FESpace.
+
+        This function exists in order to allow multicomponent_ins (and any further additions) to simplify their FES
+        creation by being able to use this helper function to create the finite element space for velocity and pressure.
+
+        Return:
+            A list containing individual finite element spaces
+        """
         if not self.DG:
             if self.element['u'] == 'HDiv' or self.element['u'] == 'RT':
                 print('We recommended that you NOT use HDIV spaces without DG due to numerical issues.')
@@ -84,15 +104,15 @@ class INS(Model):
                              dgjumps=self.DG, RT=True)
         else:
             fes_u = getattr(ngs, self.element['u'])(self.mesh, order=self.interp_ord,
-                                                  dirichlet=self.dirichlet_names.get('u', ''), dgjumps=self.DG)
+                                                    dirichlet=self.dirichlet_names.get('u', ''), dgjumps=self.DG)
 
-        if self.element['p'] == 'L2' and 'p' in self.dirichlet_names.keys():
+        if self.element['p'] == 'L2' and 'p' in self.dirichlet_names:
             raise ValueError('Not able to pin pressure at a point on L2 spaces.')
         else:
             fes_p = getattr(ngs, self.element['p'])(self.mesh, order=self.interp_ord - 1,
-                                                  dirichlet=self.dirichlet_names.get('p', ''), dgjumps=self.DG)
+                                                    dirichlet=self.dirichlet_names.get('p', ''), dgjumps=self.DG)
 
-        return ngs.FESpace([fes_u, fes_p], dgjumps=self.DG)
+        return [fes_u, fes_p]
 
     def _construct_linearization_terms(self) -> Optional[List[GridFunction]]:
         tmp = ngs.GridFunction(self.fes.components[0])
@@ -105,11 +125,11 @@ class INS(Model):
             # Update the velocity linearization term.
             try:
                 # First try just updating the value of the term.
-                comp_index = self.model_components['u']
-                self.W[comp_index].vec.data = gfu.components[comp_index].vec
+                self.W[self.model_components['u']].vec.data = gfu.components[self.model_components['u']].vec
             except:
                 # In some cases the finite element space of the model will have changed, so the linearization term needs
                 # to be completely reconstructed.
+                # E.g. during convergence testing.
                 self.W = self._construct_linearization_terms()
         else:
             # Do nothing, no linearization term to update.
@@ -117,17 +137,13 @@ class INS(Model):
 
     def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
                                     dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
-        u, p = U
-        v, q = V
-
-        comp_index = self.model_components['u']
 
         if self.linearize == 'Oseen':
             if time_step > 0:
                 # Using known values from a previous time step, so no need to iteratively solve for a wind.
-                w = U[comp_index]
+                w = U[self.model_components['u']]
             else:
-                w = self.W[comp_index]
+                w = self.W[self.model_components['u']]
         elif self.linearize == 'IMEX':
             w = None
         else:
@@ -135,26 +151,22 @@ class INS(Model):
 
         if self.DIM:
             # Use the diffuse interface method.
-            a = self._bilinear_time_ODE_DIM(u, v, w, dt, time_step)
+            a = self._bilinear_time_ODE_DIM(U, V, w, dt, time_step)
         else:
             # Solve on a standard conformal mesh.
-            a = self._bilinear_time_ODE_no_DIM(u, v, w, dt, time_step)
+            a = self._bilinear_time_ODE_no_DIM(U, V, w, dt, time_step)
 
         return [a]
 
-    def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction],
-                                    dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
-        u, p = U
-        v, q = V
-
-        comp_index = self.model_components['u']
+    def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction], dt: Parameter,
+                                            time_step: int) -> List[BilinearForm]:
 
         if self.linearize == 'Oseen':
             if time_step > 0:
                 # Using known values from a previous time step, so no need to iteratively solve for a wind.
-                w = U[comp_index]
+                w = U[self.model_components['u']]
             else:
-                w = self.W[comp_index]
+                w = self.W[self.model_components['u']]
         elif self.linearize == 'IMEX':
             w = None
         else:
@@ -162,27 +174,24 @@ class INS(Model):
 
         if self.DIM:
             # Use the diffuse interface method.
-            a = self._bilinear_time_coefficient_DIM(u, p, v, q, w, dt, time_step)
+            a = self._bilinear_time_coefficient_DIM(U, V, w, dt, time_step)
         else:
             # Solve on a standard conformal mesh.
-            a = self._bilinear_time_coefficient_no_DIM(u, p, v, q, w, dt, time_step)
+            a = self._bilinear_time_coefficient_no_DIM(U, V, w, dt, time_step)
 
         return [a]
 
-    def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
-                         dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
-        v, q = V
-
-        comp_index = self.model_components['u']
+    def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
+                         dt: Parameter, time_step: int) -> List[LinearForm]:
 
         if self.linearize == 'Oseen':
             if time_step > 0 and gfu_0 is not None:
                 # Using known values from a previous time step, so no need to iteratively solve for a wind.
                 # Check for gfu_0 = None because adaptive_three_step requires a solve where w should be taken from W for
                 # a half step (time_step != 0).
-                w = gfu_0[comp_index]
+                w = gfu_0[self.model_components['u']]
             else:
-                w = self.W[comp_index]
+                w = self.W[self.model_components['u']]
         elif self.linearize == 'IMEX':
             w = None
         else:
@@ -190,34 +199,26 @@ class INS(Model):
 
         if self.DIM:
             # Use the diffuse interface method.
-            L = self._linear_DIM(v, w, dt, time_step)
+            L = self._linear_DIM(V, w, dt, time_step)
         else:
             # Solve on a standard conformal mesh.
-            L = self._linear_no_DIM(v, w, dt, time_step)
+            L = self._linear_no_DIM(V, w, dt, time_step)
 
         return [L]
 
-    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None,
-                                dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
-        # Note that the time_step argument is not used because the nonlinear term in INS (convection) does not include
-        # any boundary conditions or model parameters.
-
-        v, q = V
-
-        comp_index = self.model_components['u']
-
-        gfu_u = gfu_0[comp_index]
+    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
+                                dt: Parameter, time_step: int) -> List[LinearForm]:
 
         if self.DIM:
             # Use the diffuse interface method.
-            L = self._imex_explicit_DIM(v, gfu_u, dt)
+            L = self._imex_explicit_DIM(V, gfu_0, dt, time_step)
         else:
             # Solve on a standard conformal mesh.
-            L = self._imex_explicit_no_DIM(v, gfu_u, dt)
+            L = self._imex_explicit_no_DIM(V, gfu_0, dt, time_step)
 
         return [L]
 
-    def single_iteration(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
+    def solve_single_step(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
                          precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
         if self.linearize == 'Oseen':
             # The component index representing velocity
@@ -259,15 +260,32 @@ class INS(Model):
 # BILINEAR AND LINEAR FORM HELPER FUNCTIONS
 ########################################################################################################################
 
-    def _bilinear_time_ODE_DIM(self, u: Union[ProxyFunction, GridFunction], v: ProxyFunction, w: GridFunction,
-                               dt: Parameter, time_step: int) -> BilinearForm:
+    def _bilinear_time_ODE_DIM(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
+                               w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
-        This is the portion of the bilinear form for model variables with time derivatives.
+
+        This is the portion of the bilinear form which contains variables WITH time derivatives.
+
+        Args:
+            U: A list of trial functions for the model's finite element space, or a list of grid functions containing
+                the previous time step's solution.
+            V: A list of test (weighting) functions for the model's finite element space.
+            w: Velocity linearization term if using Oseen linearization, None otherwise
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
         # Define the special DG functions.
         n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
+
+        # Separate out the trial and test function for velocity
+        u = U[self.model_components['u']]
+        v = V[self.model_components['u']]
 
         # Domain integrals.
         a = dt * (
@@ -328,15 +346,31 @@ class INS(Model):
 
         return a
 
-    def _bilinear_time_coefficient_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction,
-                                       w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
+    def _bilinear_time_coefficient_DIM(self, U: List[ProxyFunction], V: List[ProxyFunction],
+                                       w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
         """
         Bilinear form when the diffuse interface method is being used. Handles both CG and DG.
-        This is the portion of the bilinear form for model variables without time derivatives.
+
+        This is the portion of the bilinear form which contains variables WITHOUT time derivatives.
+
+        Args:
+            U: A list of trial functions for the model's finite element space.
+            V: A list of test (weighting) functions for the model's finite element space.
+            w: Velocity linearization term if using Oseen linearization, None otherwise
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
         # Define the special DG functions.
         n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
+
+        # Separate out the trial and test functions for velocity and pressure.
+        u, p = U[self.model_components['u']], U[self.model_components['p']]
+        v, q = V[self.model_components['u']], V[self.model_components['p']]
 
         # Domain integrals.
         a = dt * (
@@ -370,15 +404,32 @@ class INS(Model):
 
         return a
 
-    def _bilinear_time_ODE_no_DIM(self, u: Union[ProxyFunction, GridFunction], v: ProxyFunction, w: GridFunction,
-                                  dt: Parameter, time_step: int) -> BilinearForm:
+    def _bilinear_time_ODE_no_DIM(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
+                                  w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
         """
-        Bilinear form when the diffuse interface method is not being used. Handles both CG and DG.
-        This is the portion of the bilinear form for model variables with time derivatives.
+        Bilinear form when the diffuse interface method is NOT being used. Handles both CG and DG.
+
+        This is the portion of the bilinear form which contains variables WITH time derivatives.
+
+        Args:
+            U: A list of trial functions for the model's finite element space, or a list of grid functions containing
+                the previous time step's solution.
+            V: A list of test (weighting) functions for the model's finite element space.
+            w: Velocity linearization term if using Oseen linearization, None otherwise
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
-        # Define the special DG functions.
+        # Define the special DG functions
         n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
+
+        # Separate out the trial and test function for velocity
+        u = U[self.model_components['u']]
+        v = V[self.model_components['u']]
 
         # Domain integrals.
         a = dt * (
@@ -419,15 +470,31 @@ class INS(Model):
 
         return a
 
-    def _bilinear_time_coefficient_no_DIM(self, u: ProxyFunction, p: ProxyFunction, v: ProxyFunction, q: ProxyFunction,
-                                          w: GridFunction, dt: Parameter, time_step: int) -> BilinearForm:
+    def _bilinear_time_coefficient_no_DIM(self, U: List[ProxyFunction], V: List[ProxyFunction],
+                                          w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
         """
-        Bilinear form when the diffuse interface method is not being used. Handles both CG and DG.
-        This is the portion of the bilinear form for model variables without time derivatives.
+        Bilinear form when the diffuse interface method is NOT being used. Handles both CG and DG.
+
+        This is the portion of the bilinear form which contains variables WITHOUT time derivatives.
+
+        Args:
+            U: A list of trial functions for the model's finite element space.
+            V: A list of test (weighting) functions for the model's finite element space.
+            w: Velocity linearization term if using Oseen linearization, None otherwise.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the bilinear form.
         """
 
         # Define the special DG functions.
         n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
+
+        # Separate out the trial and test functions for velocity and pressure.
+        u, p = U[self.model_components['u']], U[self.model_components['p']]
+        v, q = V[self.model_components['u']], V[self.model_components['p']]
 
         # Domain integrals.
         a = dt * (
@@ -457,16 +524,30 @@ class INS(Model):
 
         return a
 
-    def _linear_DIM(self, v: ProxyFunction, w: GridFunction, dt: Parameter, time_step: int) -> LinearForm:
+    def _linear_DIM(self, V: List[ProxyFunction], w: Optional[GridFunction], dt: Parameter, time_step: int)\
+            -> LinearForm:
         """
         Linear form when the diffuse interface method is being used. Handles both CG and DG.
+
+        Args:
+            V: A list of test (weighting) functions for the model's finite element space.
+            w: Velocity linearization term if using Oseen linearization, None otherwise.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The linear form.
         """
 
         # Define the special DG functions.
         n, h, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
+        # Separate out the test function for velocity.
+        v = V[self.model_components['u']]
+
         # Domain integrals.
-        L = dt * v * self.f[time_step] * self.DIM_solver.phi_gfu * ngs.dx
+        L = dt * v * self.f['u'][time_step] * self.DIM_solver.phi_gfu * ngs.dx
 
         # Force u to zero where phi is zero. If DIM rigid body motion is being used force u to the velocity of the
         # rigid body instead.
@@ -514,27 +595,30 @@ class INS(Model):
 
         return L
 
-    def _imex_explicit_DIM(self, v: ProxyFunction, gfu_u: GridFunction, dt: Parameter) -> LinearForm:
+    def _linear_no_DIM(self, V: List[ProxyFunction], w: Optional[GridFunction], dt: Parameter, time_step: int)\
+            -> LinearForm:
         """
-        Constructs the explicit IMEX terms for the linear form when the diffuse interface method is being used.
-        Handles both CG and DG.
-        """
+        Linear form when the diffuse interface method is NOT being used. Handles both CG and DG.
 
-        # Linearized convection term.
-        L = -dt * ngs.InnerProduct(ngs.Grad(gfu_u) * gfu_u, v) * self.DIM_solver.phi_gfu * ngs.dx
+        Args:
+            V: A list of test (weighting) functions for the model's finite element space.
+            w: Velocity linearization term if using Oseen linearization, None otherwise.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
 
-        return L
-
-    def _linear_no_DIM(self, v: ProxyFunction, w: GridFunction, dt: Parameter, time_step: int) -> LinearForm:
-        """
-        Linear form when the diffuse interface method is not being used. Handles both CG and DG.
+        Returns:
+            The linear form.
         """
 
         # Define the special DG functions.
         n, h, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
+        # Separate out the test function for velocity.
+        v = V[self.model_components['u']]
+
         # Domain integrals.
-        L = dt * v * self.f[time_step] * ngs.dx
+        L = dt * v * self.f['u'][time_step] * ngs.dx
 
         # Dirichlet BC for u
         if self.DG:
@@ -559,11 +643,58 @@ class INS(Model):
 
         return L
 
-    def _imex_explicit_no_DIM(self, v: ProxyFunction, gfu_u: GridFunction, dt: Parameter) -> LinearForm:
+    def _imex_explicit_DIM(self, V: List[ProxyFunction], gfu_0: List[GridFunction], dt: Parameter, time_step: int)\
+            -> LinearForm:
         """
-        Constructs the explicit IMEX terms for the linear form when the diffuse interface method is not being used.
-        Handles both CG and DG.
+        Contains any linear form terms resulting from the linearization of terms due to the IMEX method.
+
+        For when the diffuse interface method is being used. Handles both CG and DG.
+
+        Args:
+            V: A list of test (weighting) functions for the model's finite element space.
+            gfu_0: The previous time step's solution.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the linear form.
         """
+
+        # Separate out the test function for velocity.
+        v = V[self.model_components['u']]
+
+        # Velocity linearization term
+        gfu_u = gfu_0[self.model_components['u']]
+
+        # Linearized convection term.
+        L = -dt * ngs.InnerProduct(ngs.Grad(gfu_u) * gfu_u, v) * self.DIM_solver.phi_gfu * ngs.dx
+
+        return L
+
+    def _imex_explicit_no_DIM(self, V: List[ProxyFunction], gfu_0: List[GridFunction], dt: Parameter, time_step: int)\
+            -> LinearForm:
+        """
+        Contains any linear form terms resulting from the linearization of terms due to the IMEX method.
+
+        For when the diffuse interface method is NOT being used. Handles both CG and DG.
+
+        Args:
+            V: A list of test (weighting) functions for the model's finite element space.
+            gfu_0: The previous time step's solution.
+            dt: Time step parameter (in the case of a stationary solve is just one).
+            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
+                the time step in t_param and dt_param.
+
+        Returns:
+            The described portion of the linear form.
+        """
+
+        # Separate out the test function for velocity.
+        v = V[self.model_components['u']]
+
+        # Velocity linearization term
+        gfu_u = gfu_0[self.model_components['u']]
 
         # Linearized convection term.
         L = -dt * ngs.InnerProduct(ngs.Grad(gfu_u) * gfu_u, v) * ngs.dx

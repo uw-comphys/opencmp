@@ -190,15 +190,17 @@ Many models implemented in OpenCMP include dependent variables some of which may
    = &\int_{\Omega} \bm{v} \cdot \bm{f} \: dx
    
 where the above formulation uses Oseen-style linearization.
-   
-Because of this, pressure should not be included in the main time discretization scheme. This is apparent with the use of second-order or higher time discretization schemes. Consider, for example, the Crank-Nicolson scheme:
+
+Since pressure has no time derivative it should not be included in the main time discretization scheme. This is apparent with the use of second-order or higher time discretization schemes. Consider, for example, the Crank-Nicolson scheme:
 
 .. math::
    \int_{\Omega} \bm{v} \cdot \left( \frac{\bm{u}^{n+1} - \bm{u}^n}{\Delta t} \right) \: dx &= \int_{\Omega} \left( p^{n+1} \left( \bm{\nabla} \cdot \bm{v} \right) + q \left( \bm{\nabla} \cdot \bm{u}^{n+1} \right) \right) \: dx \\
    &+ \frac{1}{2} \int_{\Omega} \left( \bm{u}^{n+1} \bm{w}^{n+1} : \bm{\nabla} \bm{v} - \nu \bm{\nabla} \bm{u}^{n+1} : \bm{\nabla} \bm{v} + \bm{v} \cdot \bm{f}^{n+1} \right) \: dx - \frac{1}{2} \int_{\Gamma} \bm{v} \cdot \left( \bm{h}^{n+1} + \max \left( \bm{w}^{n+1} \cdot \bm{n}, 0 \right) \bm{u}^{n+1} \right) \: ds \\
    &+ \frac{1}{2} \int_{\Omega} \left( \bm{u}^{n} \bm{w}^{n} : \bm{\nabla} \bm{v} - \nu \bm{\nabla} \bm{u}^{n} : \bm{\nabla} \bm{v} + \bm{v} \cdot \bm{f}^{n} \right) \: dx - \frac{1}{2} \int_{\Gamma} \bm{v} \cdot \left( \bm{h}^{n} + \max \left( \bm{w}^{n} \cdot \bm{n}, 0 \right) \bm{u}^{n} \right) \: ds
    
-Terms involving solely velocity or boundary conditions are discretized following the standard Crank-Nicolson scheme, but terms involving pressure are effectively discretized with the implicit Euler scheme.
+Terms involving solely velocity or boundary conditions are discretized following the standard Crank-Nicolson scheme, but terms involving pressure are treated fully implicitly and effectively discretized with the implicit Euler scheme. 
+
+There is no clear justification for this treatment of terms without time derivatives in the literature, though it is mentioned in some papers (ex: `John2006 <https://doi.org/10.1016/j.cma.2005.10.007>`_ *A Comparison of Time-Discretization/Linearization Approaches for the Incompressible Navier-Stokes Equations*). Current understanding is that since pressure has no time derivative it acts as a constraint on the change in velocity over time but is itself unaffected by the pressure profile at previous time steps. Furthermore, from testing, this treatment of pressure is needed to obtain the expected time step convergence rates from high-order time discretization schemes.
 
 References
 ----------

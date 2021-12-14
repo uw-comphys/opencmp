@@ -15,12 +15,12 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from typing import Union, Tuple, Optional, Dict, List, TYPE_CHECKING, Any
+from typing import Union, Optional, List, TYPE_CHECKING, Any
 
 # Sphinx runs into a circular import with `from models import Model`, so only 
 # import Model for type checking.
 if TYPE_CHECKING:
-    from models import Model
+    from ..models import Model
 else:
     Model = None
 
@@ -28,8 +28,8 @@ import ngsolve as ngs
 import numpy as np
 from ngsolve import CoefficientFunction, FESpace, GridFunction, Mesh
 
-from config_functions import ConfigParser
-from helpers.ngsolve_ import get_special_functions
+from ..config_functions import ConfigParser
+from ..helpers.ngsolve_ import get_special_functions
 
 
 def mean_to_zero(gfu: GridFunction, fes: FESpace, mesh: Mesh) -> GridFunction:
@@ -81,7 +81,8 @@ def _l_inf(sol: GridFunction, ref_sol: Union[GridFunction, CoefficientFunction],
     """ L-infinity norm """
     gfu_tmp = ngs.GridFunction(fes)
     gfu_tmp.Set(sol - ref_sol)
-    # NGSolve has no builtin method for evalutating the L-infinity norm and recommends using numpy
+
+    # NGSolve has no builtin method for evaluating the L-infinity norm and recommends using numpy.
     arr = gfu_tmp.vec.FV().NumPy()
 
     return np.max(np.abs(arr))
@@ -239,8 +240,7 @@ def _surface_traction(sol: GridFunction, model: Model, marker: Optional[str]) ->
         # Also note that phi is assumed to be 1 in the fluid and 0 in the object, so a (1-phi) term is added to ensure
         # that the surface traction integral only occurs over the outer surface of the object. Otherwise the surface
         # traction integral would double count the inner and outer surfaces of the object.
-        surface_traction = ngs.Integrate((kv * grad_u - p_mat) * -model.DIM_solver.grad_phi_gfu
-                                         * model.DIM_solver.phi_gfu, model.mesh)
+        surface_traction = ngs.Integrate((kv * grad_u - p_mat) * -model.DIM_solver.grad_phi_gfu, model.mesh)
 
     return surface_traction
 
@@ -271,10 +271,7 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> List:
                     ref_sol = model.ref_sol['ref_sols'][var][0] # Assuming the t^n+1 value of the reference solution should always be used.
                     average = var in average_lst
                     component = model.model_components[var]
-                    if component is None:
-                        err = norm(metric.lower(), sol, ref_sol, model.mesh, model.fes, average)
-                    else:
-                        err = norm(metric.lower(), sol.components[component], ref_sol, model.mesh, model.fes.components[component], average)
+                    err = norm(metric.lower(), sol.components[component], ref_sol, model.mesh, model.fes.components[component], average)
 
                     error_lst.append(err)
                     print('{0} in {1}: {2}'.format(metric.replace('_', ' '), var, err))
@@ -283,10 +280,7 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> List:
                 # Calculate divergence.
                 for var in var_lst:
                     component = model.model_components[var]
-                    if component is None:
-                        div_var = _divergence(sol, model.mesh)
-                    else:
-                        div_var = _divergence(sol.components[component], model.mesh)
+                    div_var = _divergence(sol.components[component], model.mesh)
 
                     error_lst.append(div_var)
                     print('divergence of {0}: {1}'.format(var, div_var))
@@ -295,10 +289,7 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> List:
                 # Calculate facet jumps.
                 for var in var_lst:
                     component = model.model_components[var]
-                    if component is None:
-                        mag_jumps = _facet_jumps(sol, model.mesh)
-                    else:
-                        mag_jumps = _facet_jumps(sol.components[component], model.mesh)
+                    mag_jumps = _facet_jumps(sol.components[component], model.mesh)
 
                     error_lst.append(mag_jumps)
                     print('magnitude of jump of {0} facets: {1}'.format(var, mag_jumps))

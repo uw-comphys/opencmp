@@ -16,12 +16,12 @@
 ########################################################################################################################
 
 from pytest import fixture
-from helpers.math import tanh, sig, H_t, H_s
+from opencmp.helpers.math import tanh, sig, H_t, H_s
 from numpy import isclose
 from ngsolve import Parameter, CoefficientFunction, Mesh
 from typing import Tuple
-from config_functions.expanded_config_parser import ConfigParser
-from helpers.io import load_mesh
+from opencmp.config_functions.expanded_config_parser import ConfigParser
+from opencmp.helpers.io import load_mesh
 
 
 @fixture
@@ -35,7 +35,7 @@ def simple_mesh() -> Mesh:
 
     # Create config parser
     c = ConfigParser('pytests/helpers/mesh/config_blank')
-    c['MESH'] = {'filename': 'mesh_files/unit_square_coarse.vol'}
+    c['MESH'] = {'filename': 'pytests/mesh_files/unit_square_coarse.vol'}
 
     # Load the mesh
     mesh = load_mesh(c)

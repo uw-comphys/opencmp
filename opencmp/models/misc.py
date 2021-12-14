@@ -15,11 +15,10 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import models
-from models import Model
+from . import Model, models_dict
 
 from sys import modules
-from typing import Type
+from typing import Dict, Type
 
 """
 Module containing helper functions related to models.
@@ -40,7 +39,7 @@ def get_model_class(model_name: str) -> Type[Model]:
     """
 
     # Find the class by it's name
-    model_class = getattr(modules[models.__name__], model_name)
+    model_class = models_dict[model_name]
 
     # Check that whatever we found is actually a model
     if not issubclass(model_class, Model):

@@ -14,6 +14,6 @@ remainder = False
 
 [PHASE FIELDS]
 load_method = generate
-stl_filename = mesh_files/circle_nd.stl
+stl_filename = pytests/mesh_files/circle_nd.stl
 invert_phi = True
 save_to_file = False

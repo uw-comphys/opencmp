@@ -15,10 +15,10 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from models import Model
+from ..models import Model
 from typing import Type, Optional
-from config_functions import ConfigParser
-from time_integration_schemes import implicit_euler, explicit_euler, euler_IMEX, crank_nicolson, CNLF, SBDF
+from ..config_functions import ConfigParser
+from ..time_integration_schemes import implicit_euler, explicit_euler, euler_IMEX, crank_nicolson, CNLF, SBDF
 from .base_solver import Solver
 import ngsolve as ngs
 from ngsolve import Preconditioner
@@ -76,7 +76,7 @@ class TransientMultiStepSolver(Solver):
                 if preconditioner is not None:
                     preconditioner.Update()
 
-            self.model.single_iteration(a, L, preconditioners, self.gfu)
+            self.model.solve_single_step(a, L, preconditioners, self.gfu)
 
             self.num_iters += 1
 
@@ -154,7 +154,7 @@ class TransientMultiStepSolver(Solver):
         self._assemble()
 
     def _single_solve(self) -> None:
-        self.model.single_iteration(self.a, self.L, self.preconditioners, self.gfu)
+        self.model.solve_single_step(self.a, self.L, self.preconditioners, self.gfu)
 
     def _update_time_step(self) -> Tuple[bool, float, float, str]:
         # Update all previous timestep solutions.

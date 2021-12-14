@@ -17,10 +17,10 @@
 
 import ngsolve as ngs
 from ngsolve import Preconditioner
-from models import Model
+from ...models import Model
 from typing import Tuple, Type, List, Optional
-from config_functions import ConfigParser
-from time_integration_schemes import adaptive_IMEX_pred
+from ...config_functions import ConfigParser
+from ...time_integration_schemes import adaptive_IMEX_pred
 from .base_adaptive_transient_multistep import BaseAdaptiveTransientMultiStepSolver
 
 
@@ -69,7 +69,7 @@ class AdaptiveIMEX(BaseAdaptiveTransientMultiStepSolver):
         self._update_preconditioners(self.preconditioner_pred)
 
     def _single_solve(self) -> None:
-        self.model.single_iteration(self.a_pred, self.L_pred, self.preconditioner_pred, self.gfu_pred)
+        self.model.solve_single_step(self.a_pred, self.L_pred, self.preconditioner_pred, self.gfu_pred)
 
         # Correction only happens to the velocity.
         component = self.model.model_components['u']
