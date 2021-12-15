@@ -27,9 +27,6 @@ save_to_file = False
 check_error = True
 error_average = p
 
-[CONTROLLER]
-active = False
-
 [OTHER]
 num_threads = 6
 model = Stokes

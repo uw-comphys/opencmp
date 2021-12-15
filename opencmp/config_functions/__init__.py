@@ -23,8 +23,6 @@ from .expanded_config_parser import ConfigParser
 from .base_config_functions import ConfigFunctions
 from .boundary_conditions import BCFunctions
 
-# Superclass
-
 # Implemented subclasses
 from .initial_conditions import ICFunctions
 from .model_functions import ModelFunctions

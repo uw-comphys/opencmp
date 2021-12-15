@@ -327,6 +327,7 @@ class DIM:
                 arr = mesh_helpers.crop_to_mesh_bounds(tmp_arr, self.N, self.scale, self.offset, self.tmp_N,
                                                        self.tmp_scale, self.tmp_offset)
                 self.mask_arr_dict[marker] = arr
+
         return
 
     def get_DIM_gridfunctions(self, mesh: Mesh, interp_ord: int):
