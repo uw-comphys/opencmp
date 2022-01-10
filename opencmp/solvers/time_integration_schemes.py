@@ -17,7 +17,7 @@
 
 import ngsolve as ngs
 from ngsolve import GridFunction, BilinearForm, LinearForm, Parameter
-from .models import Model
+from opencmp.models import Model
 from typing import List, Tuple
 from ngsolve import dx
 

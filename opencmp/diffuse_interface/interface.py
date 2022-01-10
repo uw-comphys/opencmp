@@ -19,9 +19,15 @@ import numpy as np
 from numpy import ndarray
 import scipy.ndimage as spimg
 import scipy.special as spec
-import edt
 from typing import List, Tuple, Union, Dict, Optional
 from . import mesh_helpers
+from ..helpers.misc import can_import_module
+
+if can_import_module('edt'):
+    missing_edt = False
+    import edt
+else:
+    missing_edt = True
 
 
 def get_binary_2d(boundary_lst: List, N: List[int], scale: List[float], offset: List[float]) -> ndarray:
@@ -142,6 +148,8 @@ def get_phi(binary: ndarray, lmbda: float, N: List[int], scale: List[float], off
     Returns:
         Array containing the phase field.
     """
+    if missing_edt:
+        raise ImportError('edt package not installed, please run `pip install edt`.')
 
     if dim == 2:
         kernel = np.ones((3, 3))

@@ -15,6 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
+import pytest
 from pytest import CaptureFixture, fixture
 from pytests.full_system.helpers import automated_output_check
 from opencmp.config_functions import ConfigParser
@@ -75,6 +76,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
+    @pytest.mark.slow
     def test_sinusoidal_oseen_implicit_euler_dg(self, capsys: CaptureFixture,
                                                 sinusoidal_transient: ConfigParser) -> None:
         # Change from CG to DG
@@ -91,6 +93,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
+    @pytest.mark.slow
     def test_sinusoidal_oseen_crank_nicolson_dg(self, capsys: CaptureFixture,
                                                 sinusoidal_transient: ConfigParser) -> None:
         # Change time discretization scheme
@@ -109,6 +112,7 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
+    @pytest.mark.slow
     def test_sinusoidal_oseen_adaptive_two_step_dg(self, capsys: CaptureFixture,
                                                    sinusoidal_transient: ConfigParser) -> None:
         # Change time discretization scheme
@@ -120,13 +124,15 @@ class TestTransient:
         # Run
         automated_output_check(capsys, sinusoidal_transient, [2.5e-3, 1e-3])
 
+    # @pytest.mark.slow
     #def test_sinusoidal_oseen_adaptive_three_step_cg(self, capsys: CaptureFixture,
     #                                                sinusoidal_transient: ConfigParser) -> None:
     #   # Change time discretization scheme
     #   sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive three step'
     #   # Run
     #   automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
-    #
+
+    # @pytest.mark.slow
     #def test_sinusoidal_oseen_adaptive_three_step_dg(self, capsys: CaptureFixture,
     #                                                sinusoidal_transient: ConfigParser) -> None:
     #   # Change time discretization scheme

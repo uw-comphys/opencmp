@@ -38,6 +38,6 @@ check_error = True
 error_average = p
 
 [OTHER]
-num_threads = 2
+num_threads = 1
 model = INS
 run_dir = .

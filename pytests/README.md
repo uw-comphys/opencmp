@@ -8,7 +8,8 @@ This folder contains the scripts for the pytest unit tests and integration tests
 
 **!!! Important Note !!!**
 
-Your working directory is assumed to be `/path/to/opencmp`. If you call pytest from within `opencmp/tests` or elsewhere any tests that use relative file paths (most notably the integration tests) will fail.
+Your working directory is assumed to be `/path/to/opencmp`.
+If you call pytest from within `opencmp/tests` or elsewhere any tests that use relative file paths (most notably the integration tests) will fail.
 
 
 
@@ -20,10 +21,13 @@ pytest can also be used to run the tests in any file whose name includes "test"
 
 `pytest`
 
-However, the above command will skip running any tests that are marked as "slow" (ex: transient examples that take several minutes to run). Include these tests as follows
+However, the above command will skip running any tests that are marked as "slow" (ex: transient examples that take several minutes to run).
+Include these tests as follows
 
 `pytest --runslow`
 
+It is also recommended that the package `pytest-xdist` be installed using `pip install pytest-xdist`.
+This allows for the tests to be run in parallel over `N` threads using the following command `pytest -n X`.
 
 
 ### Creating New Tests

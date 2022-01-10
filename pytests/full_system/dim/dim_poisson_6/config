@@ -23,7 +23,7 @@ transient = False
 check_error = True
 
 [OTHER]
-num_threads = 6
+num_threads = 1
 model = Poisson
 run_dir = pytests/full_system/dim/dim_poisson_6
 

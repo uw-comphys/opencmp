@@ -18,7 +18,7 @@
 from ..models import Model
 from typing import Type, Optional
 from ..config_functions import ConfigParser
-from ..time_integration_schemes import implicit_euler, explicit_euler, euler_IMEX, crank_nicolson, CNLF, SBDF
+from .time_integration_schemes import implicit_euler, explicit_euler, euler_IMEX, crank_nicolson, CNLF, SBDF
 from .base_solver import Solver
 import ngsolve as ngs
 from ngsolve import Preconditioner

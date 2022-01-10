@@ -27,10 +27,10 @@ nonlinear_max_iterations = 10
 transient = True
 scheme = implicit euler
 time_range = 0.0, 10
-dt = 0.004
+dt = 0.01
 dt_range = 1e-16, 5
 dt_tolerance = relative -> 1e-6
-               absolute -> 5e-4
+               absolute -> 1e-5
 
 [VISUALIZATION]
 save_to_file = False
@@ -42,7 +42,7 @@ subdivision = 3
 check_error = True
 
 [OTHER]
-num_threads = 6
+num_threads = 1
 model = MultiComponentINS
 component_names = a, b
 component_in_error_calc = a -> True

@@ -1,6 +1,6 @@
 [REFERENCE SOLUTIONS]
 u = [1.0, 0.0]
-a = 0.0
+a = 0.1
 b = 1.0
 
 [METRICS]

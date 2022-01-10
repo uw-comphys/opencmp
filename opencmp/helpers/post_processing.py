@@ -20,7 +20,6 @@ from ngsolve import GridFunction, Mesh, Parameter, VTKOutput, H1
 from ..models import get_model_class, Model
 from pathlib import Path
 from os import remove
-import meshio
 from typing import Optional, Union
 from multiprocessing.pool import Pool
 from multiprocessing import cpu_count
@@ -152,24 +151,12 @@ def _sol_to_vtu(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
     else:
         coefs = [gfu]
 
-    # Write to .vtk
+    # Write to .vtu
     VTKOutput(ma=mesh, coefs=coefs, names=save_names,
               filename=filename, subdivision=subdivision).Do()
 
-    # Convert .vtk to .vtu
-    # This is only necessary for some versions of NGSolve. Newer versions of NGSolve save to .vtu.
-    if Path(filename + '.vtk').exists():
-        # Convert to .vtu
-        meshio.read(filename + '.vtk').write(filename + '.vtu')
-
-        # Remove the .vtk
-        remove(filename + '.vtk')
-
-    elif Path(filename + '.vtu').exists():
-        # Already .vtu
-        pass
-
-    else:
+    # Check that the file was created
+    if not Path(filename + '.vtu').exists():
         raise FileNotFoundError('Neither .vtk nor .vtu files are being generated. Something is wrong with _sol_to_vtu.')
 
     # Delete .sol

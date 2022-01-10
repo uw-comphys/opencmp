@@ -120,6 +120,19 @@ class Model(ABC):
             # Need to define this parameter, but won't end up using it so suppress the default value warning.
             self.ipc = self.config.get_item(['DG', 'interior_penalty_coefficient'], float, quiet=True)
 
+        self.no_constrained_dofs = self.config.get_item(['FINITE ELEMENT SPACE', 'no_constrained_dofs'],
+                                                        bool, quiet=True)
+
+        if 'HDiv' in self.element.values() or 'RT' in self.element.values():
+            # HDiv elements can only strongly apply u.n Dirichlet boundary conditions. In order to apply other
+            # Dirichlet boundary conditions (ex: on the full vector or the tangential vector) the boundary
+            # conditions must be weakly imposed. This is done in DG by penalization terms but requires solving
+            # over all DOFs, not just the free DOFs. This will not work in CG, hence the warning to the user.
+            if self.no_constrained_dofs:
+                if not self.DG:
+                    print('WARNING: It is strongly recommended to use DG with HDiv if'
+                          'tangential Dirichlet boundary conditions need to be applied.')
+
         # TODO: we should probably rename self.nu to something else so it doesnt conflict with kinematic viscosity
         # Construct nu as ipc*interp_ord^2.
         self.nu = self.ipc * self.interp_ord ** 2
@@ -129,6 +142,10 @@ class Model(ABC):
         if self.solver == 'default':
             # Default to a direct solve.
             self.solver = 'direct'
+
+        if self.solver == 'direct':
+            print("WARNING: The direct linear solver does not respect the num_threads parameter you may have set."
+                  "This is an NGSolve issue")
 
         # Load the preconditioner types
         self.preconditioners = self.config.get_list(['SOLVER', 'preconditioner'], str)
@@ -156,8 +173,8 @@ class Model(ABC):
         # Note: Need dirichlet_names before constructing fes, but need to construct fes before gridfunctions can be
         #       loaded for ex: BCs, ICs, reference solutions. So, get the BC dict before constructing fes,
         #       but then actually load the BCs etc after constructing fes.
-        self.bc_functions       = BCFunctions(self.run_dir + '/bc_dir/bc_config', self.run_dir, self.mesh, self.t_param,
-                                              self.update_variables)
+        self.bc_functions = BCFunctions(self.run_dir + '/bc_dir/bc_config', self.run_dir, self.mesh, self.t_param,
+                                        self.update_variables)
 
         # 1/2: Create BCs.
         # Needs to be done in two steps since initializing the BC gridfunctions requires a FES, which in turn requires
@@ -172,12 +189,12 @@ class Model(ABC):
         self._test, self._trial = self._create_test_and_trial_functions()
 
         # Create the rest of the ConfigFunction classes
-        self.ic_functions       = ICFunctions(self.run_dir + '/ic_dir/ic_config', self.run_dir, self.mesh, self.t_param,
-                                              self.update_variables)
-        self.model_functions    = ModelFunctions(self.run_dir + '/model_dir/model_config', self.run_dir, self.mesh,
+        self.ic_functions      = ICFunctions(self.run_dir + '/ic_dir/ic_config', self.run_dir, self.mesh, self.t_param,
+                                             self.update_variables)
+        self.model_functions   = ModelFunctions(self.run_dir + '/model_dir/model_config', self.run_dir, self.mesh,
+                                                self.t_param, self.update_variables)
+        self.ref_sol_functions = RefSolFunctions(self.run_dir + '/ref_sol_dir/ref_sol_config', self.run_dir, self.mesh,
                                                  self.t_param, self.update_variables)
-        self.ref_sol_functions  = RefSolFunctions(self.run_dir + '/ref_sol_dir/ref_sol_config', self.run_dir, self.mesh,
-                                                  self.t_param, self.update_variables)
 
         # Load initial condition.
         self.IC = self.construct_gfu()
@@ -232,7 +249,9 @@ class Model(ABC):
 
         # Initialize all time values of each time-varying parameter to zero.
         for param in self.model_parameters:
-            assert param not in self.update_variables[0].keys() # Should never be using the same name for a model component and parameter.
+            # Should never be using the same name for a model component and parameter.
+            assert param not in self.update_variables[0].keys()
+
             for time_dict in self.update_variables:
                 time_dict[param] = 0
 
@@ -304,6 +323,7 @@ class Model(ABC):
                     gfu.components[i].Set(self.g_D[component_name][time_step],
                                           definedon=self.mesh.Boundaries(self.dirichlet_names[component_name]))
 
+    # TODO: This needs a better name
     def construct_and_run_solver(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner,
                                  gfu: GridFunction):
         """
@@ -317,28 +337,13 @@ class Model(ABC):
                 solution.
         """
 
-        no_constrained_dofs = self.config.get_item(['FINITE ELEMENT SPACE', 'no_constrained_dofs'], bool, quiet=True)
+        if precond is None:
+            # If there's no preconditioner, then the freedofs argument must be provided for the solver.
+            # Confirm that the user hasn't specified that all dofs should be free dofs.
+            if self.no_constrained_dofs:
+                raise ValueError('Must constrain Dirichlet DOFs if not providing a preconditioner.')
 
         freedofs: Optional[BitArray] = self.fes.FreeDofs()
-
-        if precond is None:
-            # Need to provide a freedofs argument to the solver. Confirm that the user hasn't specified that all
-            # dofs should be free dofs.
-
-            if no_constrained_dofs:
-                raise ValueError('Must constrain Dirichlet DOFs if not providing a preconditioner.')
-        else:
-            if 'HDiv' in self.element.values() or 'RT' in self.element.values():
-                # HDiv elements can only strongly apply u.n Dirichlet boundary conditions. In order to apply other
-                # Dirichlet boundary conditions (ex: on the full vector or the tangential vector) the boundary
-                # conditions must be weakly imposed. This is done in DG by penalization terms but requires solving
-                # over all DOFs, not just the free DOFs. This will not work in CG, hence the warning to the user.
-                if no_constrained_dofs:
-                    if not self.DG:
-                        print('We strongly recommend using DG with HDiv if tangential Dirichlet boundary conditions'
-                              'need to be applied.')
-
-                    freedofs = None
 
         if self.solver == 'direct':
             inv = a_assembled.mat.Inverse(freedofs=freedofs)
