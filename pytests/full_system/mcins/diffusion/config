@@ -43,7 +43,7 @@ subdivision = 3
 check_error = True
 
 [OTHER]
-num_threads = 6
+num_threads = 1
 model = MultiComponentINS
 component_names = a, b, c
 component_in_error_calc = a -> True

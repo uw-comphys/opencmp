@@ -16,6 +16,8 @@
 ########################################################################################################################
 
 from typing import Dict
+import importlib.util
+import sys
 
 
 def merge_bc_dict(dict_add_to: Dict, dict_add_from: Dict) -> Dict:
@@ -66,3 +68,23 @@ def merge_bc_dict(dict_add_to: Dict, dict_add_from: Dict) -> Dict:
             dict_add_to[key] = dict_add_from[key]
 
     return dict_add_to
+
+
+def can_import_module(module_name: str) -> bool:
+    """
+    This function checks if a module can be imported.
+    From: https://docs.python.org/3/library/importlib.html#checking-if-a-module-can-be-imported
+
+    Args:
+        module_name: The name of the module to be imported
+
+    Return:
+        True if the module can be imported, False otherwise
+    """
+
+    if module_name in sys.modules:
+        return True
+    elif importlib.util.find_spec(module_name) is not None:
+        return True
+    else:
+        return False

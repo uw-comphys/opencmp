@@ -20,7 +20,7 @@ from ngsolve import Preconditioner
 from ...models import Model
 from typing import Tuple, Type, List, Optional
 from ...config_functions import ConfigParser
-from ...time_integration_schemes import implicit_euler
+from ..time_integration_schemes import implicit_euler
 from .base_adaptive_transient_RK import BaseAdaptiveTransientRKSolver
 
 
