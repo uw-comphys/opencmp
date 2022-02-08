@@ -17,7 +17,7 @@
 
 from ..config_functions import ConfigParser
 from . import interface, mesh_helpers
-from ..helpers.ngsolve_ import numpy_to_NGSolve
+from ..helpers.ngsolve_ import numpy_to_ngsolve
 from ..helpers.io import create_and_load_gridfunction_from_file
 import numpy as np
 import ngsolve as ngs
@@ -224,14 +224,17 @@ class DIM:
         """
         if self.dim == 2:
             # In 2D vertices is a list of coordinates.
-            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None) # There should be no reason to ever re-parse vertices.
+            # There should be no reason to ever re-parse vertices.
+            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None)
         else:
             # In 3D vertices is a list of stl file names that contain the points of the planes that separate the
             # various boundary conditions.
-            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None, all_str=True)  # There should be no reason to ever re-parse vertices.
+            # There should be no reason to ever re-parse vertices.
+            self.vertices, _ = bc_config.get_one_level_dict('VERTICES', self.import_dir, None, all_str=True)
 
         try:
-            self.centroid, _ = bc_config.get_one_level_dict('CENTROIDS', self.import_dir, None) # There should be no reason to ever re-parse centroid.
+            # There should be no reason to ever re-parse centroid.
+            self.centroid, _ = bc_config.get_one_level_dict('CENTROIDS', self.import_dir, None)
         except KeyError:
             self.centroid = {}
 
@@ -384,13 +387,13 @@ class DIM:
             if self.N == self.N_mesh:
                 # phi was generated on the simulation mesh, so just load phi into a gridfunction and compute Grad(phi)
                 # and |Grad(phi)|.
-                self.phi_gfu = numpy_to_NGSolve(self.mesh, interp_ord, self.phi_arr, self.scale, self.offset, self.dim)
+                self.phi_gfu = numpy_to_ngsolve(self.mesh, interp_ord, self.phi_arr, self.scale, self.offset, self.dim)
                 self.grad_phi_gfu = ngs.Grad(self.phi_gfu)
                 self.mag_grad_phi_gfu = ngs.Norm(ngs.Grad(self.phi_gfu))
             else:
                 # phi was generated on a refined mesh, so load it into a refined mesh gridfunction, compute Grad(phi)
                 # and |Grad(phi)|, then project all three into gridfunctions defined on the simulation mesh.
-                phi_gfu_tmp = numpy_to_NGSolve(self.mesh_refined, interp_ord, self.phi_arr, self.scale, self.offset, self.dim)
+                phi_gfu_tmp = numpy_to_ngsolve(self.mesh_refined, interp_ord, self.phi_arr, self.scale, self.offset, self.dim)
                 grad_phi_gfu_tmp = ngs.Grad(phi_gfu_tmp)
                 mag_grad_phi_gfu_tmp = ngs.Norm(ngs.Grad(phi_gfu_tmp))
 
@@ -408,12 +411,12 @@ class DIM:
             if self.multiple_bcs:
                 # There are multiple BC masks that must be generated and loaded.
                 for marker, mask_arr in self.mask_arr_dict.items():
-                    mask_gfu = numpy_to_NGSolve(mesh, interp_ord, mask_arr, self.scale, self.offset, self.dim)
+                    mask_gfu = numpy_to_ngsolve(mesh, interp_ord, mask_arr, self.scale, self.offset, self.dim)
                     self.mask_gfu_dict[marker] = mask_gfu
             else:
                 # One single mask that is just a grid function of ones.
                 mask_arr = np.ones(tuple([int(n + 1) for n in self.N]))
-                mask_gfu = numpy_to_NGSolve(mesh, interp_ord, mask_arr, self.scale, self.offset, self.dim)
+                mask_gfu = numpy_to_ngsolve(mesh, interp_ord, mask_arr, self.scale, self.offset, self.dim)
                 self.mask_gfu_dict['all'] = mask_gfu
 
             # Save the gridfunctions if desired.

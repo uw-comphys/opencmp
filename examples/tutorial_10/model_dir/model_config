@@ -1,5 +1,5 @@
 [PARAMETERS]
-diffusion_coefficient = all -> 1.0
+kinematic_viscosity = all -> 1e-3
 
 [FUNCTIONS]
-source = all -> 0.0
+source = u -> [0.0, 0.0, 0.0]

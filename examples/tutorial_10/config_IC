@@ -1,0 +1,29 @@
+[MESH]
+filename = flow_past_cyl_3d.msh
+curved_elements = True
+
+[FINITE ELEMENT SPACE]
+elements = u -> VectorH1
+           p -> H1
+interpolant_order = 2
+
+[DG]
+DG = False
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = default
+preconditioner = default
+
+[VISUALIZATION]
+save_type = .vtu
+save_to_file = True
+
+[ERROR ANALYSIS]
+check_error = True
+
+[OTHER]
+num_threads = 6
+model = Stokes
+run_dir = .
+messaging_level = 2

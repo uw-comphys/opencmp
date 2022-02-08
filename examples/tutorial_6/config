@@ -1,5 +1,6 @@
 [MESH]
-filename = coarse_channel_3bcs.vol 
+filename = channel_w_cyl.vol 
+curved_elements = True
 
 [FINITE ELEMENT SPACE]
 elements = u -> HDiv
@@ -11,27 +12,25 @@ DG = True
 interior_penalty_coefficient = 10.0
 
 [SOLVER]
-solver = direct
-preconditioner = None
+solver = default
+preconditioner = default
+linearization_method = Oseen
+nonlinear_tolerance = relative -> 1e-6
+                      absolute -> 1e-6
+nonlinear_max_iterations = 3
 
 [TRANSIENT]
 transient = True
-scheme = adaptive two step
-time_range = 0, 2
-dt = 0.005
-dt_range = 1e-10, 0.1
-dt_tolerance = relative -> 1e-3
-               absolute -> 1e-3
+scheme = implicit euler
+time_range = 0.0, 1.0
+dt = 1e-2
 
 [VISUALIZATION]
 save_to_file = True
 save_type = .vtu
 save_frequency = 0.1, time
 
-[ERROR ANALYSIS]
-check_error = True
-
 [OTHER]
-model = Stokes
+model = INS
 run_dir = .
 num_threads = 2

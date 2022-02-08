@@ -18,7 +18,7 @@
 from ..models import Model
 from typing import Type, Optional
 from ..config_functions import ConfigParser
-from ..time_integration_schemes import RK_222, RK_232
+from .time_integration_schemes import RK_222, RK_232
 from .base_solver import Solver
 import ngsolve as ngs
 from ngsolve import Preconditioner

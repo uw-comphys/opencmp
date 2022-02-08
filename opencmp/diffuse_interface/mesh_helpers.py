@@ -19,10 +19,8 @@ import numpy as np
 from numpy import ndarray
 import netgen.meshing as ngmsh
 from netgen.read_gmsh import ReadGmsh
-from netgen.geom2d import unit_square
-import netgen.csg as ngcsg
 import os
-from typing import List, Any, Tuple, Union
+from typing import List, Any, Tuple
 
 
 def index_sublist(lst: List, val: Any) -> int:

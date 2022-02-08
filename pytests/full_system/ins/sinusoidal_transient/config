@@ -37,6 +37,6 @@ save_to_file = False
 check_error = True
 
 [OTHER]
-num_threads = 6
+num_threads = 1
 model = INS
 run_dir = pytests/full_system/ins/sinusoidal_transient

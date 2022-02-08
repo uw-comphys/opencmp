@@ -20,7 +20,6 @@ from ngsolve import GridFunction, Mesh, Parameter, VTKOutput, H1
 from ..models import get_model_class, Model
 from pathlib import Path
 from os import remove
-import meshio
 from typing import Optional, Union
 from multiprocessing.pool import Pool
 from multiprocessing import cpu_count
@@ -51,7 +50,7 @@ class PhaseFieldModelMimic:
 
 
 def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union[Model, PhaseFieldModelMimic]] = None,
-               delete_sol_file: bool = False) -> None:
+               delete_sol_file: bool = False, allow_all_threads: bool = False) -> None:
     """
     Function to take the output .sol files and convert them into .vtu for visualization.
 
@@ -59,7 +58,9 @@ def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union
         config: The loaded config parser used by the model
         output_dir_path: The path to the folder in which the .sol files are, and where the .vtu files will be saved.
         model: The model that generated the .sol files.
-        delete_sol_file: Bool to indicate whether or not to delete the original .sol files after converting to .vtu,
+        delete_sol_file: Bool to indicate if to delete the original .sol files after converting to .vtu,
+            Default is False.
+        allow_all_threads: Bool to indicate if to use all available threads (if there are enough files),
             Default is False.
 
     """
@@ -83,9 +84,18 @@ def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union
 
     # Number of files to convert
     n_files = len(sol_path_list)
-    # Number of cores to use
+
+    # Figure out the maximum number of threads at our disposal
+    if allow_all_threads:
+        # Number of threads on the machine that we have access to
+        num_threads = cpu_count()
+    else:
+        # Number of threads to use as specified in the config file
+        num_threads = config.get_item(['OTHER', 'num_threads'], int)
+
+    # Number of threads to use
     # NOTE: No point of starting more threads than files, and also lets us depend on modulo math later.
-    n_threads = min(n_files, cpu_count())
+    n_threads = min(n_files, num_threads)
 
     # Create gridfunctions, one per thread
     gfus = [model.construct_gfu() for _ in range(n_threads)]
@@ -152,24 +162,12 @@ def _sol_to_vtu(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
     else:
         coefs = [gfu]
 
-    # Write to .vtk
+    # Write to .vtu
     VTKOutput(ma=mesh, coefs=coefs, names=save_names,
               filename=filename, subdivision=subdivision).Do()
 
-    # Convert .vtk to .vtu
-    # This is only necessary for some versions of NGSolve. Newer versions of NGSolve save to .vtu.
-    if Path(filename + '.vtk').exists():
-        # Convert to .vtu
-        meshio.read(filename + '.vtk').write(filename + '.vtu')
-
-        # Remove the .vtk
-        remove(filename + '.vtk')
-
-    elif Path(filename + '.vtu').exists():
-        # Already .vtu
-        pass
-
-    else:
+    # Check that the file was created
+    if not Path(filename + '.vtu').exists():
         raise FileNotFoundError('Neither .vtk nor .vtu files are being generated. Something is wrong with _sol_to_vtu.')
 
     # Delete .sol

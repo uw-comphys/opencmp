@@ -18,7 +18,7 @@
 from .base_config_functions import ConfigFunctions
 from ..helpers.io import create_and_load_gridfunction_from_file
 from ngsolve import Mesh, Parameter, CoefficientFunction, GridFunction, FESpace
-from typing import Dict, Optional, Union, List
+from typing import Dict, Union, List
 
 
 class ModelFunctions(ConfigFunctions):

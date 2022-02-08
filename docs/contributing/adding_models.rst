@@ -17,12 +17,12 @@ Initialization
 This method returns a a dictionary containing the names of the model variables and their ordering in the finite element space. Convention for flow models is for velocity to be first followed by pressure and any extra components.
 
 :code:`_define_time_derivative_components`
---------------------------------
+------------------------------------------
 
 This method returns a list of dictionaries, keys are variable names and values are bool, indicating which varibles have a time derivative in each
 
 :code:`_define_model_local_error_components`
---------------------------------
+--------------------------------------------
 
 This method returns a dictionary noting which model variables are included in local error calculations for adaptive time-stepping. Generally all model variables should be included.
 
@@ -32,12 +32,12 @@ This method returns a dictionary noting which model variables are included in lo
 This function returns an integer indicating how many different weak forms are used when solving the model. This will only be greater than one for highly nonlinear models that require iterating solves between different model variables (ex: solve velocity holding phase fraction constant then solve phase fraction holding velocity constant all during one single time step).
 
 :code:`_pre_init`
---------------------------------
+-----------------
 
 This function is called AFTER :code:`_define_num_weak_forms`, :code:`_define_model_components`, :code:`_define_model_local_error_components`, and :code:`_define_time_derivative_components` but BEFORE the rest of __init__(). This is used for setting up model-specific things, such as loading the extra components in mcins.
 
 :code:`_post_init`
---------------------------------
+------------------
 
 This function is for doing any final model-specific setup after the entire __init__() function has run. For a non-linear model this may include loading :code:`self.linearize` and various other linearization parameters from the main configuration file (see for example "models/ins").
 
@@ -57,7 +57,7 @@ This method constructs the finite element space for the model. Note that the ord
 Any nonlinear models must be linearized in order to be solved by the linear solvers available in OpenCMP. Currently Oseen-style linearization and IMEX-style linearization are used (see for example "models/ins.py"). This method defines the known fields used by Oseen-style linearization.
 
 :code:`_define_bc_types`
---------------------------------
+------------------------
 
 This method returns a list containing the names of all allowable BC types for this model.
 
@@ -91,7 +91,7 @@ Consider for example the incompressible Navier-Stokes equations - with Oseen-sty
    &+ \frac{1}{2} \int_{\Omega} \bm{v} \cdot \bm{f}^{n+1} \: dx - \frac{1}{2} \int_{\Gamma} \bm{v} \cdot \left( \bm{h}^{n+1} + \max \left( \bm{w}^{n+1} \cdot \bm{n}, 0 \right) \bm{u}^{n+1} \right) \: ds \\
    &+ \frac{1}{2} \int_{\Omega} \left( \bm{u}^{n} \bm{w}^{n} : \bm{\nabla} \bm{v} - \nu \bm{\nabla} \bm{u}^{n} : \bm{\nabla} \bm{v} \right) \: dx \\
    &+ \frac{1}{2} \int_{\Omega} \bm{v} \cdot \bm{f}^{n} \: dx - \frac{1}{2} \int_{\Gamma} \bm{v} \cdot \left( \bm{h}^{n} + \max \left( \bm{w}^{n} \cdot \bm{n}, 0 \right) \bm{u}^{n} \right) \: ds
-   
+
 Pressure does not have a time derivative, so all terms containing pressure are discretized with the implicit Euler scheme (right side of line 1). Velocity does have a time derivative, so the terms involving only velocity or boundary conditions are discretized by the Crank-Nicolson scheme (left side of line 1 and lines 2-5).
 
 All models should have a standard Galerkin finite element formulation and a discontinuous Galerkin formulation, as well as diffuse interface formulations for both. Current practice, to avoid long convoluted methods, is to provide each of these formulations as separate functions and then call the desired ones (as specified in the main configuration file) within :code:`construct_bilinear_time_ode` and :code:`construct_bilinear_time_coefficient`.
@@ -126,4 +126,3 @@ This method constructs the portion of the linear form added due to IMEX-style li
 -------------------------
 
 This method runs one single time step of the model possibly including iterations for Oseen-style linearization or iterations between different model weak forms. In the case of a stationary solve, this method solves for the steady state solution.
-

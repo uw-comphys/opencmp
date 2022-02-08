@@ -1,5 +1,7 @@
 [DIRICHLET]
+u = top    ->  0
+    bottom ->  0
 
 [NEUMANN]
-
-[ROBIN]
+u = right -> (1-2*x)*y*(1-y)
+    left  -> -(1-2*x)*y*(1-y)

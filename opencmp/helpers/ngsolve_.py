@@ -16,8 +16,7 @@
 ########################################################################################################################
 
 import ngsolve as ngs
-from typing import List, Optional, Tuple, Union, Callable
-from ngsolve.comp import ProxyFunction
+from typing import List, Optional, Tuple, Callable
 from ngsolve import CoefficientFunction, Mesh, GridFunction, Parameter
 import numpy as np
 from numpy import ndarray
@@ -36,7 +35,7 @@ def construct_identity_mat(dim: int) -> CoefficientFunction:
         An identity matrix of the desired dimension.
     """
     if dim < 1:
-        raise ValueError('Can\'t construct a 0D identity matrix.')
+        raise ValueError('Can\'t construct a {}D identity matrix.'.format(dim))
 
     lst = []
     for i in range(dim):
@@ -71,7 +70,7 @@ def get_special_functions(mesh: Mesh, nu: float) \
     return n, h, alpha, I_mat
 
 
-def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[float], offset: List[float], dim: int = 2,
+def ngsolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[float], offset: List[float], dim: int = 2,
                      binary: Optional[ndarray] = None) -> List[ndarray]:
     """
     Assign the values in gfu to a numpy array whose elements correspond to the nodes of mesh while preserving spatial
@@ -94,14 +93,16 @@ def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[fl
         the various components of gfu.
     """
 
+    N_arr = np.array(N) + 1
+    arr = np.zeros(N_arr)
+
+    # The GridFunction may be vector-valued.
+    # Return a list containing the spatial field for each
+    # vector component.
+    arr_vec = [arr] * gfu.dim
+
+    # TODO: combine these two branches of the if statement together (it's the same code).
     if dim == 2:
-        arr = np.zeros((N[0] + 1, N[1] + 1))
-
-        # The GridFunction may be vector-valued.
-        # Return a list containing the spatial field for each
-        # vector component.
-        arr_vec = [arr] * gfu.dim
-
         for i in range(N[0] + 1):
             for j in range(N[1] + 1):
                 x = -offset[0] + scale[0] * i / N[0]
@@ -117,13 +118,6 @@ def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[fl
                     arr_vec[0][i, j] = val
 
     elif dim == 3:
-        arr = np.zeros((N[0] + 1, N[1] + 1, N[2] + 1))
-
-        # The GridFunction may be vector-valued.
-        # Return a list containing the spatial field for each
-        # vector component.
-        arr_vec = [arr] * gfu.dim
-
         for i in range(N[0] + 1):
             for j in range(N[1] + 1):
                 for k in range(N[2] + 1):
@@ -141,7 +135,8 @@ def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[fl
                         arr_vec[0][i, j, k] = val
 
     else:
-        raise ValueError('Only works with 2D or 3D meshes.')
+        raise ValueError('`NGSolve_to_numpy` called with dimension of {}. '
+                         'It only works with 2D or 3D meshes.'.format(dim))
 
     if binary is not None:
         for arr in arr_vec:
@@ -150,7 +145,7 @@ def NGSolve_to_numpy(mesh: Mesh, gfu: GridFunction, N: List[int], scale: List[fl
     return arr_vec
 
 
-def numpy_to_NGSolve(mesh: Mesh, interp_ord: int, arr: ndarray, scale: List[float], offset: List[float], dim: int = 2) \
+def numpy_to_ngsolve(mesh: Mesh, interp_ord: int, arr: ndarray, scale: List[float], offset: List[float], dim: int = 2) \
         -> GridFunction:
     """
     Assign the values in arr to a NGSolve GridFunction defined over the given NGSolve mesh while preserving spatial
@@ -168,6 +163,7 @@ def numpy_to_NGSolve(mesh: Mesh, interp_ord: int, arr: ndarray, scale: List[floa
         Gridfunction containing the values in arr.
     """
 
+    # TODO: combine these two branches of the if statement together (it's the same code).
     if dim == 2:
         # Corrects for x,y mismatch.
         arr = np.transpose(arr)
@@ -183,7 +179,8 @@ def numpy_to_NGSolve(mesh: Mesh, interp_ord: int, arr: ndarray, scale: List[floa
                                     arr,
                                     linear=True)
     else:
-        raise ValueError('Only works with 2D or 3D meshes.')
+        raise ValueError('`numpy_to_NGSolve` called with dimension of {}.'
+                         'It only works with 2D or 3D meshes.'.format(dim))
 
     fes = ngs.H1(mesh, order=interp_ord)
     grid_func_tmp = ngs.GridFunction(fes)
@@ -234,6 +231,7 @@ def gridfunction_rigid_body_motion(t: Parameter, orig_gfu: GridFunction, gfu: Gr
         Gridfunction containing the field at the current time.
     """
 
+    # TODO: combine these two branches of the if statement together (it's the same code).
     if mesh.dim == 2:
         tmp_arr = np.ones((N[0] + 1, N[1] + 1))
 
@@ -292,6 +290,7 @@ def gridfunction_rigid_body_motion(t: Parameter, orig_gfu: GridFunction, gfu: Gr
                                      tmp_arr.transpose(2,1,0), linear=True))
 
     else:
-        raise ValueError('Only works with 2D or 3D meshes.')
+        raise ValueError('Mesh has dimension {}. '
+                         '`gridfunction_rigid_body_motion` only works with 2D or 3D meshes.'.format(mesh.dim))
 
     return gfu

@@ -62,8 +62,8 @@ def automated_output_check(capsys: CaptureFixture, config: ConfigParser, expecte
 
     Args:
         capsys: Pytest object used to get access to stdout and stderr.
-        configfile_path: File path for the config file relative to the main OpenCMP directory.
         config: An initialized config parser holding the relevant information for the simulation
+        expected_err: A list of floats representing the expected error values
     """
     run_example(config)
     captured = capsys.readouterr()

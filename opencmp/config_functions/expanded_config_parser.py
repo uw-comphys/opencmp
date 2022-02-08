@@ -33,7 +33,7 @@ config_defaults: Dict = {
            'interior_penalty_coefficient': 10.0},
     'SOLVER': {'solver': 'default',
                'preconditioner': 'default',
-               'solver_tolerance': 1e-8,
+               'solver_tolerance': 1e-15,
                'solver_max_iterations': 100,
                'linearization_method': 'Oseen',
                'nonlinear_tolerance': {'absolute': 0.0, 'relative': 'REQUIRED'},
@@ -43,7 +43,7 @@ config_defaults: Dict = {
                   'time_range': [0.0, 5.0],
                   'dt': 0.001,
                   'dt_tolerance': {'absolute': 0.0, 'relative': 'REQUIRED'},
-                  'dt_range': [1e-12, 0.1],
+                  'dt_range': [1e-6, 0.1],
                   'maximum_rejected_solves': 1000},
     'ERROR ANALYSIS': {'check_error': False,
                        'check_error_every_timestep': False,
@@ -51,7 +51,7 @@ config_defaults: Dict = {
                        'convergence_test': {'h': False, 'p': False},
                        'error_average': [],
                        'num_refinements': 4},
-    'OTHER': {'num_threads': 4,
+    'OTHER': {'num_threads': 1,
               'messaging_level': 0,
               'model': 'REQUIRED',
               'component_names': [],
@@ -142,10 +142,7 @@ class ConfigParser(configparser.ConfigParser):
                 val_str_lst = self.get_list([config_section, key], str)
 
                 if t_param is None:
-                    if len(val_str_lst) == 1:
-                        dict_one[key] = val_str_lst[0]
-                    else:
-                        dict_one[key] = val_str_lst
+                    dict_one[key] = val_str_lst
                 else:
                     dict_one[key] = [val_str_lst for _ in t_param]
             else:
@@ -283,10 +280,10 @@ class ConfigParser(configparser.ConfigParser):
 
         try:
             param = self[section][key]
-        except:
+        except KeyError:
             try:
                 param = config_defaults[section][key]
-            except:
+            except KeyError:
                 raise ValueError('{0}, {1} is not a valid parameter.'.format(section, key))
 
             if param == 'REQUIRED':
@@ -317,10 +314,10 @@ class ConfigParser(configparser.ConfigParser):
 
         try:
             param_tmp = self[section][key].split(', ')
-        except:
+        except KeyError:
             try:
                 param_tmp = config_defaults[section][key]
-            except:
+            except KeyError:
                 raise ValueError('{0}, {1} is not a valid parameter.'.format(section, key))
 
             if param_tmp == 'REQUIRED':

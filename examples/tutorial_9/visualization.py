@@ -1,16 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import axes3d
-import matplotlib.colors as mcolors
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-import matplotlib as mpl
 import matplotlib.cm as cm
 
 import ngsolve as ngs
-import netgen.meshing as ngmsh
 
 from opencmp.diffuse_interface import interface, mesh_helpers
-from opencmp.helpers.ngsolve_ import NGSolve_to_numpy
+from opencmp.helpers.ngsolve_ import ngsolve_to_numpy
 
 N = [80, 80, 80]
 scale = [5.0, 5.0, 2.6]
@@ -35,7 +30,7 @@ x = np.linspace(-2.5, 2.5, N[0])
 y = np.linspace(-2.5, 2.5, N[1])
 xx, yy = np.meshgrid(x, y)
 
-data = NGSolve_to_numpy(mesh, data_gfu, N, scale, offset, dim, None)[0] * binary
+data = ngsolve_to_numpy(mesh, data_gfu, N, scale, offset, dim, None)[0] * binary
 
 z_grid = [20, 40, 60, 70]
 z_vals = [z*(scale[2]/N[2]) - offset[2] for z in z_grid]

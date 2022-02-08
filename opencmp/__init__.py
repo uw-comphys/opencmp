@@ -17,6 +17,5 @@
 
 from . import models
 from . import solvers
-from . import error_analysis
 from . import helpers
 from . import config_functions

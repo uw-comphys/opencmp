@@ -1,0 +1,4 @@
+[REFERENCE SOLUTIONS]
+u = x*(1-x)*y*(1-y)
+
+[METRICS]

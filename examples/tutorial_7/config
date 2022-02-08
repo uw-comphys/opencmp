@@ -14,14 +14,11 @@ interior_penalty_coefficient = 10.0
 [SOLVER]
 solver = default
 preconditioner = default
-linearization_method = Oseen
-nonlinear_tolerance = relative -> 1e-6
-                      absolute -> 1e-6
-nonlinear_max_iterations = 3
+linearization_method = IMEX
 
 [TRANSIENT]
 transient = True
-scheme = implicit euler
+scheme = euler IMEX
 time_range = 0.0, 1.0
 dt = 1e-2
 

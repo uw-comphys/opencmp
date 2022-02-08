@@ -1,67 +1,119 @@
 .. Contains the first tutorial.
 .. _tutorial_1:
 
-Tutorial 1 - Introducing the User Interface
-===========================================
+Tutorial 1 - Solving the Poisson Equation
+=========================================
 
 The files for this tutorial can be found in "Examples/tutorial_1".
 
-Directory Structure
+Governing Equations
 -------------------
 
-Drawing inspiration from packages like OpenFOAM and SU2, OpenCMP's user interface is organized around configuration files and the command line. Each simulation requires its own directory to hold its configuration files and outputs. This is known as the run directory or run_dir. The standard layout of this directory is shown below.
+This tutorial will demonstrate how to solve the Poisson equation with mixed Dirichlet and Neumann boundary conditions. Consider a domain :math:`\Omega` with boundary regions :math:`\Gamma_D` and :math:`\Gamma_N` corresponding to the Dirichlet and Neumann boundary conditions respectively. The governing equations are as follows:
 
-.. aafig::
-   simulation
-   |
-   +-- config
-   |
-   +-- "bc_dir"
-   |      |
-   |      +-- "bc_config"
-   |
-   +-- "ic_dir"
-   |      |
-   |      +-- "ic_config"
-   |
-   +-- "model_dir"
-   |      |
-   |      +-- "model_config"
-   |
-   +-- "ref_sol_dir"
-   |      |
-   |      +-- "ref_sol_config"
-   |
-   +-- output
+.. math::
+   -\nabla^2 u &= f \mbox{ in } \Omega \\
+   u &= g \mbox{ on } \Gamma_D \\
+   -\bm{n} \cdot \bm{\nabla} u &= h \mbox{ on } \Gamma_N
 
-The main directory and each subdirectory contain a configuration file - "< >_config". These are plaintext files that specify the simulation parameters and run conditions.
+Choose the solution to be :math:`u = x(1-x)y(1-y)` and define the top and bottom boundaries to be :math:`\Gamma_D` and the right and left boundaries to be :math:`\Gamma_N`. Then, on a unit square domain, the governing equations become:
 
-The Main Directory
-------------------
+.. math::
+   -\nabla^2 u &= 2\left(x(1-x) + y(1-y)\right) \mbox{ in } \Omega \\
+   u &= 0 \mbox{ on the top/bottom} \\
+   -\bm{n} \cdot \bm{\nabla} u &= \pm (1-2x)y(1-y) \mbox{ on the right/left}
 
-The configuration file in the main directory holds general information about the simulation including which model, mesh, finite elements, and solver should be used. It also holds information about how the simulation should be run such as the level of detail in the output messages and the amount of multi-threading to use.
+These governing equations and the simulation parameters can now be specified in the configuration files.
 
-The Boundary Condition Subdirectory
------------------------------------
+The Main Configuration File
+---------------------------
 
-The "bc_dir" subdirectory holds information about the boundary conditions. Its configuration file specifies the type and value of each boundary condition. This subdirectory can also hold files containing boundary condition data if a boundary condition value is to be loaded from file instead of given in closed form.
+Start with the configuration file "config" in the main simulation directory.
 
-The Initial Condition Subdirectory
-----------------------------------
+The first section specifies the mesh information. All meshes used in the tutorials and examples can be found in the "mesh_files" directory. In this case, a unit square domain with four labelled boundaries is desired, so "unit_square_4bcs.vol" is used. The configuration file gives the path to this mesh file relative to the project. ::
 
-The "ic_dir" subdirectory holds information about the initial conditions. Its configuration file specifies the value of the initial condition for each model variable. Like "bc_dir", "ic_dir" may contain additional files from which the initial condition data is loaded during the simulation.
+   [MESH]
+   filename = unit_square_4bcs.vol
 
-The Model Subdirectory
-----------------------
+The next section specifies the finite element space. As some models use different finite elements for each model variable a finite element must be specified for each model variable. In this case, the Poisson equation only has one model variable - "u" - and H1 elements will be used. An interpolant order of 2 is used, which should allow the governing equations to be solved exactly. ::
 
-The "model_dir" subdirectory holds information about model parameters and model functions. Its configuration file specifies the values of any model parameters or functions for each model variable and the subdirectory may hold additional data files to be loaded during the simulation.
+   [FINITE ELEMENT SPACE]
+   elements = u -> H1
+   interpolant_order = 2
+
+Next the solver is specified. Since the mesh is quite small a direct solver can be used and no preconditioner is necessary. For a full list of the solvers and preconditioners available see :ref:`example_config`. ::
+
+   [SOLVER]
+   solver = direct
+   preconditioner = None
+
+The next section specifies if and how the simulation results should be saved to file. If "save_to_file" is set to "True" results are automatically saved to the Netgen .sol format. In this case, "save_type" is specified as ".vtu" so the results will also be saved to a .vtu file to be visualized in ParaView. ::
+
+   [VISUALIZATION]
+   save_to_file = True
+   save_type = .vtu
+
+Finally, the general run options must be specified. The model to be run is the Poisson equation and "run_dir" points to the main simulation directory so OpenCMP can find all the necessary configuration files. The final commonly specified parameter is "num_threads", which sets how many threads should be used for multithreading. This tutorial uses 2 threads by default. ::
+
+   [OTHER]
+   model = Poisson
+   run_dir = .
+   num_threads = 2
+
+The Boundary Condition Configuration File
+-----------------------------------------
+
+The boundary conditions are specified in the "config" file inside the "bc_dir" subdirectory.
+
+The Poisson equation has three possible types of boundary condition: Dirichlet boundary conditions, Neumann boundary conditions, and Robin boundary conditions. However, in this tutorial only Dirichlet and Neumann boundary conditions will be used. Each boundary condition type has its own section and boundary conditions must be specified by the model variable they apply to and the mesh boundary region they should be applied on.
+
+The Poisson equation only has one single model variable - "u" - so all boundary conditions will be specified for "u". The Dirichlet boundary conditions will be applied to the top and bottom sides of the unit square and are identically zero. ::
+
+   [DIRICHLET]
+   u = top    -> 0
+       bottom -> 0
+
+The Neumann boundary conditions will be applied to the right and left sides of the unit square. ::
+
+   [NEUMANN]
+   u = right -> (1-2*x)*y*(1-y)
+       left  -> -(1-2*x)*y*(1-y)
+
+Note that the mesh file used for this tutorial has boundary markers "top", "bottom", "right", and "left". If the boundary markers changed the boundary condition configuration file would need to change to reflect the new marker names.
+
+The Initial Condition Configuration File
+----------------------------------------
+
+Since this is a steady-state problem no initial condition is needed. The initial condition configuration file will be discussed in more detail in :ref:`tutorial_5`.
+
+The Model Configuration File
+----------------------------
+
+Model parameter and function values are specified in the "config" file inside the "model_dir" subdirectory.
+
+Model parameters and model functions are specified either for their specific model variable or for "all" if they affect all model variables. The Poisson equation has one model parameter - the diffusion coefficient - and one source function, both of which apply to all model variables. In the governing equations given above the diffusion coefficient is lumped into the source function, so it will just be set to one. ::
+
+   [PARAMETERS]
+   diffusion_coefficient = all -> 1.0
+
+   [FUNCTIONS]
+   source = all -> 2*(x*(1-x) + y*(1-y))
 
 The Error Analysis Subdirectory
 -------------------------------
 
-The "ref_sol_dir" subdirectory holds information about the error analysis to be conducted on the final simulation result. Its configuration file specifies what error metrics should be computed during post-processing. This configuration file also contains the reference solutions the results should be compared against, either in closed form or as references to other files in the subdirectory that are loaded during post-processing.
- 
-The Output Subdirectory
------------------------
+Information about what error metrics to compute during post-processing is held in the "config" file in the "ref_sol_dir" subdirectory. However, no error analysis is done in this tutorial so that file can be kept blank.
 
-The output subdirectory holds any saved simulation results. It doesn't need to be created before running the simulation, it will be generated automatically if results should be saved to file.
+Running the Simulation
+----------------------
+
+The simulation can be run from the command line; within the directory examples/tutorial_1/ execute :code:`python3 -m opencmp config`.
+
+Several messages will print out to warn that default values are being used for some of the commonly specified configuration file parameters. A message will also print out at the end of the simulation when saved results are converted to .vtu files.
+
+To visualize the simulation results go to the newly created "output" subdirectory and open "transient.pvd" in ParaView.
+
+.. image:: ../_static/tutorial_1.png
+   :width: 400
+   :align: center
+   :alt: Simulation result visualized in ParaView.

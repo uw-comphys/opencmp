@@ -1,5 +1,5 @@
 [MESH]
-filename = channel_3bcs.vol 
+filename = coarse_channel_3bcs.vol 
 
 [FINITE ELEMENT SPACE]
 elements = u -> HDiv
@@ -11,10 +11,19 @@ DG = True
 interior_penalty_coefficient = 10.0
 
 [SOLVER]
-solver = CG
-preconditioner = direct
-solver_tolerance = 1e-12
-solver_max_iterations = 100
+solver = direct
+preconditioner = None
+
+[TRANSIENT]
+transient = True
+scheme = implicit euler
+time_range = 0, 2
+dt = 0.005
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtu
+save_frequency = 0.1, time
 
 [ERROR ANALYSIS]
 check_error = True

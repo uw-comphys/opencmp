@@ -1,17 +1,20 @@
 [MESH]
-
-[DIM]
+filename = unit_square_4bcs.vol
 
 [FINITE ELEMENT SPACE]
-
-[DG]
+elements = u -> H1
+interpolant_order = 2
 
 [SOLVER]
-
-[TRANSIENT]
+solver = direct
+preconditioner = None
 
 [VISUALIZATION]
-
-[ERROR ANALYSIS]
+save_to_file = True
+save_type = .vtu
 
 [OTHER]
+model = Poisson
+run_dir = .
+num_threads = 2
+

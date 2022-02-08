@@ -15,7 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from pytests.full_system.helpers import run_example
+from opencmp.helpers.testing import run_example
 from opencmp.config_functions import ConfigParser
 
 

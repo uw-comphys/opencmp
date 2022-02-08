@@ -21,7 +21,7 @@ from ..config_functions import ConfigParser
 from ..helpers import merge_bc_dict
 from ..models import Model
 from ngsolve import CoefficientFunction, GridFunction, Parameter
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 
 class ControllerGroup:

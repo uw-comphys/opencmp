@@ -1,5 +1,2 @@
-[MultiComponentINS]
-u = all -> [0.0, 0.0]
-p = all -> 0.0
-a = all -> 0.0
-b = all -> 0.0
+[POISSON]
+u = all -> None

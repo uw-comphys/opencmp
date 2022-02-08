@@ -81,7 +81,7 @@ def load_mesh(config: ConfigParser) -> Mesh:
 
     try:
         mesh_filename = config['MESH']['filename']
-    except:
+    except KeyError:
         raise ValueError('No default available for MESH, filename. Please specify a value in the config file.')
 
     # Check that the file exists.

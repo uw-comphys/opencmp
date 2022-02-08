@@ -1,7 +1,2 @@
 [DIRICHLET]
-u = top    ->  0
-    bottom ->  0
-
-[NEUMANN]
-u = right -> (1-2*x)*y*(1-y)
-    left  -> -(1-2*x)*y*(1-y)
+u = bc -> 0.0

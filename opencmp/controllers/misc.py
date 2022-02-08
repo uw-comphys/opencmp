@@ -19,11 +19,10 @@ Module containing helper functions related to models
 """
 from typing import List
 
-from . import  controllers_dict
+from . import controllers_dict
 from ..models import Model
 from .base_controller import Controller
 from ngsolve import Parameter
-from sys import modules
 
 
 def get_controller(controller_type: str, t_params: List[Parameter], model: Model, config_rel_path: str) -> Controller:

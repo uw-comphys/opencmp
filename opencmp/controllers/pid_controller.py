@@ -18,9 +18,8 @@
 from .base_controller import Controller
 from ..models import Model
 from ngsolve import CoefficientFunction, GridFunction, Parameter
-from typing import Dict, List, Optional, Union, cast
+from typing import Dict, List, Optional, cast
 from numpy import isclose
-from ..helpers.math import H_s, H_t
 
 
 class PID(Controller):

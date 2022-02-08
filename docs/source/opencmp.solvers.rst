@@ -36,6 +36,14 @@ opencmp.solvers.stationary module
    :undoc-members:
    :show-inheritance:
 
+opencmp.solvers.time\_integration\_schemes module
+-------------------------------------------------
+
+.. automodule:: opencmp.solvers.time_integration_schemes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 opencmp.solvers.transient\_RK module
 ------------------------------------
 
