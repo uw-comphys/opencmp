@@ -1,5 +1,4 @@
 ---
-
 title: 'OpenCMP: An Open-Source Computational Multiphysics Package'
 tags:
  - Python
