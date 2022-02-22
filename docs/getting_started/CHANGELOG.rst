@@ -2,6 +2,7 @@ OpenCMP Changelog
 =================
 
 February 8, 2022
+
 * Reordered examples so that the previous Example 1 is now part of the getting-started documented, shifted all remaining examples down by 1.
 * Corrected typo in Example 6, now Example 5.
 * Added Example 10, based on an existing 3D immersed cylinder flow benchmark.

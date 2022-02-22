@@ -7,7 +7,7 @@ elements = u -> VectorH1
            p -> H1
            a -> H1
            b -> H1
-interpolant_order = 3
+interpolant_order = 2
 
 [DG]
 DG = False
@@ -16,15 +16,18 @@ DG = False
 solver = default
 preconditioner = default
 linearization_method = Oseen
-nonlinear_tolerance = relative -> 1e-6
+nonlinear_tolerance = relative -> 1e-5
                       absolute -> 1e-6
-nonlinear_max_iterations = 3
+nonlinear_max_iterations = 10
 
 [TRANSIENT]
 transient = True
-scheme = implicit euler
-time_range = 0.0, 10.0
-dt = 1e-2
+scheme = adaptive three step
+time_range = 0, 3
+dt = 1e-3
+dt_range = 1e-6, 0.5
+dt_tolerance = relative -> 1e-3
+               absolute -> 1e-4
 
 [VISUALIZATION]
 save_to_file = True

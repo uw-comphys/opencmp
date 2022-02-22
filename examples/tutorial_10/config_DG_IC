@@ -5,7 +5,7 @@ curved_elements = True
 [FINITE ELEMENT SPACE]
 elements = u -> HDiv
            p -> L2
-interpolant_order = 2
+interpolant_order = 1
 
 [DG]
 DG = True

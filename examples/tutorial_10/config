@@ -9,14 +9,13 @@ interpolant_order = 2
 
 [DG]
 DG = False
-interior_penalty_coefficient = 10.0
 
 [SOLVER]
 solver = direct
 preconditioner = direct
 linearization_method = Oseen
-nonlinear_tolerance = relative -> 1e-6
-                      absolute -> 1e-6
+nonlinear_tolerance = relative -> 1e-3
+                      absolute -> 1e-3
 nonlinear_max_iterations = 500
 
 [TRANSIENT]

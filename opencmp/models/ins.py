@@ -56,7 +56,7 @@ class INS(Model):
 
     def _define_model_local_error_components(self) -> Dict[str, bool]:
         return {'u': True,
-                'p': True}
+                'p': False}
 
     def _define_time_derivative_components(self) -> List[Dict[str, bool]]:
         return [

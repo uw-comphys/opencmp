@@ -126,11 +126,16 @@ The progress of a steady solution will be displayed in terms of number of nonlin
    :align: center
    :alt: Visualization of steady solution velocity field using line integral convolutions on two different cross-sections.
 
-The calculated force vector will be displayed following completion of the solve, the drag and lift coefficients may calculated based on the following relations,
+The calculated force vector will be displayed following completion of the solve, the drag and lift coefficients may calculated based on the mean velocity,
 
 .. math::
-    C_D = \frac{2 F_z}{\rho U_m^2 A} = 6.886
-.. math::
-    C_L = -\frac{2 F_y}{\rho U_m^2 A} = 3.424e-2
+    \bar{U} = \frac{4}{9} U_m
 
-where the reference values are 6.185 and 9.401e-3, respectively. Improved accuracy would result from mesh refinement and recomputing, but this will significantly increase the memory and CPU requirements.  
+and the following relations,
+
+.. math::
+    C_D = \frac{2 F_z}{\rho \bar{U}^2 A} = 6.886
+.. math::
+    C_L = -\frac{2 F_y}{\rho \bar{U}^2 A} = 3.424e-2
+
+where the computed values for the coarse mesh used are 7.128 and 0.2054, respectively. Improved accuracy would result from mesh refinement and and recomputing, but this will significantly increase the memory and CPU requirements.
