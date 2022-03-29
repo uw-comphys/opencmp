@@ -116,13 +116,13 @@ The base of the heat sink is exposed to a spatially varying heat flux profile, c
 
 ![](images/tutorial_9_geometry.png) ![](images/tutorial_9_cross_section.png)
 
-[Tutorial 10](https://opencmp.io/tutorials/tutorial_10.html) demonstrate using OpenCMP to perform a standard benchmark for 3D flow around an immersed cylinder [@Bayraktar2012] under laminar flow conditions. Both continuous and discontinuous Galerkin finite element solver configurations are provided, defaulting to the continuous Galerkin variation due to reduced memory constraints. The geometry is shown below with parabolic inlet velocity resulting in Re=20.
+[Tutorial 10](https://opencmp.io/tutorials/tutorial_10.html) demonstrate using OpenCMP to perform a standard benchmark for 3D flow around an immersed cylinder [@Bayraktar2012] under laminar flow conditions. Both continuous and discontinuous Galerkin finite element solver configurations are provided, defaulting to the continuous Galerkin variation due to reduced memory constraints. The geometry involves an immersed cylinder in square channel with parabolic inlet velocity resulting in Re=20. This example also uses the built-in error analysis functionality of OpenCMP to automatically compute the force vector on the immersed cylinder through integration of the surface traction over its boundary. This facilitates the calculation of the resulting drag and lift forces on the immersed cylinder.
 
-![](images/tutorial_10_geometry.png)
+Visualizations of the three-dimensional steady-state velocity field are shown below and include side and top view cross-sections with line integral convolution rendering of the velocity field. Additionally, velocity streamlines are shown with a background cross-section indicating pressure along the channel.
 
-This example also uses the built-in error analysis functionality of OpenCMP to automatically compute the force vector on the immersed cylinder through integration of the surface traction over its boundary. This facilitates the calculation of the resulting drag and lift forces on the immersed cylinder. A visualization of the three-dimensional steady-state velocity field is shown below.
-
-![](images/tutorial_10_result.png)
+![](images/tutorial_10_top_view.png)
+![](images/tutorial_10_side_view.png)
+![](images/tutorial_10_streamlines.png)
 
 Several additional examples of usage of OpenCMP in tutorial form are available via the [website](https://opencmp.io/tutorials/).
 
