@@ -48,6 +48,7 @@ The goal of OpenCMP is to fill this evident need for an open-source computationa
 
 # Features
 
+
 The table below summarizes the current capabilities of OpenCMP. The numerical solvers for each of these models have been verified using common benchmarks [@Monte2021a]. Future work on OpenCMP will focus on adding models - for multi-phase flow, turbulence, and heat transfer - and enabling running simulations in parallel over multiple nodes with MPI [@mpi].
 
 | Feature           | Description                                                  |
