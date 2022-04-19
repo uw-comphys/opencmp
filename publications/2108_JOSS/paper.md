@@ -107,9 +107,7 @@ Several examples of usage of OpenCMP are present in ref. [@Monte2021a] and also 
 
 The mixture is composed of two components (A, B) where A undergoes an irreversible reaction A &#8594; B. A parabolic inlet flow of pure A is imposed, such that the mixture undergoes convection, reaction, and molecular diffusion throughout the channel. Sample simulation results of the steady-state are shown resulting from a cosine ramp of the inlet velocity an initial condition with no flow and pure A.
 
-![](images/tutorial_8_results_3s_a.png)
-
-![](images/tutorial_8_results_3s_b.png)
+![](images/tutorial_8_results_3s_combined.png)
 
 [Tutorial 9](https://opencmp.io/tutorials/tutorial_9.html) demonstrates how to use the diffuse interface method to approximate complex geometries with nonconformal structured quadrilateral/hexahedral meshes, versus the use of a traditional unstructured mesh which conforms to the complex geometry boundary. The sample problem is based on simulation of heat transfer within an LED heat sink from ref. [@Monte2021], with a geometry shown below.
 
@@ -121,9 +119,7 @@ The base of the heat sink is exposed to a spatially varying heat flux profile, c
 
 Visualizations of the three-dimensional steady-state velocity field are shown below and include side and top view cross-sections with line integral convolution rendering of the velocity field. Additionally, velocity streamlines are shown with a background cross-section indicating pressure along the channel.
 
-![](images/tutorial_10_top_view.png)
-![](images/tutorial_10_side_view.png)
-![](images/tutorial_10_streamlines.png)
+![](images/tutorial_10_combined.png)
 
 Several additional examples of usage of OpenCMP in tutorial form are available via the [website](https://opencmp.io/tutorials/).
 
