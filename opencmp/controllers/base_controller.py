@@ -16,7 +16,7 @@
 ########################################################################################################################
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 from ngsolve import CoefficientFunction, exp, GridFunction, Parameter
 from ..config_functions import ControllerFunctions
 from ..models import Model

@@ -17,26 +17,10 @@ Subpackages
 Submodules
 ----------
 
-opencmp.error\_analysis module
-------------------------------
-
-.. automodule:: opencmp.error_analysis
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 opencmp.run module
 ------------------
 
 .. automodule:: opencmp.run
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-opencmp.time\_integration\_schemes module
------------------------------------------
-
-.. automodule:: opencmp.time_integration_schemes
    :members:
    :undoc-members:
    :show-inheritance:

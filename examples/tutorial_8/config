@@ -1,26 +1,33 @@
 [MESH]
-filename = channel_w_cyl.vol 
+filename = reaction.vol 
 curved_elements = True
 
 [FINITE ELEMENT SPACE]
-elements = u -> HDiv
-           p -> L2
-interpolant_order = 3
+elements = u -> VectorH1
+           p -> H1
+           a -> H1
+           b -> H1
+interpolant_order = 2
 
 [DG]
-DG = True
-interior_penalty_coefficient = 10.0
+DG = False
 
 [SOLVER]
 solver = default
 preconditioner = default
-linearization_method = IMEX
+linearization_method = Oseen
+nonlinear_tolerance = relative -> 1e-5
+                      absolute -> 1e-6
+nonlinear_max_iterations = 10
 
 [TRANSIENT]
 transient = True
-scheme = euler IMEX
-time_range = 0.0, 1.0
-dt = 1e-2
+scheme = adaptive three step
+time_range = 0, 3
+dt = 1e-3
+dt_range = 1e-6, 0.5
+dt_tolerance = relative -> 1e-3
+               absolute -> 1e-4
 
 [VISUALIZATION]
 save_to_file = True
@@ -28,6 +35,11 @@ save_type = .vtu
 save_frequency = 0.1, time
 
 [OTHER]
-model = INS
+model = MultiComponentINS
+component_names = a, b
+component_in_error_calc = a -> True
+                          b -> True
+component_in_time_deriv = a -> True
+                          b -> True
 run_dir = .
-num_threads = 2
+num_threads = 6

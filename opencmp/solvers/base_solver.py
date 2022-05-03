@@ -20,7 +20,7 @@ from ..models import Model
 import ngsolve as ngs
 from ngsolve import CoefficientFunction, GridFunction, Preconditioner
 import math
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import Dict, List, Optional, Tuple, Type
 from abc import ABC, abstractmethod
 from ..config_functions import ConfigParser
 import sys
@@ -29,8 +29,7 @@ from ..helpers.error import calc_error
 from ..helpers.ngsolve_ import gridfunction_rigid_body_motion
 import numpy as np
 from pathlib import Path
-import os
-import contextlib
+
 from ..controllers.controller_group import ControllerGroup
 
 """

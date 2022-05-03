@@ -16,9 +16,12 @@ preconditioner = None
 
 [TRANSIENT]
 transient = True
-scheme = implicit euler
+scheme = adaptive two step
 time_range = 0, 2
 dt = 0.005
+dt_range = 1e-10, 0.1
+dt_tolerance = relative -> 1e-3
+               absolute -> 1e-3
 
 [VISUALIZATION]
 save_to_file = True

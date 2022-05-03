@@ -21,8 +21,7 @@ from ..helpers.dg import jump, grad_avg
 from ..models import INS
 from ngsolve.comp import ProxyFunction
 from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
-from typing import Dict, Tuple, List, Union, Optional
-from ..config_functions import ConfigParser
+from typing import List, Union, Optional
 
 
 class Stokes(INS):

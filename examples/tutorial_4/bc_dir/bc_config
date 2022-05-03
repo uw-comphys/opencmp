@@ -1,5 +1,5 @@
 [DIRICHLET]
-u = inlet -> [50*y*(0.2 - y), 0.0]
+u = inlet -> [ramp(t, 0.0, 50*y*(0.2 - y), 0.5), 0.0]
     wall  -> [0.0, 0.0]
 
 [STRESS]

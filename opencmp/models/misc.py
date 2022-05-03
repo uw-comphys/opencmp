@@ -17,8 +17,7 @@
 
 from . import Model, models_dict
 
-from sys import modules
-from typing import Dict, Type
+from typing import Type
 
 """
 Module containing helper functions related to models.

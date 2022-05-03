@@ -56,7 +56,7 @@ class INS(Model):
 
     def _define_model_local_error_components(self) -> Dict[str, bool]:
         return {'u': True,
-                'p': True}
+                'p': False}
 
     def _define_time_derivative_components(self) -> List[Dict[str, bool]]:
         return [
@@ -226,7 +226,7 @@ class INS(Model):
             comp_index = self.model_components['u']
 
             # Number of linear iterations for this timestep
-            num_iteration = 1
+            num_iteration = 0
 
             # Boolean used to keep the while loop going
             done_iterating = False
@@ -246,8 +246,8 @@ class INS(Model):
 
                 num_iteration += 1
 
-                if self.verbose > 0:
-                    print(num_iteration, err)
+                if self.verbose:
+                    print('Nonlinear iteration {}, L2 error in velocity = {}'.format(num_iteration, err))
 
                 self.W[comp_index].vec.data = gfu.components[comp_index].vec
                 done_iterating = (err < self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) or (num_iteration > self.nonlinear_max_iters)

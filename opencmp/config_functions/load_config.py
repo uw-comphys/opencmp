@@ -106,12 +106,12 @@ def convert_str_to_dict(string: str, import_dir: str, t_param: Optional[List[Par
     param_tmp = string.replace('\t', '')
     param_tmp = param_tmp.replace(' ', '')
 
-    # See if param_tmp has multiple values.
-    try:
+    # If param_tmp contains multiple values, split them out into a list
+    if '\n' in param_tmp:
         param_tmp_lst = param_tmp.split('\n')
         # Remove any empty strings resulting from extraneous newlines.
         param_tmp_lst = [item for item in param_tmp_lst if item != '']
-    except:
+    else:
         param_tmp_lst = [param_tmp]
 
     # Split by the delimiting character and stick the results in a dictionary.

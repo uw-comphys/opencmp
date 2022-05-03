@@ -17,12 +17,7 @@
 
 from typing import List
 
-import ngsolve as ngs
-import numpy as np
-from ngsolve import CoefficientFunction, FESpace, GridFunction, Mesh
-
-from ..config_functions import ConfigParser
-from ..models import Model
+from ngsolve import Mesh
 
 
 def nondimensionalize_mesh_file(filename: str, char_length: List[float]) -> None:
@@ -39,7 +34,8 @@ def nondimensionalize_mesh_file(filename: str, char_length: List[float]) -> None
             dimension (ex: char_length = [scale] -> char_length = [scale, scale, scale]).
     """
     # TODO
-    return
+    raise NotImplemented
+
 
 def nondimensionlize_loaded_mesh(mesh: Mesh, char_length: List[float]) -> Mesh:
     """
@@ -57,15 +53,19 @@ def nondimensionlize_loaded_mesh(mesh: Mesh, char_length: List[float]) -> Mesh:
         The original mesh now nondimensionalized.
     """
 
-    for p in mesh.ngmesh.Points():
-        px, py = p[0], p[1]
-    p[0] = pxnp.cos(theta) - pynp.sin(theta)
-    p[1] = pxnp.sin(theta) + pynp.cos(theta)
-    if p[0] > maxX:
-        maxX = p[0]
-    if p[0] < minX:
-        minX = p[0]
-    if p[1] > maxY:
-        maxY = p[1]
-    if p[1] < minY:
-        minY = p[1]
+    # TODO
+    raise NotImplemented
+
+    # for p in mesh.ngmesh.Points():
+    #     px, py = p[0], p[1]
+    #     # p[0] = px*np.cos(theta) - py*np.sin(theta)
+    #     # p[1] = px*np.sin(theta) + py*np.cos(theta)
+    #
+    #     if p[0] > maxX:
+    #         maxX = p[0]
+    #     if p[0] < minX:
+    #         minX = p[0]
+    #     if p[1] > maxY:
+    #         maxY = p[1]
+    #     if p[1] < minY:
+    #         minY = p[1]

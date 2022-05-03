@@ -448,7 +448,10 @@ def split_nonconformal_subdomains_3d(face_lst: List, vertices: Dict[str, str], N
 
     mask_dict = {}
     for marker, tmp_vertices in vertices.items():
-        mask = nonconformal_subdomain_3d(face_lst, tmp_vertices, np.array(N), np.array(scale), np.array(offset), lmbda_overlap, centroid[marker])
+        assert len(tmp_vertices) == 1
+        mask = nonconformal_subdomain_3d(face_lst, tmp_vertices[0],
+                                         np.array(N), np.array(scale), np.array(offset),
+                                         lmbda_overlap, centroid[marker])
         mask_dict[marker] = mask
 
     if remainder:

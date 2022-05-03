@@ -1,5 +1,5 @@
-[STOKES]
-all = all -> None
-
-[INS]
-all = all -> output/sol/stokes_0.0.sol
+[MultiComponentINS]
+u = all -> [0.0, 0.0]
+p = all -> 0.0
+a = all -> 0.0
+b = all -> 0.0

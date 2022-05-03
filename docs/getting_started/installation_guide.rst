@@ -13,7 +13,7 @@ To begin using OpenCMP:
 1) Clone the `GitHub repository <https://github.com/uw-comphys/opencmp>`_.
 2) Install the dependencies
 3) Install the :code:`opencmp` module using :code:`pip3 install .` from the top-level directory. 
-4) Optionally, run the unit tests using :code:`python -m pytest` from the top-level directory. Note,
+4) Optionally, run the unit tests using :code:`python -m pytest pytests/` from the top-level directory. Note,
 
     * In order to run the tests, all optional dependencies must be installed.
     * For full information about running the tests see the README.md inside the pytests folder.

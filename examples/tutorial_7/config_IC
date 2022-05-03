@@ -1,5 +1,5 @@
 [MESH]
-filename = channel_w_cyl.vol
+filename = channel_w_cyl.vol 
 curved_elements = True
 
 [FINITE ELEMENT SPACE]

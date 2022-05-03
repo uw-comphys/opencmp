@@ -1,118 +1,141 @@
 .. Contains the tenth tutorial.
 .. _tutorial_10:
 
-Tutorial 10 - Diffuse Interface Method
-======================================
+.. warning:: This example requires at least 16gb of RAM and could take several minutes to solve, depending on the number of threads specified and the performance of your CPU.
 
-The files for this tutorial can be found in "Examples/tutorial_10".
+Tutorial 10 - Solving the Incompressible Navier-Stokes Equations (3D)
+=====================================================================
+
+The files for this tutorial can be found in "examples/tutorial_10".
 
 Governing Equations
 -------------------
 
-This tutorial will demonstrate how to use the diffuse interface method to approximate complex geometries with structured quadrilateral/hexahedral meshes.
+This tutorial will demonstrate how to solve the incompressible Navier-Stokes equations with Dirichlet and stress boundary conditions, as in :ref:`tutorial_6`, but now using geometry and conditions from a `standard benchmark for 3D flow around a cylinder <https://doi.org/10.1504/IJCSE.2012.048245>`_ under conditions in which vortex shedding is not observed and a steady solution may be obtained (Re=20). The domain geometry is shown below:
 
-.. image:: ../_static/tutorial_10_geometry.png
-   :width: 300
+.. image:: http://www.mathematik.tu-dortmund.de/~featflow/media/dfg_flow3d/fac_geo_3d.png
+   :width: 400
    :align: center
-   :alt: Perspective view of complex 3D heat sink geometry.
+   :alt: Schematic of 3D immersed cylinder geometry.
+
+There are no-slip conditions on all four channel walls and on the wall of the cylinder. The inlet velocity profile is parabolic,
+
+.. math::
+    U(0, y, z) = [0, 0, 32 U_m x y (H - x) (H - y)/H^4]
+
+where Um = 0.45 m/s and H=0.41. Note that this deviates from the benchmark paper expression which has a factor of 16 instead of 32, which is a typographical error. There is a "do-nothing" outlet stress boundary condition and the kinematic viscosity of the liquid is 0.001.
+
+Since the problem is assumed to have a steady-state, no initial conditions are required. However, to facilitate convergence of the steady solve the solution of the steady-state Stokes equations for the problem are used as the initial value for nonlinear iteration.
+
+Additionally, this example will use OpenCMP's built-in metric functionality, to compute the force vector on the immersed cylinder through integration of the surface traction over its boundary. Given that superficial velocity direction is the z-direction and the y-component is orthogonal to the flow direction, the  corresponding force vector components are the drag and lift forces, respectively.
 
 
-The Main Configuration File
----------------------------
+The Main Configuration Files
+----------------------------
 
-The main configuration file now includes and additional section to activate the diffuse interface method and point to the directory containing files specific to the diffuse interface method. ::
+There are now two main configuration files: "config_IC" to specify the Stokes solve and "config" to specify the main incompressible Navier-Stokes solve.
 
-   [DIM]
-   diffuse_interface_method = True
-   dim_dir = Examples/tutorial_10/dim_dir
+"config_IC" is very similar to the main configuration file from :ref:`tutorial_6` except for a few significant changes.
+First, since this is a low Reynolds number problem we may use a continuous Galerkin FEM, with standard Taylor-Hood elements::
 
-The Diffuse Interface Method Configuration File
------------------------------------------------
+    [FINITE ELEMENT SPACE]
+    elements = u -> VectorH1
+               p -> H1
+    interpolant_order = 2
 
-Within the diffuse interface method directory is the main configuration file for the diffuse interface method parameters - "dim_config".
+Second, the linear solver and preconditioner are changed, along with the maximum number of nonlinear iterations, so that less memory will be used compared to a direct linear solver::
 
-The first section of this configuration file governs the construction of the encompassing mesh and the diffuse interface. "mesh_dimension" is 3 since this is a 3-dimensional problem and "num_mesh_elements" controls the size of the mesh in each dimension. The spatial dimensions of the mesh come from "mesh_scale" and "mesh_offset" and should be slightly larger than the complex geometry being encompassed. In this case, the encompassing mesh extends from -2.5-2.5 in x and y and from -0.2-2.4 in z. Finally, "interface_width_parameter" controls the diffuseness of the diffuse interface approximation to the boundary of the complex geometry, with smaller values producing sharper interfaces for a given mesh element size. ::
+   [SOLVER]
+   solver = CG
+   preconditioner = default
+   linearization_method = Oseen
+   nonlinear_tolerance = relative -> 1e-6
+                         absolute -> 1e-6
+   nonlinear_max_iterations = 500
 
-   [DIM]
-   mesh_dimension = 3
-   num_mesh_elements = x -> 80
-                       y -> 80
-                       z -> 80
-   mesh_scale = x -> 5
-                y -> 5
-                z -> 2.6
-   mesh_offset = x -> 2.5
-                 y -> 2.5
-                 z -> 0.2
-   interface_width_parameter = 0.01
+Third, the transient solve is disabled::
 
-The second section controls how boundary conditions are applied at the diffuse interface. In this case, there are two different boundary conditions applied on the bottom of the heat sink and its fans, so "multiple_bcs" is True. "remainder = True" means that once the region of the diffuse interface containing the bottom of the heat sink has been identified, the remainder of the diffuse interface with be assumed to correspond to the fan boundary condition, reducing computation time. ::
+    [TRANSIENT]
+    transient = False
 
-   [DIM BOUNDARY CONDITIONS]
-   multiple_bcs = True
-   remainder = True
 
-The third section contains additional information for the construction of the diffuse interface. "load_method" has three options, "generate", "combine", and "file" for the cases of (a) a diffuse interface that is constructed from an STL file of a complex geometry, (b) a diffuse interface that is constructed by combining multiple STL files at specified locations, and (c) a pregenerated diffuse interface that is loaded from a file. In this case, the diffuse interface will be generated on the spot from an STL file whose name must also be specified. Finally, the "save_to_file" option allows the diffuse interface and mesh to be saved to file after generation so they can later just be loaded. ::
+The Boundary Condition Configuration File
+-----------------------------------------
 
-     [PHASE FIELDS]
-     load_method = generate
-     stl_filename = Examples/tutorial_10/dim_dir/led.stl
-     save_to_file = False
+The same boundary conditions are used for the Stokes solve and the incompressible Navier-Stokes solve so one boundary condition configuration file can be shared. ::
 
-The Boundary Condition Configuration Files
-------------------------------------------
+    [DIRICHLET]
+    u = wall  -> [0.0, 0.0, 0.0]
+        cyl  -> [0.0, 0.0, 0.0]
+        inlet -> [0.0, 0.0, 32.0*0.45*x*y*(0.41-x)*(0.41-y)/0.41^4]
 
-The usual boundary condition file is empty, since boundary conditions are applied at the diffuse interface itself not at the boundaries of the encompassing mesh. Instead, boundary conditions are specified within the diffuse interface boundary condition configuration file "dim_dir/bc_dir/dim_bc_config". There are the usual sections to specify Dirichlet, Neumann, or Robin boundary conditions. The two new sections, "VERTICES" and "CENTROIDS" are used to split the diffuse interface into different boundary condition regions. ::
+    [STRESS]
+    stress = outlet -> [0.0, 0.0, 0.0]
 
-   [VERTICES]
-   bottom = Examples/tutorial_10/dim_dir/bc_dir/led_bottom.msh
-
-   [CENTROIDS]
-   bottom = <0.0, 0.0, 2.0>
-
-   [DIRICHLET]
-
-   [NEUMANN]
-   u = bottom -> Examples/tutorial_10/dim_dir/bc_dir/bottom_bc.sol
-
-   [ROBIN]
-   u = remainder -> 0.00124, 0.0
+Note that the wall of the cylinder has been marked "cyl" on the mesh.
 
 The Initial Condition Configuration File
 ----------------------------------------
 
-No initial condition is needed for this steady-state problem. ::
+The Stokes solve is a steady-state solve so needs no initial conditions. ::
 
-   [Poisson]
-   u = all -> None
+   [STOKES]
+   all = all -> None
+
+The incompressible Navier-Stokes solve does require initial conditions, but to facilitate convergence of the nonlinear solver the results of the Stokes solve will be saved to file and this file will be reloaded to provide initial conditions for the incompressible Navier-Stokes solve::
+
+   [INS]
+   all = all -> output/sol/stokes_0.0.sol
 
 The Model Configuration File
 ----------------------------
 
-The model configuration file contains the usual model parameters and model functions for the Poisson equation ::
+The same model parameters are used for both solves. ::
 
    [PARAMETERS]
-   diffusion_coefficient = all -> 1.0
+   kinematic_viscosity = all -> 0.001
 
    [FUNCTIONS]
-   source = all -> 0.0
+   source = all -> [0.0, 0.0]
 
 The Error Analysis Subdirectory
 -------------------------------
 
-In this case, the exact solution is not known, so the error analysis configuration file is left empty.
+In this case, the exact solution is not known, but we do want to calculate the drag and lift coefficients from the simulation results in order to compare to the benchmark solutions which are included in the analysis metrics options that are (optionally) calculated by OpenCMP. These calculations are enabled by adding the metric "surface_traction",
+
+    [METRICS]
+    surface_traction = cyl
+
+and indicating which surface it should be calculated on. In order to enable this calculation, we must add the following lines to the main configuration file ("config"),
+
+    [ERROR ANALYSIS]
+    check_error = True
 
 Running the Simulation
 ----------------------
 
-The simulation can be run from the command line; within the directory "examples/tutorial_4/":
+The simulation can be run from the command line; within the directory "examples/tutorial_10/::
 
-1) Execute :code:`python3 -m opencmp config`, note that this is a computationally intensive simulation and :code:`num_threads` is set to 4, but should be increased to your physical core count.
-2) Execute :code:`python3 visualization` to see a sample visualization (below).
+1) Run the Stokes solve by calling :code:`python3 -m opencmp config_IC`
+2) Run the incompressible Navier-Stokes solve by calling :code:`python3 -m opencmp config`.
 
-Below is a cross section of the temperature field:
+The progress of a steady solution will be displayed in terms of number of nonlinear iterations and, within each nonlinear iteration, number of iterations of the linear solver. Once the simulation has finished the results can be visualized by opening "output/vtu/ins_0.0.vtu" in ParaView.
 
-.. image:: ../_static/tutorial_10_cross_section.png
+.. image:: ../_static/tutorial_10.png
    :width: 600
    :align: center
-   :alt: Steady-state temperature distribution cross-sections.
+   :alt: Visualization of steady solution velocity field using line integral convolutions on two different cross-sections.
+
+The calculated force vector will be displayed following completion of the solve, the drag and lift coefficients may calculated based on the mean velocity,
+
+.. math::
+    \bar{U} = \frac{4}{9} U_m
+
+and the following relations,
+
+.. math::
+    C_D = \frac{2 F_z}{\rho \bar{U}^2 A} = 6.886
+.. math::
+    C_L = -\frac{2 F_y}{\rho \bar{U}^2 A} = 3.424e-2
+
+where the computed values for the coarse mesh used are 7.128 and 0.2054, respectively. Improved accuracy would result from mesh refinement and and recomputing, but this will significantly increase the memory and CPU requirements.

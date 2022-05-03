@@ -144,7 +144,7 @@ class Model(ABC):
             self.solver = 'direct'
 
         if self.solver == 'direct':
-            print("WARNING: The direct linear solver does not respect the num_threads parameter you may have set."
+            print("WARNING: The direct linear solver does not respect the num_threads parameter you may have set. "
                   "This is an NGSolve issue")
 
         # Load the preconditioner types
@@ -346,7 +346,7 @@ class Model(ABC):
         freedofs: Optional[BitArray] = self.fes.FreeDofs()
 
         if self.solver == 'direct':
-            inv = a_assembled.mat.Inverse(freedofs=freedofs)
+            inv = a_assembled.mat.Inverse(freedofs=freedofs, inverse="umfpack")
             r = L_assembled.vec.CreateVector()
             r.data = L_assembled.vec - a_assembled.mat * gfu.vec
             gfu.vec.data += inv * r
@@ -389,7 +389,7 @@ class Model(ABC):
         Function to construct the preconditioners needed by the model.
 
         Args:
-            a_assembled_lst: A list of the assembled bilinear form.
+            a_assembled: A list of the assembled bilinear form.
 
         Returns:
             A list of the constructed preconditioners.

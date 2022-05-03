@@ -17,7 +17,7 @@
 
 from typing import Union, Optional, List, TYPE_CHECKING, Any
 
-# Sphinx runs into a circular import with `from models import Model`, so only 
+# Sphinx runs into a circular import with `from models import Model`, so only
 # import Model for type checking.
 if TYPE_CHECKING:
     from ..models import Model
@@ -202,30 +202,20 @@ def _surface_traction(sol: GridFunction, model: Model, marker: Optional[str]) ->
     else:
         p_mat = sol.components[p_comp] * I_mat
 
-    # For some reason using Grad(u) is less accurate than building a coefficientfunction out of the components of
-    # Grad(u).
-    marker_fes = ngs.H1(model.mesh, order=model.interp_ord, dgjumps=model.DG)
-    marker_gfu_lst = []
-    for i in range(model.mesh.dim):
-        for j in range(model.mesh.dim):
-            gfu_tmp = ngs.GridFunction(marker_fes)
-            gfu_tmp.Set(ngs.Grad(sol.components[u_comp])[i,j])
-            marker_gfu_lst.append(gfu_tmp)
-
-    grad_u = ngs.CoefficientFunction(tuple(marker_gfu_lst), dims=(model.mesh.dim, model.mesh.dim))
+    grad_u = ngs.Grad(sol.components[u_comp])
 
     if isinstance(marker, str):
         # A conformal mesh is being used.
         #
         # Confirm that the marker name corresponds to an actual mesh surface.
-        if not marker in model.mesh.GetBoundaries():
+
+        if not (marker in model.mesh.GetBoundaries()):
+            print(type(marker), type(model.mesh.GetBoundaries()), type(model.mesh.GetBoundaries()[0]))
             raise ValueError('{} is not a mesh surface.'.format(marker))
 
         # Note that the rho*u*u component of the stress tensor is not included because it is assumed that there is no
         # mass transfer through the surface.
-        surface_gfu = ngs.GridFunction(marker_fes)
-        surface_gfu.Set(ngs.CoefficientFunction(1.0), definedon=model.mesh.Boundaries(marker))
-        surface_traction = ngs.Integrate(((kv * grad_u - p_mat) * n) * surface_gfu, model.mesh, ngs.BND)
+        surface_traction = ngs.Integrate(cf=(kv * grad_u.trans * n + kv * grad_u * n - p_mat * n), mesh=model.mesh, definedon=model.mesh.Boundaries(marker))
 
     elif marker is None:
         # The diffuse interface method is being used.
@@ -305,7 +295,6 @@ def calc_error(config: ConfigParser, model: Model, sol: GridFunction) -> List:
                         surface_traction = _surface_traction(sol, model, marker)
                         error_lst.append([st for st in surface_traction])
                         print('surface traction on {0}: {1}'.format(marker, [st for st in surface_traction]))
-
             else:
                 raise ValueError('{} has not been implemented yet.'.format(metric))
 

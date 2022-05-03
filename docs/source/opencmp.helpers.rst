@@ -20,6 +20,14 @@ opencmp.helpers.error module
    :undoc-members:
    :show-inheritance:
 
+opencmp.helpers.error\_analysis module
+--------------------------------------
+
+.. automodule:: opencmp.helpers.error_analysis
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 opencmp.helpers.io module
 -------------------------
 

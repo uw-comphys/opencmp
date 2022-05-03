@@ -1,5 +1,5 @@
 [MESH]
-filename = unit_square_4bcs.vol
+filename = coarse_unit_square_1bc.msh
 
 [FINITE ELEMENT SPACE]
 elements = u -> H1
@@ -9,12 +9,17 @@ interpolant_order = 2
 solver = direct
 preconditioner = None
 
+[TRANSIENT]
+transient = False
+
 [VISUALIZATION]
-save_to_file = True
-save_type = .vtu
+save_to_file = False
+
+[ERROR ANALYSIS]
+convergence_test = h -> u
+num_refinements = 5
 
 [OTHER]
 model = Poisson
 run_dir = .
 num_threads = 2
-

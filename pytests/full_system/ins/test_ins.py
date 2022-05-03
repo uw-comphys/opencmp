@@ -17,7 +17,7 @@
 
 import pytest
 from pytest import CaptureFixture, fixture
-from pytests.full_system.helpers import automated_output_check
+from opencmp.helpers.testing import automated_output_check
 from opencmp.config_functions import ConfigParser
 
 

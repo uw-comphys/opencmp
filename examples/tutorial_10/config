@@ -1,31 +1,35 @@
 [MESH]
-
-[DIM]
-diffuse_interface_method = True
-dim_dir = dim_dir
+filename = flow_past_cyl_3d.msh
+curved_elements = True
 
 [FINITE ELEMENT SPACE]
-elements = u -> H1
+elements = u -> VectorH1
+           p -> H1
 interpolant_order = 2
 
 [DG]
 DG = False
 
 [SOLVER]
-solver = GMRes
-preconditioner = None
+solver = direct
+preconditioner = direct
+linearization_method = Oseen
+nonlinear_tolerance = relative -> 1e-3
+                      absolute -> 1e-3
+nonlinear_max_iterations = 500
 
 [TRANSIENT]
 transient = False
 
-[ERROR ANALYSIS]
-check_error = False
-
-[OTHER]
-num_threads = 4
-model = Poisson
-run_dir = .
-
 [VISUALIZATION]
 save_to_file = True
-save_type = .sol
+save_type = .vtu
+
+[ERROR ANALYSIS]
+check_error = True
+
+[OTHER]
+model = INS
+run_dir = .
+num_threads = 6
+messaging_level = 2

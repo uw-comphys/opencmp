@@ -142,10 +142,7 @@ class ConfigParser(configparser.ConfigParser):
                 val_str_lst = self.get_list([config_section, key], str)
 
                 if t_param is None:
-                    if len(val_str_lst) == 1:
-                        dict_one[key] = val_str_lst[0]
-                    else:
-                        dict_one[key] = val_str_lst
+                    dict_one[key] = val_str_lst
                 else:
                     dict_one[key] = [val_str_lst for _ in t_param]
             else:
@@ -283,10 +280,10 @@ class ConfigParser(configparser.ConfigParser):
 
         try:
             param = self[section][key]
-        except:
+        except KeyError:
             try:
                 param = config_defaults[section][key]
-            except:
+            except KeyError:
                 raise ValueError('{0}, {1} is not a valid parameter.'.format(section, key))
 
             if param == 'REQUIRED':
@@ -317,10 +314,10 @@ class ConfigParser(configparser.ConfigParser):
 
         try:
             param_tmp = self[section][key].split(', ')
-        except:
+        except KeyError:
             try:
                 param_tmp = config_defaults[section][key]
-            except:
+            except KeyError:
                 raise ValueError('{0}, {1} is not a valid parameter.'.format(section, key))
 
             if param_tmp == 'REQUIRED':

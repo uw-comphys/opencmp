@@ -1,137 +1,88 @@
 .. Contains the fourth tutorial.
 .. _tutorial_4:
 
-Tutorial 4 - Solving the Stokes Equations
-=========================================
+Tutorial 4 - Transient Solves
+=============================
 
 The files for this tutorial can be found in "examples/tutorial_4".
 
 Governing Equations
 -------------------
 
-This tutorial will demonstrate how to solve the Stokes equations with Dirichlet and stress boundary conditions:
+This tutorial will demonstrate how to solve the transient Stokes equations. The governing equations are similar to those used in :ref:`tutorial_4`. However, instead of a steady-state solve the inlet boundary condition is ramped up from zero velocity and pressure and the domain is allowed to reach steady-state.
 
 .. math::
-   \bm{\nabla} p - \nu \nabla^2 \bm{u} &= \bm{f} \mbox{ in } \Omega \\
+   \frac{\partial \bm{u}}{\partial t} + \bm{\nabla} p - 0.1 \nabla^2 \bm{u} &= \bm{0} \mbox{ in } \Omega \\
    \bm{\nabla} \cdot \bm{u} &= 0 \mbox{ in } \Omega \\
-   \bm{u} &= \bm{g} \mbox{ on } \Gamma_D \\
-   \bm{n} \cdot \left(p \mathbb{I} - \nu \bm{\nabla} \bm{u} \right) &= \bm{h} \mbox{ on } \Gamma_S
+   \bm{u}(t=0) &= \bm{0} \mbox{ in } \Omega \\
+   p(t=0) &= 0 \mbox{ in } \Omega \\
+   \bm{u} &= \bm{0} \mbox{ on the walls} \\
+   \bm{u} &= \mbox{ramp}\left(t, 0, 50 y (0.2 - y) \hat{x}, 0.5\right) \mbox{ at the inlet} \\
+   \bm{n} \cdot \left(p \mathbb{I} - 0.1 \bm{\nabla} \bm{u} \right) &= \bm{0} \mbox{ at the outlet}
 
-The specific example is flow through a pipe with a height of 0.2 and a length of 1. For a kinematic viscosity of 0.1 this has the exact solution:
+Note that the inlet boundary condition ramps from zero to the steady-state boundary condition in 0.5s following a cosine profile.
+
+At steady-state, the exact solution is as follows:
 
 .. math::
    \bm{u} &= 50 y (0.2 - y) \hat{x} \\
    p &= 10(1 - x)
 
-There is a no-slip boundary condition at the walls of the pipe. At the inlet of the pipe a parabolic velocity profile is given and at the outlet there is a "do-nothing" stress boundary condition. Ignoring gravity the governing equations become as follows:
-
-.. math::
-   \bm{\nabla} p - 0.1 \nabla^2 \bm{u} &= \bm{0} \mbox{ in } \Omega \\
-   \bm{\nabla} \cdot \bm{u} &= 0 \mbox{ in } \Omega \\
-   \bm{u} &= \bm{0} \mbox{ on the walls} \\
-   \bm{u} &= 50 y (0.2 - y) \hat{x} \mbox{ at the inlet} \\
-   \bm{n} \cdot \left(p \mathbb{I} - 0.1 \bm{\nabla} \bm{u} \right) &= \bm{0} \mbox{ at the outlet}
-
 The Main Configuration File
 ---------------------------
 
-As usual the first section must be updated with the new mesh. ::
+A new section must be added to the main configuration file to specify the parameters for the transient solve. In this tutorial, the first-order implicit Euler scheme will be used for time discretization. For a full list of the available time discretization schemes see :ref:`example_config`. Using a time range of 0s to 2s will give the simulation sufficient time to reach steady-state and a time step of 0.005s is chosen for reasonable accuracy. ::
 
-   [MESH]
-   filename = channel_3bcs.vol
+   [TRANSIENT]
+   transient = True
+   scheme = implicit euler
+   time_range = 0, 2
+   dt = 0.005
 
-Stokes flow involves two model variables - "u" for velocity and "p" for pressure - which must be reflected in the finite element space. Velocity and pressure require different finite elements since velocity is a vector quantity and pressure is a scalar quantity. Furthermore, in this tutorial the HDiv-L2 combination will be used to strongly enforce the incompressibility constraint.
+In addition to an error analysis of the final steady-state results, results will be saved to file throughout the duration of the simulation for later visualization. This requires a new parameter - "save_frequency" - to specify how often results should be saved. In this case, results will be saved every 0.1s. "save_frequency" can also be specified as "x, numit" if results should be saved after every x time steps. ::
 
-Only a single value is given for the interpolant order. However, to satisfy the inf-sup condition the pressure interpolant order will be one less than the velocity interpolant order. This is automatically taken care of by the model and the "interpolant_order" parameter can be thought of as the highest interpolant order present in the mixed finite element space. ::
-
-   [FINITE ELEMENT SPACE]
-   elements = u -> HDiv
-              p -> L2
-   interpolant_order = 3
-
-The HDiv-L2 pair should only be used with a DG formulation, so a new section is added to specify the DG parameters. "interior_penalty_coefficient" sets the value of the penalty coefficient in the Interior Penalty Discontinuous Galerkin method and should typically have a value of 6-10. ::
-
-   [DG]
-   DG = True
-   interior_penalty_coefficient = 10.0
-
-A new solver and preconditioner will be used to demonstrate OpenCMP's functionality. The solver's residual error tolerance and maximum number of iterations are both specified, but it's generally reasonable to leave the default values. ::
-
-   [SOLVER]
-   solver = CG
-   preconditioner = direct
-   solver_tolerance = 1e-12
-   solver_max_iterations = 100
-
-A full error analysis will be performed on the final simulation results. Most of the error analysis parameters are specified in the error analysis configuration file, but "check_error" must be set to "True" for the error metrics to be computed. ::
-
-   [ERROR ANALYSIS]
-   check_error = True
-
-The correct model must also be specified. ::
-
-   [OTHER]
-   model = Stokes
-   run_dir = .
-   num_threads = 2
+   [VISUALiZATION]
+   save_to_file = True
+   save_type = .vtu
+   save_frequency = 0.1, time
 
 The Boundary Condition Configuration File
 -----------------------------------------
 
-The Stokes equation has different types of possible boundary conditions than the Poisson equation, but they are specified in a similar manner. For this problem, the mesh has boundary markers "inlet", "wall", and "outlet. The first two boundaries have Dirichlet velocity boundary conditions: ::
+The boundary condition are similar to those used in :ref:`tutorial_4` with the exception of the inlet Dirichlet boundary condition which now ramps from zero to its steady-state value in 0.5s. ::
 
    [DIRICHLET]
-   u = inlet -> [50*y*(0.2-y), 0.0]
+   u = inlet -> [ramp(t, 0.0, 50*y*(0.2 - y), 0.5), 0.0]
        wall  -> [0.0, 0.0]
-
-The stress boundary condition is slightly different since it does not apply to a specific model variable. Instead, "stress" is given in place of a model variable name. ::
 
    [STRESS]
    stress = outlet -> [0.0, 0.0]
 
-Note that all of the boundary conditions are vectors, which are denoted by square brackets. For more information about configuration file syntax see :ref:`syntax`.
+The Initial Condition Configuration File
+----------------------------------------
 
-The Model Configuration File
-----------------------------
+Since this is a transient simulation an initial condition is needed. Initial conditions must be specified for all model variables. They can be constructed to take different values on different marked regions of the domain. However, generally they will take the same value over the entire domain, which is indicated by the "all" parameter. In this tutorial, both the velocity and pressure fields will be initialized to zero. ::
 
-Instead of a diffusion coefficient, the Stokes equation has a kinematic viscosity. Additionally, the source function is now a vector. ::
-
-   [PARAMETERS]
-   kinematic_viscosity = all -> 0.1
-
-   [FUNCTIONS]
-   source = all -> [0.0, 0.0]
-
-The Error Analysis Subdirectory
--------------------------------
-
-Similar to :ref:`tutorial_3`, a reference solution must be given for error to be computed against. However, now it must be specified for both model variables. ::
-
-   [REFERENCE SOLUTIONS]
-   u = -> [50*y*(0.2-y), 0.0]
-   p = 10*(1-x)
-
-In this tutorial, all of the possible error metrics will be computed. These are specified by listing the name of the error metric and giving the model variables for which it should be computed. ::
-
-   [METRICS]
-   L2_norm = u, p
-   L1_norm = u, p
-   Linfinity_norm = u, p
-   divergence = u
-   facet_jumps = u, p
-
-Most error metrics, like the L2 norm, can be computed for both model variables. However, it only makes sense to compute the divergence for velocity. If the incompressibility constraint is satisfied :math:`\bm{\nabla} \cdot \bm{u} \approx 0`, but the divergence of pressure has no significance.
-
-"facet_jumps" measures the magnitude of the discontinuities in the final solution and is only significant when DG is used. It can be computed when DG is not used but will always be zero.
+   [STOKES]
+   u = all -> [0.0, 0.0]
+   p = all -> 0.0
 
 Running the Simulation
 ----------------------
 
-The simulation can be run from the command line; within the directory "examples/tutorial_4/" execute :code:`python3 -m opencmp config`.
+The simulation can be run from the command line; within the directory examples/tutorial_4/ execute :code:`python3 -m opencmp config`.
 
-Once the simulation has finished the values of the error metrics will be printed out.
 
-.. image:: ../_static/tutorial_4.png
+This simulation will take longer to run than the previous tutorials. Its progress can be tracked by print outs of the current time and time step value at each time step.
+
+.. image:: ../_static/tutorial_4_a.png
+   :width: 125
+   :align: center
+   :alt: Time step progression.
+
+Once the simulation has finished the values of the error metrics will also be printed out.
+
+.. image:: ../_static/tutorial_4_b.png
    :width: 400
    :align: center
    :alt: Output of error analysis.

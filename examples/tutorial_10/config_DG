@@ -1,0 +1,36 @@
+[MESH]
+filename = flow_past_cyl_3d.msh
+curved_elements = True
+
+[FINITE ELEMENT SPACE]
+elements = u -> HDiv
+           p -> L2
+interpolant_order = 1
+
+[DG]
+DG = True
+interior_penalty_coefficient = 10.0
+
+[SOLVER]
+solver = direct
+preconditioner = direct
+linearization_method = Oseen
+nonlinear_tolerance = relative -> 1e-6
+                      absolute -> 1e-6
+nonlinear_max_iterations = 10
+
+[TRANSIENT]
+transient = False
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .vtu
+
+[ERROR ANALYSIS]
+check_error = True
+
+[OTHER]
+model = INS
+run_dir = .
+num_threads = 6
+messaging_level = 2
