@@ -346,7 +346,17 @@ class Model(ABC):
         freedofs: Optional[BitArray] = self.fes.FreeDofs()
 
         if self.solver == 'direct':
-            inv = a_assembled.mat.Inverse(freedofs=freedofs, inverse="umfpack")
+            # prefer PARDISO if available, else use UMFPACK, note that pip version of NGSolve does
+            # does not seem to populate the ngsolve.config.USE_PARDISO etc. variables correctly
+            if ngs.config.USE_PARDISO or ngs.config.USE_MKL:
+                inverse_solver = "pardiso"
+            elif ngs.config.USE_UMFPACK:
+                inverse_solver = "umfpack"
+            else:
+                raise NameError("NGSolve compiled without PARDISO or UMFPACK support.")
+
+            inv = a_assembled.mat.Inverse(freedofs=freedofs, inverse=inverse_solver)
+
             r = L_assembled.vec.CreateVector()
             r.data = L_assembled.vec - a_assembled.mat * gfu.vec
             gfu.vec.data += inv * r

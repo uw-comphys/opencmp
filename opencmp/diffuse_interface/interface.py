@@ -162,15 +162,15 @@ def get_phi(binary: ndarray, lmbda: float, N: List[int], scale: List[float], off
     # of binary, then get the distance transform relative to that border. The
     # distance transform is a Euclidean distance transform that takes into
     # account the entire array, not just a local neighbourhood.
-    erosion = spimg.morphology.binary_erosion(binary, kernel, 1).astype(np.float32)
+    erosion = spimg.binary_erosion(binary, kernel, 1).astype(np.float32)
     border = 1.0 - (binary - erosion)
     border = border.astype(np.float32)
 
     dt = edt.edt(border)
     dt *= min(scale) / min(N)
 
-    # The phase field should run from -1 to 1, take the value 0 at binary's 
-    # border, and follow the error function's distribution away from binary's 
+    # The phase field should run from -1 to 1, take the value 0 at binary's
+    # border, and follow the error function's distribution away from binary's
     # border (either towards -1 or 1).
     phi_in = spec.erf(dt / lmbda) * binary
     phi_out = spec.erf(dt / lmbda) * (binary - 1.0)
