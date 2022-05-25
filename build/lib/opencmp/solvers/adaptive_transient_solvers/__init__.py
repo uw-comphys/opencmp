@@ -15,15 +15,11 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
+# Base solver classes
+from .base_adaptive_transient_multistep import BaseAdaptiveTransientMultiStepSolver
+from .base_adaptive_transient_RK import BaseAdaptiveTransientRKSolver
 
-from .run import run
-
-if __name__ == '__main__':
-
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
-
-    config_file_path = sys.argv[1]
-    run(config_file_path)
+# Implemented solvers
+from .adaptive_IMEX import AdaptiveIMEX
+from .adaptive_two_step import AdaptiveTwoStep
+from .adaptive_three_step import AdaptiveThreeStep

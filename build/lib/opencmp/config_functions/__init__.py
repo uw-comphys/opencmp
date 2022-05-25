@@ -15,15 +15,16 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
+# Superclass
+# Expanded ConfigParser
+from .expanded_config_parser import ConfigParser
 
-from .run import run
+# Superclass
+from .base_config_functions import ConfigFunctions
+from .boundary_conditions import BCFunctions
 
-if __name__ == '__main__':
-
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
-
-    config_file_path = sys.argv[1]
-    run(config_file_path)
+# Implemented subclasses
+from .initial_conditions import ICFunctions
+from .model_functions import ModelFunctions
+from .reference_solutions import RefSolFunctions
+from .controller_functions import ControllerFunctions

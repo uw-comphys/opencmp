@@ -15,15 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
-
-from .run import run
-
-if __name__ == '__main__':
-
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
-
-    config_file_path = sys.argv[1]
-    run(config_file_path)
+from . import models
+from . import solvers
+from . import helpers
+from . import config_functions

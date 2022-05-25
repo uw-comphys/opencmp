@@ -15,15 +15,69 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
+from ngsolve import CoefficientFunction, Grad
+from ngsolve.comp import ProxyFunction
 
-from .run import run
 
-if __name__ == '__main__':
+def jump(q: CoefficientFunction) -> CoefficientFunction:
+    """
+    Returns the jump of a field.
 
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
+    Args:
+        q: The field.
 
-    config_file_path = sys.argv[1]
-    run(config_file_path)
+    Returns:
+        The jump of q at every facet of the mesh.
+    """
+
+    return q - q.Other()
+
+
+def grad_jump(q: CoefficientFunction) -> CoefficientFunction:
+    """
+    Returns the jump of the gradient of a field.
+
+    Args:
+        q: The field.
+
+    Returns:
+        The jump of the gradient of q at every facet of the mesh.
+    """
+
+    # Grad must be called differently if q is a trial or testfunction instead of a coefficientfunction/gridfunction.
+    if isinstance(q, ProxyFunction):
+        return Grad(q) - Grad(q.Other())
+    else:
+        return Grad(q) - Grad(q).Other()
+
+
+def avg(q: CoefficientFunction) -> CoefficientFunction:
+    """
+    Returns the average of a scalar field.
+
+    Args:
+        q: The scalar field.
+
+    Returns:
+        The average of q at every facet of the mesh.
+    """
+
+    return 0.5 * (q + q.Other())
+
+
+def grad_avg(q: CoefficientFunction) -> CoefficientFunction:
+    """
+    Returns the average of the gradient of a field.
+
+    Args:
+        q: The field.
+
+    Returns:
+        The average of the gradient of q at every facet of the mesh.
+    """
+
+    # Grad must be called differently if q is a trial or testfunction instead of a coefficientfunction/gridfunction.
+    if isinstance(q, ProxyFunction):
+        return 0.5 * (Grad(q) + Grad(q.Other()))
+    else:
+        return 0.5 * (Grad(q) + Grad(q).Other())

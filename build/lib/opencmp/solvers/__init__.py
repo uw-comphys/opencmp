@@ -15,15 +15,17 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
+# Superclass
+from .base_solver import Solver
 
-from .run import run
+# Implemented solvers
+from .stationary import StationarySolver
+from .transient_multistep import TransientMultiStepSolver
+from .transient_RK import TransientRKSolver
+from .adaptive_transient_solvers import AdaptiveIMEX
+from .adaptive_transient_solvers import AdaptiveThreeStep
+from .adaptive_transient_solvers import AdaptiveTwoStep
 
-if __name__ == '__main__':
+# Helper functions
+from .misc import get_solver_class
 
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
-
-    config_file_path = sys.argv[1]
-    run(config_file_path)

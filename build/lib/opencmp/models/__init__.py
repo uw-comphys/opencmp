@@ -15,15 +15,16 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
+# Superclass
+from .base_model import Model
 
-from .run import run
+# Implemented models
+from .ins                   import INS
+from .poisson               import Poisson
+from .stokes                import Stokes
+from .multi_component_ins   import MultiComponentINS
 
-if __name__ == '__main__':
+models_dict = {"INS" : INS, "Poisson" : Poisson, "Stokes" : Stokes, "MultiComponentINS": MultiComponentINS}
 
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
-
-    config_file_path = sys.argv[1]
-    run(config_file_path)
+# Helper functions
+from .misc import get_model_class

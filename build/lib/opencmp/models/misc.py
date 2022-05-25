@@ -15,15 +15,34 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
+from . import Model, models_dict
 
-from .run import run
+from typing import Type
 
-if __name__ == '__main__':
+"""
+Module containing helper functions related to models.
+"""
 
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
 
-    config_file_path = sys.argv[1]
-    run(config_file_path)
+def get_model_class(model_name: str) -> Type[Model]:
+    """
+    Function to find the correct model to to find, initialize, and return an instance of the desired model class(es).
+
+    Will raise a ValueError if a model could not be found.
+
+    Args:
+        model_name: String representing the model to use, must be the name of the model class.
+
+    Returns:
+        An initialized instance of the desired model.
+    """
+
+    # Find the class by it's name
+    model_class = models_dict[model_name]
+
+    # Check that whatever we found is actually a model
+    if not issubclass(model_class, Model):
+        # Raise an error if it isn't
+        raise AttributeError("Provided class is not a model")
+
+    return model_class

@@ -15,15 +15,10 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import sys
+# Superclass
+from .base_controller import Controller
 
-from .run import run
+# Implemented controllers
+from .pid_controller import PID
 
-if __name__ == '__main__':
-
-    if len(sys.argv) == 1:
-        print("ERROR: Provide configuration file path.")
-        exit(0)
-
-    config_file_path = sys.argv[1]
-    run(config_file_path)
+controllers_dict = {'PID' : PID}
