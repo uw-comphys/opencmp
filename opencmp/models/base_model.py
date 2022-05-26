@@ -48,6 +48,11 @@ class Model(ABC):
         # The name of the model (helper variable). It is the name of the class.
         self.name = self.__class__.__name__.lower()
 
+        # Remove the trailing "dim" from the model name if the Diffuse Interface Method version is used
+        # Lets us continue using "Poisson" or "INS" in config files without adding the DIM
+        if "dim" == self.name[-3:]:
+            self.name = self.name[:-3]
+
         # Set config file.
         self.config = config
 
