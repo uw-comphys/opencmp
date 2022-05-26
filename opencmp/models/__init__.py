@@ -24,6 +24,7 @@ from .ins_dim               import INSDIM
 from .poisson               import Poisson
 from .poisson_dim           import PoissonDIM
 from .stokes                import Stokes
+from .stokes_dim            import StokesDIM
 from .multi_component_ins   import MultiComponentINS
 
 models_dict = {"INS": INS,
@@ -31,7 +32,7 @@ models_dict = {"INS": INS,
                "Poisson": Poisson,
                "Poisson-DIM": PoissonDIM,
                "Stokes": Stokes,
-               # "Stokes-DIM": StokesDIM,
+               "Stokes-DIM": StokesDIM,
                "MultiComponentINS": MultiComponentINS}
 
 # Helper functions
