@@ -20,11 +20,18 @@ from .base_model import Model
 
 # Implemented models
 from .ins                   import INS
+from .ins_dim               import INSDIM
 from .poisson               import Poisson
 from .stokes                import Stokes
 from .multi_component_ins   import MultiComponentINS
 
-models_dict = {"INS" : INS, "Poisson" : Poisson, "Stokes" : Stokes, "MultiComponentINS": MultiComponentINS}
+models_dict = {"INS": INS,
+               "INS-DIM": INSDIM,
+               "Poisson": Poisson,
+               # "Poisson-DIM": PoissonDIM,
+               "Stokes": Stokes,
+               # "Stokes-DIM": StokesDIM,
+               "MultiComponentINS": MultiComponentINS}
 
 # Helper functions
 from .misc import get_model_class
