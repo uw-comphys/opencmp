@@ -15,8 +15,6 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import ngsolve as ngs
-
 from ..helpers.ngsolve_ import get_special_functions
 from . import INS
 from ..config_functions import ConfigParser
@@ -25,6 +23,7 @@ from ngsolve import BilinearForm, FESpace, Grad, InnerProduct, LinearForm, GridF
     Parameter, CoefficientFunction
 from ngsolve.comp import ProxyFunction
 
+import ngsolve
 
 # TODO: These might be a good reference
 # https://github.com/NGSolve/modeltemplates/tree/master/templates
@@ -72,12 +71,12 @@ class MultiComponentINS(INS):
         # Iterate over each component and add a fes for each
         for component in self.extra_components:
             fes_total.append(
-                getattr(ngs, self.element[component])(self.mesh, order=self.interp_ord,
+                getattr(ngsolve, self.element[component])(self.mesh, order=self.interp_ord,
                                                       dirichlet=self.dirichlet_names.get(component, ''),
                                                       dgjumps=self.DG)
             )
 
-        return ngs.FESpace(fes_total, dgjumps=self.DG)
+        return FESpace(fes_total, dgjumps=self.DG)
 
     def _define_bc_types(self) -> List[str]:
         # TODO: For James. Neumann BC or diffusive flux BC? Which makes more sense?
@@ -104,31 +103,35 @@ class MultiComponentINS(INS):
         assert len(self.Ds) == len(self.extra_components)
         assert len(self.f) == len(self.extra_components) + 1  # Extra +1 since velocity also has a source term.
 
-########################################################################################################################
-# BILINEAR AND LINEAR FORM HELPER FUNCTIONS
-########################################################################################################################
-    def _bilinear_time_ODE_no_DIM(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
-                                  w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
-        """
-        Bilinear form when the diffuse interface method is NOT being used. Handles both CG and DG.
+    def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction], dt: Parameter,
+                                            time_step: int) -> List[BilinearForm]:
 
-        This is the portion of the bilinear form which contains variables WITH time derivatives.
+        # Calculate the hydrodynamic contribution to the bilinear terms
+        a = super().construct_bilinear_time_coefficient(U, V, dt, time_step)[0]
 
-        Args:
-            U: A list of trial functions for the model's finite element space, or a list of grid functions containing
-                the previous time step's solution.
-            V: A list of test (weighting) functions for the model's finite element space.
-            w: Velocity linearization term if using Oseen linearization, None otherwise
-            dt: Time step parameter (in the case of a stationary solve is just one).
-            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
-                the time step in t_param and dt_param.
+        w = self._get_wind(U, time_step)
 
-        Returns:
-            The described portion of the bilinear form.
-        """
+        # TODO: Not sure that this has actually been split up correctly.
+        #       Convection term is currently the only term that must always be solved implicitly.
+        # Transport of mixture components.
+        if self.linearize == 'Oseen':
+            for comp in self.extra_components:
+                # Trial and test functions
+                c = U[self.model_components[comp]]
+                r = V[self.model_components[comp]]
 
-        # Calculate the hydrodynamic contribution to the bilinear terms from INS
-        a = super()._bilinear_time_ODE_no_DIM(U, V, w, dt, time_step)
+                # Additional convection term.
+                a += -dt * c * InnerProduct(w, Grad(r)) * dx
+
+        return [a]
+
+    def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
+                                    dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
+
+        # Calculate the hydrodynamic contribution to the bilinear terms
+        a = super().construct_bilinear_time_ODE(U, V, dt, time_step)[0]
+
+        w = self._get_wind(U, time_step)
 
         # Get unit normal
         n = get_special_functions(self.mesh, self.nu)[0]
@@ -174,62 +177,13 @@ class MultiComponentINS(INS):
                     h = self.BC['neumann'][comp][marker][time_step]
                     a += -dt * r.Trace() * (h - c * InnerProduct(w, n)) * self._ds(marker)
 
-        return a
+        return [a]
 
-    def _bilinear_time_coefficient_no_DIM(self, U: List[ProxyFunction], V: List[ProxyFunction],
-                                          w: Optional[GridFunction], dt: Parameter, time_step: int) -> BilinearForm:
-        """
-        Bilinear form when the diffuse interface method is NOT being used. Handles both CG and DG.
+    def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
+                         dt: Parameter, time_step: int) -> List[LinearForm]:
 
-        This is the portion of the bilinear form which contains variables WITHOUT time derivatives.
-
-        Args:
-            U: A list of trial functions for the model's finite element space.
-            V: A list of test (weighting) functions for the model's finite element space.
-            w: Velocity linearization term if using Oseen linearization, None otherwise
-            dt: Time step parameter (in the case of a stationary solve is just one).
-            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
-                the time step in t_param and dt_param.
-
-        Returns:
-            The described portion of the bilinear form.
-        """
-
-        # Calculate the hydrodynamic contribution to the bilinear terms from INS
-        a = super()._bilinear_time_coefficient_no_DIM(U, V, w, dt, time_step)
-
-        # TODO: Not sure that this has actually been split up correctly.
-        #       Convection term is currently the only term that must always be solved implicitly.
-        # Transport of mixture components.
-        if self.linearize == 'Oseen':
-            for comp in self.extra_components:
-                # Trial and test functions
-                c = U[self.model_components[comp]]
-                r = V[self.model_components[comp]]
-
-                # Additional convection term.
-                a += -dt * c * InnerProduct(w, Grad(r)) * dx
-
-        return a
-
-    def _linear_no_DIM(self, V: List[ProxyFunction], w: Optional[GridFunction], dt: Parameter, time_step: int)\
-            -> LinearForm:
-        """
-        Linear form when the diffuse interface method is NOT being used. Handles both CG and DG.
-
-        Args:
-            V: A list of test (weighting) functions for the model's finite element space.
-            w: Velocity linearization term if using Oseen linearization, None otherwise.
-            dt: Time step parameter (in the case of a stationary solve is just one).
-            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
-                the time step in t_param and dt_param.
-
-        Returns:
-            The linear form.
-        """
-
-        # Calculate the hydrodynamic contribution to the linear terms from INS
-        L = super()._linear_no_DIM(V, w, dt, time_step)
+        # Calculate the hydrodynamic contribution to the linear terms
+        L = super().construct_linear(V, gfu_0, dt, time_step)[0]
 
         # Transport of mixture components.
         for comp in self.extra_components:
@@ -264,28 +218,13 @@ class MultiComponentINS(INS):
                 else:
                     L += dt * val * r * dx
 
-        return L
+        return [L]
 
-    def _imex_explicit_no_DIM(self, V: List[ProxyFunction], gfu_0: List[GridFunction], dt: Parameter, time_step: int) \
-            -> LinearForm:
-        """
-        Contains any linear form terms resulting from the linearization of terms due to the IMEX method.
+    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
+                                dt: Parameter, time_step: int) -> List[LinearForm]:
 
-        For when the diffuse interface method is NOT being used. Handles both CG and DG.
-
-        Args:
-            V: A list of test (weighting) functions for the model's finite element space.
-            gfu_0: The previous time step's solution.
-            dt: Time step parameter (in the case of a stationary solve is just one).
-            time_step: What time step values to use for ex: boundary conditions. The value corresponds to the index of
-                the time step in t_param and dt_param.
-
-        Returns:
-            The described portion of the linear form.
-        """
-
-        # Calculate the hydrodynamic contribution to the linear terms from INS
-        L = super()._imex_explicit_no_DIM(V, gfu_0, dt, time_step)
+        # Calculate the hydrodynamic contribution to the linear terms
+        L = super().construct_imex_explicit(V, gfu_0, dt, time_step)[0]
 
         # Velocity linearization term
         gfu_u = gfu_0[self.model_components['u']]
@@ -311,4 +250,4 @@ class MultiComponentINS(INS):
             if self.BC.get('total_flux', {}).get(comp, None) is not None:
                 raise ValueError('Cannot specify total flux for IMEX schemes since convection term is fully explicit.')
 
-        return L
+        return [L]
