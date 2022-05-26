@@ -16,14 +16,13 @@
 ########################################################################################################################
 from typing import List, Optional, Union
 
+from ..helpers.ngsolve_ import get_special_functions
+from ..helpers.dg import avg, grad_avg, jump
+from . import INS
+
 from ngsolve import BilinearForm, Grad, GridFunction, IfPos, InnerProduct, LinearForm, Norm, OuterProduct, Parameter, \
     div, dx
 from ngsolve.comp import ProxyFunction
-from opencmp.helpers.dg import avg, grad_avg, jump
-
-from opencmp.helpers.ngsolve_ import get_special_functions
-
-from .ins import INS
 
 
 class INSDIM(INS):
