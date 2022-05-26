@@ -22,13 +22,14 @@ from .base_model import Model
 from .ins                   import INS
 from .ins_dim               import INSDIM
 from .poisson               import Poisson
+from .poisson_dim           import PoissonDIM
 from .stokes                import Stokes
 from .multi_component_ins   import MultiComponentINS
 
 models_dict = {"INS": INS,
                "INS-DIM": INSDIM,
                "Poisson": Poisson,
-               # "Poisson-DIM": PoissonDIM,
+               "Poisson-DIM": PoissonDIM,
                "Stokes": Stokes,
                # "Stokes-DIM": StokesDIM,
                "MultiComponentINS": MultiComponentINS}
