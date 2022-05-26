@@ -24,7 +24,7 @@ Module containing helper functions related to models.
 """
 
 
-def get_model_class(model_name: str) -> Type[Model]:
+def get_model_class(model_name: str, dim_used: bool) -> Type[Model]:
     """
     Function to find the correct model to to find, initialize, and return an instance of the desired model class(es).
 
@@ -32,17 +32,20 @@ def get_model_class(model_name: str) -> Type[Model]:
 
     Args:
         model_name: String representing the model to use, must be the name of the model class.
+        dim_used:   bool indicating if the Diffuse Interface Method implemetation of a class should be used.
 
     Returns:
         An initialized instance of the desired model.
     """
 
-    # Find the class by it's name
-    model_class = models_dict[model_name]
+    if dim_used:
+        model_name += "-DIM"
 
-    # Check that whatever we found is actually a model
-    if not issubclass(model_class, Model):
-        # Raise an error if it isn't
-        raise AttributeError("Provided class is not a model")
+    # Find the class by its name
+    try:
+        model_class = models_dict[model_name]
+    except KeyError:
+        raise KeyError("Tried to run with class {" + model_name + "}. \n"
+                       "The available models are " + str(list(models_dict.keys())))
 
     return model_class
