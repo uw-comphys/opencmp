@@ -25,7 +25,9 @@ Installing OpenCMP
     
     * Windows - We recommend using `WSL <#supplementary-information>`_ (Windows Subsystem for Linux).
 
-3) Install the :code:`opencmp` module: from the top-level directory, execute :code:`pip3 install .`
+3) Install the :code:`opencmp` module from the top-level directory: :code:`pip3 install .`
+
+    * Install with optional dependencies `here <#dependencies>`_.
 
 4) Optionally, run all the unit tests using :code:`pytesting` from the top-level directory. Note,
 
@@ -35,20 +37,16 @@ Installing OpenCMP
 
 5) Go through the `tutorials <https://opencmp.io/tutorials/index.html>`_ and other examples found in the "examples/" folder.
 
-
 Custom Commands for OpenCMP
 ===========================
 
-**Installing Optional Dependencies**
+**Using OpenCMP**
 
-* :code:`get_optional_dependencies` automatically installs all the optional dependencies.
+* :code:`opencmp` can be run using :code:`opencmp config` instead of :code:`python3 -m opencmp config`, where :code:`config` is the name of the configuration file.
 
-* :code:`get_pytest` automatically installs the :code:`pytest` python library. 
+**Running OpenCMP Unit Tests**
 
-**Running OpenCMP Test Files**
-
-* :code:`pytesting` from the top-level directory runs all the pytests. 
-
+* :code:`pytesting` from the top-level directory runs all the pytests. All optional dependencies must be installed.
 
 Dependencies
 ============
@@ -59,26 +57,41 @@ Dependencies
 
 **Optional**
 
-* edt (:code:`pip3 install edt`)
+* :code:`edt` - Needed for the Diffuse Interface Method.
 
-    * Needed for the Diffuse Interface Method.
+* :code:`tabulate` - Needed to output results for mesh refinement and polynomial order convergence tests.
 
-* tabulate (:code:`pip3 install tabulate`)
+* :code:`pytest` - Needed for the unit tests.
 
-    * Needed to output results for mesh refinement and polynomial order convergence tests.
+* :code:`pytest-xdist` - requires :code:`pytest`. Can distribute tests across multiple CPUs to speed up test execution.
+.. list-table::
+    :widths: 25 25
+    :header-rows: 1
 
-* pytest (:code:`pip3 install pytest`)
+    * - Command (from top-level directory)
+      - Dependencies Installed
+    * - :code:`pip3 install .[all]`
+      - :code:`edt` :code:`tabulate` :code:`pytest` :code:`pytest-xdist`
+    * - :code:`pip3 install .[edt]`
+      - :code:`edt`
+    * - :code:`pip3 install .[tab]`
+      - :code:`tabulate`
+    * - :code:`pip3 install .[test]`
+      - :code:`pytest`
+    * - :code:`pip3 install .[test_ext]`
+      - :code:`pytest` :code:`pytest-xdist`
 
-    * Needed for the unit tests.
+* To install :code:`opencmp` with more than one dependency argument: :code:`pip3 install .[x,y]`
+
 
 Supplementary Information
 =========================
 
 **WSL (Windows Subsystem for Linux)**
 
-* WSL (Windows Subsystem for Linux) is the recommended platform for OpenCMP for native Windows users.
+* WSL is the recommended platform for native Windows users to use OpenCMP.
 
-* To install WSL, go to the `Microsoft Store <ms-windows-store://home>`_. Install Ubuntu 20.04 or 22.04.
+* To install WSL, go to the `Microsoft Store <ms-windows-store://home>`_. Install Ubuntu 20.04 LTS.
 
 * Python 3.7+ should come pre-installed. To check this, execute :code:`python3 --version`.
 
@@ -92,9 +105,7 @@ Supplementary Information
 
     * Press :code:`CTRL+S` then :code:`CTRL+X`. Exit WSL and restart the application. 
 
-* Ngsolve, a required dependency for OpenCMP, has a graphics issue for WSL. To correct this, execute :code:`sudo apt install ubuntu-desktop`
-
-    * This installs a windows manager for WSL that will allow ngsolve to function correctly.
+* :code:`ngsolve`, a required dependency for OpenCMP, has a graphics issue for WSL. To correct this, install a windows manager via :code:`sudo apt install ubuntu-desktop`
 
 **Installing an X Server on WSL**
 
@@ -108,14 +119,11 @@ Supplementary Information
     
     * Enable Public Access on your X11 server for Windows. Follow the tutorial `here <https://skeptric.com/wsl2-xserver/>`_. Be sure to only follow the section "Allow WSL Access via Windows Firewall".
 
-    * Download `VcXsrv https://sourceforge.net/projects/vcxsrv/>`_. Then:
+    * Download `VcXsrv <https://sourceforge.net/projects/vcxsrv/>`_. Navigate to :code:`C:\Program Files\VcXsrv` and open :code:`xlaunch.exe`. 
     
-        * Navigate to :code:`C:\Program Files\VcXsrv` and open :code:`xlaunch.exe`. Click Next until "Extra Settings" page.
-
-        * Be sure to check the box for "Disable Access Control". Save the configuration file somewhere useful.
-
-        * When you want to see visuals in WSL (i.e., :code:`matplotlib` or other outputs/plots), be sure to double click the config.xlaunch you just created before executing the code!
-
+        * Click Next until "Extra Settings" page. Check the box for "Disable Access Control". 
+        
+        * Save the configuration file somewhere useful. Ensure that you run the :code:`config.xlaunch` file before executing code with any graphical output.
 
 
 
