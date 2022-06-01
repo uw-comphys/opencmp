@@ -1,7 +1,0 @@
-
-[:python_version > "3.7.0"]
-configparser
-ngsolve
-numpy
-pyparsing
-scipy
