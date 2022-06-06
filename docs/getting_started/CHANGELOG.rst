@@ -1,12 +1,17 @@
 OpenCMP Changelog
 =================
 
+June 6, 2022 (v1.0.1)
+
+* Improved dependency checking/handling in setup.cfg (setuptools).
+* Refactored diffuse interface support in models to improve readability and extensability.
+
 May 17, 2022
 
 * Added detection of underlying NGSolve linear solver configuration and changed default direct linear solver to PARDISO.
 * Slight modification to diffuse interface code to account for namespace changes in SciPy.
 
-February 8, 2022
+February 8, 2022 (v1.0.0)
 
 * Reordered examples so that the previous Example 1 is now part of the getting-started documented, shifted all remaining examples down by 1.
 * Corrected typo in Example 6, now Example 5.

@@ -5,3 +5,9 @@ To build the documentation install,
 then build using the Makefile,
 
 > make html
+
+If Sphinx is displaying old docstrings or failing to find renamed/removed modules,
+
+> sphinx-apidoc -o source/ ../
+
+then recompile.
