@@ -18,26 +18,16 @@
 import ngsolve as ngs
 from ..helpers.ngsolve_ import get_special_functions
 from ..helpers.dg import jump, grad_avg
-from ..models import INS
+from .stokes import Stokes
 from ngsolve.comp import ProxyFunction
 from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
 from typing import List, Union, Optional
 
 
-class Stokes(INS):
+class StokesDIM(Stokes):
     """
-    A single phase Stokes model.
+    A single phase Stokes model with the Diffuse Interface Method.
     """
-
-    def _define_bc_types(self) -> List[str]:
-        return ['dirichlet', 'stress', 'pinned']
-
-    def _post_init(self) -> None:
-        # TODO: see if this override is still needed when transient tests are added
-        # Added to explicitly override
-
-        # NOTE: Does not get used. Created in order to keep function signatures the same
-        self.W = self._construct_linearization_terms()
 
     def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
                                     dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
@@ -51,33 +41,50 @@ class Stokes(INS):
 
         a = dt * (
                 self.kv[time_step] * ngs.InnerProduct(ngs.Grad(u), ngs.Grad(v))  # Stress, Newtonian
-        ) * ngs.dx
+        ) * self.DIM_solver.phi_gfu * ngs.dx
 
-        # Penalty for dirichlet BCs
+        # Force u to zero where phi is zero.
+        # If DIM rigid body motion is being used force u to the velocity of the rigid body instead.
+        a += dt * alpha * u * v * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
+
+        # Penalty terms for conformal Dirichlet BCs
         if self.DG and self.dirichlet_names.get('u', None) is not None:
             a += -dt * self.kv[time_step] * (
-                    ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))    # ∇u^ = ∇u
+                    ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, n))  # ∇u^ = ∇u
                     + ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, n))  # 1/2 of penalty for u=g on 𝚪_D
-                    - alpha * u * v                                          # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
+                    - alpha * u * v  # 1/2 of penalty term for u=g on 𝚪_D from ∇u^
             ) * self._ds(self.dirichlet_names['u'])
+
+        # Penalty term for DIM Dirichlet BCs. This is the Nitsche method.
+        for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
+            a += dt * self.kv[time_step] * (
+                    ngs.InnerProduct(ngs.Grad(u), ngs.OuterProduct(v, self.DIM_solver.grad_phi_gfu))
+                    + ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(u, self.DIM_solver.grad_phi_gfu))
+                    + alpha * u * v * self.DIM_solver.mag_grad_phi_gfu
+            ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
+
+        # TODO: Add non-Dirichlet DIM BCs.
 
         return [a]
 
     def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction],
                                             dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
+        # Define the special DG functions.
+        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
-        # Separate out the trial and test functions for velocity and pressure.
+        # Separate out the trial and test functions for velocity and pressure
         u, p = U[0], U[1]
         v, q = V[0], V[1]
 
         a = dt * (
                 - ngs.div(u) * q  # Conservation of mass
                 - ngs.div(v) * p  # Pressure
-                - 1e-10 * p * q   # Stabilization term
-        ) * ngs.dx
+                - 1e-10 * p * q  # Stabilization term.
+        ) * self.DIM_solver.phi_gfu * ngs.dx
 
-        # Define the special DG functions.
-        n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
+        # Force grad(p) to zero where phi is zero. If rigid body motion is being used ignore this.
+        if not self.DIM_solver.rigid_body_motion:
+            a += -dt * p * ngs.div(v) * (1.0 - self.DIM_solver.phi_gfu) * ngs.dx
 
         # Bulk of Bilinear form
         if self.DG:
@@ -89,10 +96,10 @@ class Stokes(INS):
 
             # Penalty for discontinuities
             a += -dt * self.kv[time_step] * (
-                    ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))   # Stress
+                    ngs.InnerProduct(avg_grad_u, ngs.OuterProduct(jump_v, n))  # Stress
                     + ngs.InnerProduct(avg_grad_v, ngs.OuterProduct(jump_u, n))  # U
-                    - alpha * ngs.InnerProduct(jump_u, jump_v)                   # Term for u+=u- on 𝚪_I from ∇u^
-            ) * ngs.dx(skeleton=True)
+                    - alpha * ngs.InnerProduct(jump_u, jump_v)  # Term for u+=u- on 𝚪_I from ∇u^
+            ) * self.DIM_solver.phi_gfu * ngs.dx(skeleton=True)
 
         return [a]
 
@@ -103,19 +110,35 @@ class Stokes(INS):
         v = V[0]
 
         # Define the base linear form
-        L = dt * v * self.f['u'][time_step] * ngs.dx
+        L = dt * v * self.f['u'][time_step] * self.DIM_solver.phi_gfu * ngs.dx
 
         # Define the special DG functions.
         n, _, alpha, I_mat = get_special_functions(self.mesh, self.nu)
 
+        # Force u to zero where phi is zero. If DIM rigid body motion is being used force u to the velocity of the
+        # rigid body instead.
+        if self.DIM_solver.rigid_body_motion:
+            for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
+                g = self.DIM_BC['dirichlet']['u'][marker][time_step]
+                L += dt * alpha * g * v * (1.0 - self.DIM_solver.phi_gfu) * self.DIM_solver.mask_gfu_dict[
+                    marker] * ngs.dx
+
         if self.DG:
-            # Dirichlet BCs for u
+            # Conformal Dirichlet BCs for u
             for marker in self.BC.get('dirichlet', {}).get('u', {}):
                 g = self.BC['dirichlet']['u'][marker][time_step]
                 L += dt * self.kv[time_step] * (
                         alpha * g * v  # 1/2 of penalty for u=g from ∇u^ on 𝚪_D
                         - ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, n))  # 1/2 of penalty for u=g
                 ) * self._ds(marker)
+
+        # Penalty term for DIM Dirichlet BCs. This is the Nitsche method.
+        for marker in self.DIM_BC.get('dirichlet', {}).get('u', {}):
+            g = self.DIM_BC['dirichlet']['u'][marker][time_step]
+            L += dt * self.kv[time_step] * (
+                    alpha * g * v * self.DIM_solver.mag_grad_phi_gfu
+                    + ngs.InnerProduct(ngs.Grad(v), ngs.OuterProduct(g, self.DIM_solver.grad_phi_gfu))
+            ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
 
         # Stress BCs
         for marker in self.BC.get('stress', {}).get('stress', {}):
@@ -125,13 +148,7 @@ class Stokes(INS):
             else:
                 L += dt * v.Trace() * h * self._ds(marker)
 
+        # TODO: Add non-Dirichlet DIM BCs.
+
         return [L]
 
-    def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]] = None, dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[LinearForm]:
-        # The Stokes equations are linear and have no need for IMEX schemes.
-        pass
-
-    def solve_single_step(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
-                         precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
-
-        self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
