@@ -48,6 +48,11 @@ class Model(ABC):
         # The name of the model (helper variable). It is the name of the class.
         self.name = self.__class__.__name__.lower()
 
+        # Remove the trailing "dim" from the model name if the Diffuse Interface Method version is used
+        # Lets us continue using "Poisson" or "INS" in config files without adding the DIM
+        if "dim" == self.name[-3:]:
+            self.name = self.name[:-3]
+
         # Set config file.
         self.config = config
 
@@ -842,7 +847,7 @@ class Model(ABC):
     def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
                                 dt: Parameter, time_step: int) -> List[LinearForm]:
         """
-        Function to construct the linear form excluding any terms that arise solely from an IMEX scheme.
+        Function to construct the linear form containing any terms that arise solely from an IMEX scheme.
 
         This function should only include the terms specific to the IMEX scheme. E. g. for INS only the explicit form of
         the convection term would be included in this function. The other linear form terms like the body force and
@@ -866,6 +871,8 @@ class Model(ABC):
                          dt: Parameter, time_step: int) -> List[LinearForm]:
         """
         Function to construct the linear form.
+
+        DO NOT include any terms that arise from and an IMEX scheme, see construct_imex_explicit for those terms.
 
         Args:
             V: A list of test (weighting) functions for the model's finite element space.
