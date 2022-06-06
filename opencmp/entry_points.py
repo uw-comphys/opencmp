@@ -1,15 +1,21 @@
-# Entry points (console commands) for OpenCMP
+########################################################################################################################
+# Copyright 2021 the authors (see AUTHORS file for full list).                                                         #
+#                                                                                                                      #
+# This file is part of OpenCMP.                                                                                        #
+#                                                                                                                      #
+# OpenCMP is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public  #
+# License as published by the Free Software Foundation, either version 2.1 of the License, or (at your option) any     #
+# later version.                                                                                                       #
+#                                                                                                                      #
+# OpenCMP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied        #
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more  #
+# details.                                                                                                             #
+#                                                                                                                      #
+# You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
+# <https://www.gnu.org/licenses/>.                                                                                     #
+########################################################################################################################
 
-import os, sys, platform, time
-from typing import Dict, Optional, cast
-from .models import get_model_class
-from .solvers import get_solver_class
-from .helpers.error_analysis import h_convergence, p_convergence
-from .helpers.error import calc_error
-from .config_functions import ConfigParser
-import pyngcore as ngcore
-from ngsolve import ngsglobals
-from .helpers.post_processing import sol_to_vtu, PhaseFieldModelMimic
+import os, sys, platform
 from .run import run
 
 def run_opencmp():
@@ -18,12 +24,10 @@ def run_opencmp():
 
     Args (from command line):
         config_file_path: Filename of the config file to load. Required parameter.
-        config_parser: Optionally provide the ConfigParser if running tests. Optional parameter.
+
     """
     
     # Arguments for command line use
-
-    config_parser = None
 
     if len(sys.argv) == 1: # if user did not provide any configuration path (which is required)
         print("ERROR: Provide configuration file path.")
@@ -31,33 +35,19 @@ def run_opencmp():
 
     elif len(sys.argv) == 2: # if user did provide a configuration path
         config_file_path = sys.argv[1]
-        config_parser = ConfigParser(config_file_path)
 
-    elif len(sys.argv) == 3: # if the user provided both config path and optional config_parser argument
-        config_file_path = sys.argv[1]
-        config_parser = sys.argv[2]
-        config_parser = cast(ConfigParser, config_parser)    
-    
-    else: # if the user provides more than 2 arguments. Print error messages and quit.
-        print('ERROR: More than two arguments were provided.')
-        print('\tOpenCMP supports up to two (2) arguments. The first argument is a required configuration file path.')
-        print('\tThe second argument is the optional ConfigParser if running tests.')
-        print('\tPlease re-try using only 1 or 2 arguments as described above. Thank you.')
+    else: # if the user provides more than 1 argument (in addition to opencmp). Print error messages and quit.
+        print('ERROR: More than one argument was provided.')
+        print('** OpenCMP supports up to one (1) argument. The argument is a required configuration file path.')
+        print('Please re-try with "opencmp config" where "config" is the name of the configuration file in the current directory. **')
         exit(0)
 
     # call the function in run.py
-    run(config_file_path, config_parser)
+    run(config_file_path)
 
     return
 
-# Entry point 1: install all optional dependencies for OpenCMP: edit, tabulate, pytest
-def install_optional_dependencies():
-    
-    print("Now installing OpenCMP optional dependencies: edt, tabulate, pytest.")
-    os.system("pip3 install edt tabulate pytest")
 
-
-# Entry point 2: short form command to run the pytests... instead of doing python -m pytest pytests/
 def pytest_tests():
     
     print("Now will run the pytests...")
@@ -69,8 +59,3 @@ def pytest_tests():
     
     else: # macOS or linux (and WSL)
         os.system("python3 -m pytest pytests//")
-
-# Entry point 3: install pytest...
-def install_pytest():
-
-    os.system("pip3 install pytest")

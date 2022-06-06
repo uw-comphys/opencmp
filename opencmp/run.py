@@ -56,8 +56,9 @@ def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> 
 
     # Run the model.
     with ngcore.TaskManager():
+        dim_used = config_parser.get_item(['DIM', 'diffuse_interface_method'], bool, quiet=True)
 
-        model_class = get_model_class(model_name)
+        model_class = get_model_class(model_name, dim_used)
         solver_class = get_solver_class(config_parser)
         solver = solver_class(model_class, config_parser)
         sol = solver.solve()
