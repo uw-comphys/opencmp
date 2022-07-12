@@ -5,8 +5,6 @@ diffusion_coefficients = a -> 1
                          c -> 1
 
 [FUNCTIONS]
-source = u -> [0.0, 0.0]
-         # k = 5
-         a -> -5*a + 0.9*5*b
+source = a -> -5*a + 0.9*5*b
          b ->  5*a - 5*b
          c ->  5*0.1*b

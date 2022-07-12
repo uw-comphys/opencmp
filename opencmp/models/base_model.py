@@ -64,6 +64,7 @@ class Model(ABC):
 
         # Dictionary to map variable name to index inside fes/gridfunctions, and for labeling variables in vtk output.
         self.model_components = self._define_model_components()
+        self.model_components_ic = self._define_model_components()
 
         # Dictionary to specify if a particular component should be used for error calculations
         self.model_local_error_components = self._define_model_local_error_components()
@@ -85,6 +86,9 @@ class Model(ABC):
         # Ensure that every variable is specified for the time derivative terms for each weak form
         for form in self.time_derivative_components:
             assert len(self.model_components) == len(form)
+
+        # For MCINS, whether or not the velocity is fixed in time at the initial condition, and thus does not have to be solved
+        self.fixed_velocity = self.config.get_item(['OTHER', 'velocity_fixed'], bool)
 
         # Run any model-specific work now that some things have been initialized.
         self._pre_init()
@@ -113,7 +117,7 @@ class Model(ABC):
         self.interp_ord = self.config.get_item(['FINITE ELEMENT SPACE', 'interpolant_order'], int)
 
         # Ensure that each component has an associated element
-        assert len(self.model_components) == len(self.element)
+        assert len(self.model_components) == len(self.element) - (2 if self.fixed_velocity else 0)
 
         # Check if DG should be used.
         self.DG = self.config.get_item(['DG', 'DG'], bool)
@@ -127,8 +131,6 @@ class Model(ABC):
 
         self.no_constrained_dofs = self.config.get_item(['FINITE ELEMENT SPACE', 'no_constrained_dofs'],
                                                         bool, quiet=True)
-
-        self.fixed_velocity = self.config.get_item(['OTHER', 'velocity_fixed'], bool)
 
         if 'HDiv' in self.element.values() or 'RT' in self.element.values():
             # HDiv elements can only strongly apply u.n Dirichlet boundary conditions. In order to apply other
@@ -192,6 +194,7 @@ class Model(ABC):
         # Create the finite element space.
         # This needs to be done before the initial conditions are loaded.
         self.fes = self._construct_fes()
+        self.fes_ic = self._construct_ic_fes()
 
         self._test, self._trial = self._create_test_and_trial_functions()
 
@@ -204,8 +207,8 @@ class Model(ABC):
                                                  self.t_param, self.update_variables)
 
         # Load initial condition.
-        self.IC = self.construct_gfu()
-        self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components)
+        self.IC = self.construct_gfu_ic()
+        self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components_ic)
 
         # 2/2: Create BCs
         # Now that we have the FES, we can load in the bc gridfunctions
@@ -398,6 +401,17 @@ class Model(ABC):
             A GridFunction initialized on the finite element space of the model.
         """
         gfu = ngs.GridFunction(self.fes)
+
+        return gfu
+
+    def construct_gfu_ic(self) -> GridFunction:
+        """
+        Function to construct a solution GridFunction.
+
+        Returns:
+            A GridFunction initialized on the finite element space of the model.
+        """
+        gfu = ngs.GridFunction(self.fes_ic)
 
         return gfu
 
@@ -678,7 +692,7 @@ class Model(ABC):
         if ic_update:
             # Update the initial conditions.
             self.ic_functions.update_initial_conditions(self.t_param, self.update_variables, self.mesh)
-            self.IC = self.construct_gfu()
+            self.IC = self.construct_gfu_ic()
             self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components)
 
         if ref_sol_update:
@@ -715,6 +729,19 @@ class Model(ABC):
         Returns:
             The finite element space.
         """
+
+    def _construct_ic_fes(self) -> FESpace:
+        """
+        Function to construct the finite element space for the model's initial condition.
+        In more circumstances this is identical to self._construct_fes.
+        The exception is the MCINS model when the velocity and pressure do not wish to be solved in time.
+        In that case, this method will return a mixed function space which contains a function space for the velocity in pressure
+        while the result from self._construct_fes will NOT have a function space for velocity and pressure.
+
+        Returns:
+            The finite element space onto which to load the initial condition
+        """
+        return self._construct_fes()
 
     @abstractmethod
     def _define_bc_types(self) -> List[str]:

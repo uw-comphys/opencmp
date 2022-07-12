@@ -19,7 +19,7 @@ from ..helpers.ngsolve_ import get_special_functions
 from . import INS
 from ..config_functions import ConfigParser
 from typing import Dict, List, Optional, Union
-from ngsolve import BilinearForm, FESpace, Grad, InnerProduct, LinearForm, GridFunction, dx, \
+from ngsolve import BilinearForm, FESpace, Grad, InnerProduct, LinearForm, GridFunction, Preconditioner, dx, \
     Parameter, CoefficientFunction
 from ngsolve.comp import ProxyFunction
 
@@ -54,17 +54,38 @@ class MultiComponentINS(INS):
         assert len(self.extra_components) == len(new_components_in_error_calc)
         assert len(self.extra_components) == len(new_components_in_time_deriv)
 
+        # If the velocity is fixed, remove info associated with it from the model
+        if (self.fixed_velocity):
+            self.model_components = dict()
+            self.model_local_error_components = dict()
+            self.time_derivative_components = [dict()]
+
         # Number of default variables
         num_existing = len(self.model_components)
+        num_existing_ic = len(self.model_components_ic)
 
         for i in range(len(self.extra_components)):
             component = self.extra_components[i]
 
             self.model_components[component]                = i + num_existing
+            self.model_components_ic[component]             = i + num_existing_ic
             self.model_local_error_components[component]    = new_components_in_error_calc[component]
             self.time_derivative_components[0][component]   = new_components_in_time_deriv[component]
 
     def _construct_fes(self) -> FESpace:
+        fes_total = []
+
+        # Iterate over each component and add a fes for each
+        for component in self.extra_components:
+            fes_total.append(
+                getattr(ngsolve, self.element[component])(self.mesh, order=self.interp_ord,
+                                                          dirichlet=self.dirichlet_names.get(component, ''),
+                                                          dgjumps=self.DG)
+            )
+
+        return FESpace(fes_total, dgjumps=self.DG)
+
+    def _construct_ic_fes(self) -> FESpace:
         # Create the FE spaces for velocity and pressure
         fes_total = self._contruct_fes_helper()
 
@@ -72,8 +93,8 @@ class MultiComponentINS(INS):
         for component in self.extra_components:
             fes_total.append(
                 getattr(ngsolve, self.element[component])(self.mesh, order=self.interp_ord,
-                                                      dirichlet=self.dirichlet_names.get(component, ''),
-                                                      dgjumps=self.DG)
+                                                          dirichlet=self.dirichlet_names.get(component, ''),
+                                                          dgjumps=self.DG)
             )
 
         return FESpace(fes_total, dgjumps=self.DG)
@@ -87,7 +108,10 @@ class MultiComponentINS(INS):
         if self.DIM or self.DG:
             raise NotImplementedError('DIM and DG are not yet implemented.')
 
-        super()._post_init()
+        if self.fixed_velocity:
+            self.W = self._construct_linearization_terms()
+        else:
+            super()._post_init()
 
     def _pre_init(self) -> None:
         # Read in and add the multiple components
@@ -101,26 +125,29 @@ class MultiComponentINS(INS):
 
         # Ensure that a value was loaded for each extra component
         assert len(self.Ds) == len(self.extra_components)
-        assert len(self.f) == len(self.extra_components) + 1  # Extra +1 since velocity also has a source term.
+        assert len(self.f) == len(self.extra_components) + 0 if self.fixed_velocity else 1  # Extra +1 since velocity also has a source term, +0 if velocity is fixed since it's equation is not used
 
     def _get_wind(self, U, time_step):
         if self.fixed_velocity:
-            return self.W[0]
+            return self.W[self.model_components_ic['u']]
         else:
             return super()._get_wind(U, time_step)
 
     def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction], dt: Parameter,
                                             time_step: int) -> List[BilinearForm]:
 
-        # Calculate the hydrodynamic contribution to the bilinear terms
-        a = super().construct_bilinear_time_coefficient(U, V, dt, time_step)[0]
-
-        w = self._get_wind(U, time_step)
+        if self.fixed_velocity:
+            a = CoefficientFunction(0) * dx
+        else:
+            # Calculate the hydrodynamic contribution to the bilinear terms
+            a = super().construct_bilinear_time_coefficient(U, V, dt, time_step)[0]
 
         # TODO: Not sure that this has actually been split up correctly.
         #       Convection term is currently the only term that must always be solved implicitly.
         # Transport of mixture components.
         if self.linearize == 'Oseen':
+            w = self._get_wind(U, time_step)
+
             for comp in self.extra_components:
                 # Trial and test functions
                 c = U[self.model_components[comp]]
@@ -134,10 +161,14 @@ class MultiComponentINS(INS):
     def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
                                     dt: Parameter = Parameter(1.0), time_step: int = 0) -> List[BilinearForm]:
 
-        # Calculate the hydrodynamic contribution to the bilinear terms
-        a = super().construct_bilinear_time_ODE(U, V, dt, time_step)[0]
+        if self.fixed_velocity:
+            a = CoefficientFunction(0) * dx
+        else:
+            # Calculate the hydrodynamic contribution to the bilinear terms
+            a = super().construct_bilinear_time_ODE(U, V, dt, time_step)[0]
 
-        w = self._get_wind(U, time_step)
+        if self.linearize == 'Oseen':
+            w = self._get_wind(U, time_step)
 
         # Get unit normal
         n = get_special_functions(self.mesh, self.nu)[0]
@@ -188,8 +219,11 @@ class MultiComponentINS(INS):
     def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
                          dt: Parameter, time_step: int) -> List[LinearForm]:
 
-        # Calculate the hydrodynamic contribution to the linear terms
-        L = super().construct_linear(V, gfu_0, dt, time_step)[0]
+        if self.fixed_velocity:
+            L = CoefficientFunction(0) * dx
+        else:
+            # Calculate the hydrodynamic contribution to the linear terms
+            L = super().construct_linear(V, gfu_0, dt, time_step)[0]
 
         # Transport of mixture components.
         for comp in self.extra_components:
@@ -228,12 +262,15 @@ class MultiComponentINS(INS):
 
     def construct_imex_explicit(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
                                 dt: Parameter, time_step: int) -> List[LinearForm]:
-
-        # Calculate the hydrodynamic contribution to the linear terms
-        L = super().construct_imex_explicit(V, gfu_0, dt, time_step)[0]
-
-        # Velocity linearization term
-        gfu_u = gfu_0[self.model_components['u']]
+        if self.fixed_velocity:
+            L = CoefficientFunction(0) * dx
+            # Velocity linearization term
+            gfu_u = self.W[self.model_components_ic['u']]
+        else:
+            # Calculate the hydrodynamic contribution to the linear terms
+            L = super().construct_imex_explicit(V, gfu_0, dt, time_step)[0]
+            # Velocity linearization term
+            gfu_u = gfu_0[self.model_components['u']]
 
         for comp in self.extra_components:
             # Previous concentration result
@@ -257,3 +294,10 @@ class MultiComponentINS(INS):
                 raise ValueError('Cannot specify total flux for IMEX schemes since convection term is fully explicit.')
 
         return [L]
+
+    def solve_single_step(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
+                          precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
+        if self.fixed_velocity:
+            self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
+        else:
+            super().solve_single_step(a_lst, L_lst, precond_lst, gfu, time_step)

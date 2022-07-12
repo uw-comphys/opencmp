@@ -143,7 +143,10 @@ class TransientMultiStepSolver(Solver):
 
         for i in range(self.scheme_order):
             gfu_0 = self.model.construct_gfu()
-            gfu_0.vec.data = self.model.IC.vec
+            for component_name in self.model.model_components:
+                i_gfu = self.model.model_components[component_name]
+                i_ic = self.model.model_components_ic[component_name]
+                gfu_0.components[i_gfu].vec.data = self.model.IC.components[i_ic].vec
             self.gfu_0_list.append(gfu_0)
 
         # Update the values of the model variables based on the initial condition and re-parse the model functions as
