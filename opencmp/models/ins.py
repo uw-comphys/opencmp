@@ -117,7 +117,7 @@ class INS(Model):
         return [fes_u, fes_p]
 
     def _construct_linearization_terms(self) -> Optional[List[GridFunction]]:
-        tmp = GridFunction(self.fes.components[0])
+        tmp = GridFunction(self._contruct_fes_helper()[0])  # Read a new FES
         tmp.vec.data = self.IC.components[0].vec
 
         return [tmp]

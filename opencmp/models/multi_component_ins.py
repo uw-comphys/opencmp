@@ -103,6 +103,12 @@ class MultiComponentINS(INS):
         assert len(self.Ds) == len(self.extra_components)
         assert len(self.f) == len(self.extra_components) + 1  # Extra +1 since velocity also has a source term.
 
+    def _get_wind(self, U, time_step):
+        if self.fixed_velocity:
+            return self.W[0]
+        else:
+            return super()._get_wind(U, time_step)
+
     def construct_bilinear_time_coefficient(self, U: List[ProxyFunction], V: List[ProxyFunction], dt: Parameter,
                                             time_step: int) -> List[BilinearForm]:
 

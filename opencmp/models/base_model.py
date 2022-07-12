@@ -128,6 +128,8 @@ class Model(ABC):
         self.no_constrained_dofs = self.config.get_item(['FINITE ELEMENT SPACE', 'no_constrained_dofs'],
                                                         bool, quiet=True)
 
+        self.fixed_velocity = self.config.get_item(['OTHER', 'velocity_fixed'], bool)
+
         if 'HDiv' in self.element.values() or 'RT' in self.element.values():
             # HDiv elements can only strongly apply u.n Dirichlet boundary conditions. In order to apply other
             # Dirichlet boundary conditions (ex: on the full vector or the tangential vector) the boundary

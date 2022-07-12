@@ -194,6 +194,17 @@ This is the main configuration file for the simulation run. It is kept in the ru
 |               |                              |                    |                | an adaptive time-stepping  |
 |               |                              |                    |                | scheme.                    |
 |               +------------------------------+--------------------+----------------+----------------------------+
+|               | velocity_fixed               | True/False         | False          | Only for multicomponent    |
+|               |                              |                    |                | flow model. Whether or not |
+|               |                              |                    |                | to solve the fluid flow at |
+|               |                              |                    |                | each timestep, or to keep  |
+|               |                              |                    |                | it fixed. Enable if the    |
+|               |                              |                    |                | velocity does not need to  |
+|               |                              |                    |                | be solved as it results in |
+|               |                              |                    |                | significantly faster       |
+|               |                              |                    |                | solves, and lower memory   |
+|               |                              |                    |                | usage.                     |
+|               +------------------------------+--------------------+----------------+----------------------------+
 |               | parameter_names              | name, name...      | Nothing        | Names of parameters that   |
 |               |                              |                    |                | will be used as additional |
 |               |                              |                    |                | variables in the model.    |

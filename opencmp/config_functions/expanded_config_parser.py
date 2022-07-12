@@ -56,6 +56,7 @@ config_defaults: Dict = {
               'model': 'REQUIRED',
               'component_names': [],
               'parameter_names': [],
+              'velocity_fixed': False,
               'run_dir': 'REQUIRED'},
     'VISUALIZATION': {'save_to_file': False,
                       'save_type': '.sol',
