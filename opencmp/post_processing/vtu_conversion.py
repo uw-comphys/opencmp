@@ -15,9 +15,9 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from opencmp.config_functions import ConfigParser
+from ..config_functions import ConfigParser
 from ngsolve import GridFunction, Mesh, Parameter, VTKOutput, H1
-from opencmp.models import get_model_class, Model
+from ..models import get_model_class, Model
 from pathlib import Path
 from os import remove
 from typing import Optional, Union

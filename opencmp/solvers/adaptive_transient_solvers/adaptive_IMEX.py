@@ -20,7 +20,7 @@ from ngsolve import Preconditioner
 from ...models import Model
 from typing import Tuple, Type, List, Optional
 from ...config_functions import ConfigParser
-from opencmp.solvers.time_integration_schemes import adaptive_IMEX_pred
+from ..time_integration_schemes import adaptive_IMEX_pred
 from .base_adaptive_transient_multistep import BaseAdaptiveTransientMultiStepSolver
 
 

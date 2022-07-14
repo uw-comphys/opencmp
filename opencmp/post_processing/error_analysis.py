@@ -15,13 +15,13 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from opencmp.config_functions import ConfigParser
-from opencmp.helpers.error import norm
-from opencmp.solvers import Solver
+from ..config_functions import ConfigParser
+from ..helpers.error import norm
+from ..solvers import Solver
 from ngsolve import GridFunction
 import math
 from typing import List, Union
-from opencmp.helpers.misc import can_import_module
+from ..helpers.misc import can_import_module
 
 missing_tabulate = not can_import_module('tabulate')
 if not missing_tabulate:
