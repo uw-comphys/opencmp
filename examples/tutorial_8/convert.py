@@ -1,4 +1,4 @@
-from opencmp.helpers.post_processing import sol_to_vtu
+from opencmp.post_processing.post_processing import sol_to_vtu
 from opencmp.config_functions import ConfigParser
 
 path_to_config_file = "config"

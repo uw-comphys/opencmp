@@ -19,12 +19,12 @@ from typing import Dict, Optional, cast
 
 from .models import get_model_class
 from .solvers import get_solver_class
-from .helpers.error_analysis import h_convergence, p_convergence
+from .post_processing.error_analysis import h_convergence, p_convergence
 from .helpers.error import calc_error
 from .config_functions import ConfigParser
 import pyngcore as ngcore
 from ngsolve import ngsglobals
-from .helpers.post_processing import sol_to_vtu, PhaseFieldModelMimic
+from .post_processing.post_processing import sol_to_vtu, PhaseFieldModelMimic
 
 
 def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> None:
@@ -47,9 +47,6 @@ def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> 
     msg_level = config_parser.get_item(['OTHER', 'messaging_level'], int, quiet=True)
     model_name = config_parser.get_item(['OTHER', 'model'], str)
 
-    # Load error analysis parameters from the config_parser file.
-    check_error = config_parser.get_item(['ERROR ANALYSIS', 'check_error'], bool)
-
     # Set parameters for ngsolve
     ngcore.SetNumThreads(num_threads)
     ngsglobals.msg_level = msg_level
@@ -63,6 +60,8 @@ def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> 
         solver = solver_class(model_class, config_parser)
         sol = solver.solve()
 
+        # Load error analysis parameters from the config_parser file.
+        check_error = config_parser.get_item(['ERROR ANALYSIS', 'check_error'], bool)
         if check_error:
             calc_error(config_parser, solver.model, sol)
 

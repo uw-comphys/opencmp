@@ -16,18 +16,16 @@
 ########################################################################################################################
 
 from opencmp.config_functions import ConfigParser
-from .error import norm
+from opencmp.helpers.error import norm
 from opencmp.solvers import Solver
 from ngsolve import GridFunction
 import math
 from typing import List, Union
-from .misc import can_import_module
+from opencmp.helpers.misc import can_import_module
 
-if can_import_module('tabulate'):
-    missing_tabulate = False
+missing_tabulate = not can_import_module('tabulate')
+if not missing_tabulate:
     import tabulate
-else:
-    missing_tabulate = True
 
 
 def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: str) -> None:

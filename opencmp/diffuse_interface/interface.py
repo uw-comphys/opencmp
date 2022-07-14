@@ -23,11 +23,9 @@ from typing import List, Tuple, Union, Dict, Optional
 from . import mesh_helpers
 from ..helpers.misc import can_import_module
 
-if can_import_module('edt'):
-    missing_edt = False
+missing_edt = not can_import_module('edt')
+if not missing_edt:
     import edt
-else:
-    missing_edt = True
 
 
 def get_binary_2d(boundary_lst: List, N: List[int], scale: List[float], offset: List[float]) -> ndarray:
