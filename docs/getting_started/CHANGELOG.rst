@@ -1,6 +1,10 @@
 OpenCMP Changelog
 =================
 
+July , 2022 (v1.0.2)
+
+* Refactored error analysis and sol-to-vtu post-processing into a separate directory
+
 June 6, 2022 (v1.0.1)
 
 * Improved dependency checking/handling in setup.cfg (setuptools).

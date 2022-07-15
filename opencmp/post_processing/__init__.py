@@ -14,3 +14,37 @@
 # You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
+
+import pyngcore as ngcore
+from ngsolve import GridFunction
+
+from .output_conversions import sol_to_vtu, sol_to_vtu_direct
+from .error_analysis import convergence_analysis
+from ..config_functions import ConfigParser
+from ..helpers.error import calc_error
+from ..solvers import Solver
+
+
+def run_post_processing(config_parser: ConfigParser, solver: Solver, sol: GridFunction) -> None:
+    """
+    This function iterates through each of the built-in post-processing operations, checks if they
+    should be run, and then runs them.
+
+    Args:
+        config_parser:  The config_parser for the simulation to perform post-processing on
+        solver:         The solver object created from the config_parser and which produced sol
+        sol:            Gridfunction containing the final solution produced by the model from solver.model
+    """
+    with ngcore.TaskManager():
+        # Calculate error metrics on the solution (e.g. L2 norm or divergence of the velocity field)
+        if config_parser.get_item(['ERROR ANALYSIS', 'check_error'], bool):
+            calc_error(config_parser, solver.model, sol)
+
+        convergence_analysis(config_parser, solver, sol)
+
+    save_output = config_parser.get_item(['VISUALIZATION', 'save_to_file'], bool, quiet=True)
+    save_type = config_parser.get_item(['VISUALIZATION', 'save_type'], str, quiet=True)
+    # Run the post-processor to convert the .sol to .vtu
+    if save_output and save_type == '.vtu':
+        print('Converting saved output to VTU.')
+        sol_to_vtu(config_parser, solver)

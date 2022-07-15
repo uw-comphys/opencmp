@@ -24,6 +24,8 @@ from typing import Optional, Union
 from multiprocessing.pool import Pool
 from multiprocessing import cpu_count
 
+from ..solvers import Solver
+
 
 class PhaseFieldModelMimic:
     """
@@ -49,31 +51,62 @@ class PhaseFieldModelMimic:
         return GridFunction(self.fes)
 
 
-def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union[Model, PhaseFieldModelMimic]] = None,
-               delete_sol_file: bool = False, allow_all_threads: bool = False) -> None:
+def sol_to_vtu(config_parser: ConfigParser, solver: Solver) -> None:
+    """
+    Wrapper function to handle the VTU-to-SOL conversion.
+
+    Args:
+        config_parser:  The config_parser for the simulation files to convert to .vtu
+        solver:         The solver object created from the config_parser which produced the .sol files
+    """
+    # Path where output is stored
+    output_dir_path = config_parser.get_item(['OTHER', 'run_dir'], str) + '/output/'
+
+    # Run the conversion
+    sol_to_vtu_direct(config_parser, output_dir_path, solver.model)
+
+    # Repeat for the saved phase field .sol files if using the diffuse interface method.
+    if solver.model.DIM:
+        print('Converting saved phase fields to VTU.')
+
+        # Construct a mimic of the Model class appropriate for the phase field (mainly contains the correct
+        # finite element space).
+        phi_model = PhaseFieldModelMimic(solver.model)
+
+        # Path where the output is stored
+        output_dir_phi_path = config_parser.get_item(['OTHER', 'run_dir'], str) + '/output_phi/'
+
+        # Run the conversion.
+        # Note: The normal main simulation ConfigParse can be used since it is only used
+        # to get a value for subdivision.
+        sol_to_vtu_direct(config_parser, output_dir_phi_path, phi_model)
+
+
+def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: Optional[Union[Model, PhaseFieldModelMimic]] = None,
+                      delete_sol_file: bool = False, allow_all_threads: bool = False) -> None:
     """
     Function to take the output .sol files and convert them into .vtu for visualization.
 
     Args:
-        config: The loaded config parser used by the model
-        output_dir_path: The path to the folder in which the .sol files are, and where the .vtu files will be saved.
-        model: The model that generated the .sol files.
-        delete_sol_file: Bool to indicate if to delete the original .sol files after converting to .vtu,
-            Default is False.
-        allow_all_threads: Bool to indicate if to use all available threads (if there are enough files),
-            Default is False.
-
+        config_parser:      The loaded config parser used by the model
+        output_dir_path:    The path to the folder in which the .sol files are, and where the .vtu files will be saved.
+        model:              The model that generated the .sol files.
+                            If one is not provided (such as when running manually), one is created from the config_parser.
+        delete_sol_file:    Bool to indicate if to delete the original .sol files after converting to .vtu,
+                            Default is False.
+        allow_all_threads:  Bool to indicate if to use all available threads (if there are enough files),
+                            Default is False.
     """
 
     # Being run outside of run.py, so have to create model
     if model is None:
         # Load model
-        model_name  = config.get_item(['OTHER', 'model'], str)
+        model_name  = config_parser.get_item(['OTHER', 'model'], str)
         model_class = get_model_class(model_name)
-        model       = model_class(config, [Parameter(0.0)])
+        model       = model_class(config_parser, [Parameter(0.0)])
 
     # Number of subdivisions per element
-    subdivision = config.get_item(['VISUALIZATION', 'subdivision'], int)
+    subdivision = config_parser.get_item(['VISUALIZATION', 'subdivision'], int)
     # NOTE: -1 is the value used whenever an int default is needed.
     if subdivision == -1:
         subdivision = model.interp_ord
@@ -91,7 +124,7 @@ def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union
         num_threads = cpu_count()
     else:
         # Number of threads to use as specified in the config file
-        num_threads = config.get_item(['OTHER', 'num_threads'], int)
+        num_threads = config_parser.get_item(['OTHER', 'num_threads'], int)
 
     # Number of threads to use
     # NOTE: No point of starting more threads than files, and also lets us depend on modulo math later.
@@ -107,8 +140,8 @@ def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union
     with Pool(processes=n_threads) as pool:
         # Create the pool and start it. It will automatically take and run the next entry when it needs it
         a = [
-                pool.apply_async(_sol_to_vtu, (gfus[i % n_threads], sol_path_list[i], output_dir_path,
-                                               model.save_names, delete_sol_file, subdivision, model.mesh)
+                pool.apply_async(_sol_to_vtu_parallel_runner, (gfus[i % n_threads], sol_path_list[i], output_dir_path,
+                                                               model.save_names, delete_sol_file, subdivision, model.mesh)
                                  ) for i in range(n_files)
         ]
 
@@ -128,19 +161,19 @@ def sol_to_vtu(config: ConfigParser, output_dir_path: str, model: Optional[Union
             file.write(line)
 
 
-def _sol_to_vtu(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
-                save_names: str, delete_sol_file: bool, subdivision: int, mesh: Mesh) -> str:
+def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
+                                save_names: str, delete_sol_file: bool, subdivision: int, mesh: Mesh) -> str:
     """
     Function that gets parallelized and does the actual sol-to-vtu conversion.
 
     Args:
-        gfu: The grid function into which to load the .sol file
-        sol_path_str: The path to the solve file to load
-        output_dir_path: The path to the directory to save the .vtu into
-        save_names: The names of the variables to save
-        delete_sol_file: Whether or not to delete the sol file after
-        subdivision: Number of subdivisions on each mesh element
-        mesh: The mesh on which the gfu was solved.
+        gfu:                The grid function into which to load the .sol file
+        sol_path_str:       The path to the solve file to load
+        output_dir_path:    The path to the directory to save the .vtu into
+        save_names:         The names of the variables to save
+        delete_sol_file:    Whether or not to delete the sol file after
+        subdivision:        Number of subdivisions on each mesh element
+        mesh:               The mesh on which the gfu was solved.
 
     Returns:
         A string containing the entry for the .pvd file for this .vtu file.
@@ -168,7 +201,7 @@ def _sol_to_vtu(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
 
     # Check that the file was created
     if not Path(filename + '.vtu').exists():
-        raise FileNotFoundError('Neither .vtk nor .vtu files are being generated. Something is wrong with _sol_to_vtu.')
+        raise FileNotFoundError('Neither .vtk nor .vtu files are being generated. Something is wrong with _sol_to_vtu_parallel_runner.')
 
     # Delete .sol
     if delete_sol_file:

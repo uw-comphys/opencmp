@@ -15,16 +15,14 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from typing import Dict, Optional, cast
+from typing import Optional, cast
 
 from .models import get_model_class
 from .solvers import get_solver_class
-from .post_processing.error_analysis import h_convergence, p_convergence
-from .helpers.error import calc_error
 from .config_functions import ConfigParser
 import pyngcore as ngcore
 from ngsolve import ngsglobals
-from .post_processing.post_processing import sol_to_vtu, PhaseFieldModelMimic
+from .post_processing import run_post_processing
 
 
 def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> None:
@@ -60,50 +58,6 @@ def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> 
         solver = solver_class(model_class, config_parser)
         sol = solver.solve()
 
-        # Load error analysis parameters from the config_parser file.
-        check_error = config_parser.get_item(['ERROR ANALYSIS', 'check_error'], bool)
-        if check_error:
-            calc_error(config_parser, solver.model, sol)
-
-        # Suppressing the warning about using the default value for convergence_test.
-        convergence_test: Dict[str, str] = config_parser.get_dict(['ERROR ANALYSIS', 'convergence_test'],
-                                                                  None, quiet=True)
-        for key, var_lst in convergence_test.items():
-            if key == 'h' and var_lst:
-                for var in var_lst:
-                    h_convergence(config_parser, solver, sol, var)
-            elif key == 'p' and var_lst:
-                for var in var_lst:
-                    p_convergence(config_parser, solver, sol, var)
-
-    save_output = config_parser.get_item(['VISUALIZATION', 'save_to_file'], bool, quiet=True)
-    if save_output:
-        save_type = config_parser.get_item(['VISUALIZATION', 'save_type'], str, quiet=True)
-
-        # Run the post-processor to convert the .sol to .vtu
-        if save_type == '.vtu':
-            print('Converting saved output to VTU.')
-
-            # Path where output is stored
-            output_dir_path = config_parser.get_item(['OTHER', 'run_dir'], str) + '/output/'
-
-            # Run the conversion
-            sol_to_vtu(config_parser, output_dir_path, solver.model)
-
-            # Repeat for the saved phase field .sol files if using the diffuse interface method.
-            if solver.model.DIM:
-                print('Converting saved phase fields to VTU.')
-
-                # Construct a mimic of the Model class appropriate for the phase field (mainly contains the correct
-                # finite element space).
-                phi_model = PhaseFieldModelMimic(solver.model)
-
-                # Path where the output is stored
-                output_dir_phi_path = config_parser.get_item(['OTHER', 'run_dir'], str) + '/output_phi/'
-
-                # Run the conversion.
-                # Note: The normal main simulation ConfigParse can be used since it is only used
-                # to get a value for subdivision.
-                sol_to_vtu(config_parser, output_dir_phi_path, phi_model)
+    run_post_processing(config_parser, solver, sol)
 
     return

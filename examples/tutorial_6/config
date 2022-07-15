@@ -33,4 +33,4 @@ save_frequency = 0.1, time
 [OTHER]
 model = INS
 run_dir = .
-num_threads = 2
+num_threads = 6
