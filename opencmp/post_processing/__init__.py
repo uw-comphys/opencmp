@@ -18,7 +18,7 @@
 import pyngcore as ngcore
 from ngsolve import GridFunction
 
-from .output_conversions import sol_to_vtu, sol_to_vtu_direct
+from .output_conversions import sol_to_vtu, sol_to_vtu_direct, sol_to_components
 from .error_analysis import convergence_analysis
 from ..config_functions import ConfigParser
 from ..helpers.error import calc_error
@@ -48,3 +48,11 @@ def run_post_processing(config_parser: ConfigParser, solver: Solver, sol: GridFu
     if save_output and save_type == '.vtu':
         print('Converting saved output to VTU.')
         sol_to_vtu(config_parser, solver)
+
+    # Split the .sol file for the final time-step into individual components to make using it for
+    # the initial conditions of other simulations easier
+    if config_parser.get_item(['VISUALIZATION', 'split_components'], bool, quiet=True):
+        sol_to_components(config_parser,
+                          config_parser.get_item(['OTHER', 'run_dir'], str) + '/output/',
+                          solver.model)
+

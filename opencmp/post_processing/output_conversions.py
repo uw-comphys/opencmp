@@ -51,6 +51,52 @@ class PhaseFieldModelMimic:
         return GridFunction(self.fes)
 
 
+def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: Optional[Model] = None,
+                             delete_sol_file: bool = False, allow_all_threads: bool = False) -> None:
+    """
+    Function which takes the final .sol file in the output_dir and splits each component out into its own .sol file.
+    Allows for easily loading only part of a previous solution into a different simulation.
+    Particularly useful for loading a steady-state velocity profile into the multi-component INS model.
+    .sol files for the individual components will be named as C_t.sol where C is the component name from model.components
+    and t is the time obtained from the filename of the original .sol file.
+
+    Args:
+        config_parser:      The loaded config parser used by the model
+        output_dir_path:    The path to the folder in which the .sol files are, and where the .vtu files will be saved.
+        model:              The model that generated the .sol files.
+                            If one is not provided (such as when running manually), one is created from the config_parser.
+    """
+
+    # Being run outside of run_post_processing, so have to create model
+    if model is None:
+        # Load model
+        model_name = config_parser.get_item(['OTHER', 'model'], str)
+        model_class = get_model_class(model_name)
+        model = model_class(config_parser, [Parameter(0.0)])
+
+    # Generate a lsit of all .sol file paths
+    sol_paths = sorted(str(sol_path) for sol_path in Path(output_dir_path + 'sol/').rglob('*.sol'))
+    sol_path_final = ""
+    # Since the list may include .sol files used as IC for the current simulation, find the final .sol file for THIS model
+    for i in range(len(sol_paths)):
+        if model.name in sol_paths[-i]:
+            sol_path_final = sol_paths[-i]
+            break
+
+    if len(sol_path_final) == 0:
+        raise FileNotFoundError('A .sol file for model \"' + model.name
+                                + '\" was not found in folder \"' + output_dir_path + 'sol/' + '\"')
+
+    # Get the timestep for this .sol file from its name
+    sol_name = sol_path_final.split('/')[-1][:-4]
+
+    gfu_for_saving = model.construct_gfu()
+    gfu_for_saving.Load(sol_path_final)
+
+    for component_name in model.model_components:
+        gfu_for_saving.components[model.model_components[component_name]].Save(output_dir_path + "sol_ic/" + component_name + ".sol")
+
+
 def sol_to_vtu(config_parser: ConfigParser, solver: Solver) -> None:
     """
     Wrapper function to handle the VTU-to-SOL conversion.
@@ -98,7 +144,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
                             Default is False.
     """
 
-    # Being run outside of run.py, so have to create model
+    # Being run outside of run_post_processing, so have to create model
     if model is None:
         # Load model
         model_name  = config_parser.get_item(['OTHER', 'model'], str)
