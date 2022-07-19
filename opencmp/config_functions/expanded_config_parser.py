@@ -62,7 +62,7 @@ config_defaults: Dict = {
                       'save_type': '.sol',
                       'save_frequency': ['1', 'numit'],
                       'subdivision': -1,
-                      'split_components': True},
+                      'split_components': False},
     'DIM': {'diffuse_interface_method': False,
             'dim_dir': 'REQUIRED',
             'mesh_dimension': 2,
