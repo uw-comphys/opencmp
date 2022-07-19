@@ -164,7 +164,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
         subdivision = model.interp_ord
 
     # Generate a list of all .sol files
-    sol_path_generator  = Path(output_dir_path+'sol/').rglob('*.sol')
+    sol_path_generator  = Path(output_dir_path+'sol/').rglob('*' + model.name + '*.sol')
     sol_path_list       = [str(sol_path) for sol_path in sol_path_generator]
 
     # Number of files to convert
