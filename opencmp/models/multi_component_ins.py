@@ -184,7 +184,8 @@ class MultiComponentINS(INS):
             r = V[self.model_components[comp]]
 
             # Domain integrals.
-            a += dt * self.Ds[comp][time_step] * InnerProduct(Grad(c), Grad(r)) * dx
+            if self.Ds[comp][time_step] > 0:  # If the diffusion coefficient is 0, don't add diffusion term
+                a += dt * self.Ds[comp][time_step] * InnerProduct(Grad(c), Grad(r)) * dx
 
             # NOTE: Reaction terms can go in either the bilinear form or the linear form depending on if the reaction
             #       coefficients are functions of the trial functions. Basic type-checking can't be used since the
@@ -215,6 +216,9 @@ class MultiComponentINS(INS):
             if self.linearize == 'Oseen':
                 # Neumann BC for C
                 for marker in self.BC.get('neumann', {}).get(comp, {}):
+                    if self.Ds[comp][time_step] == 0:
+                        raise ValueError("Trying to apply a neuman boundary condition for "
+                                         "purely advective flow (diffusion coefficient is 0).")
                     h = self.BC['neumann'][comp][marker][time_step]
                     a += -dt * r.Trace() * (h - c * InnerProduct(w, n)) * self._ds(marker)
 
@@ -289,6 +293,9 @@ class MultiComponentINS(INS):
             # Neumann BC for C
             # TODO: Is this implemented correctly?
             for marker in self.BC.get('neumann', {}).get(comp, {}):
+                if self.Ds[comp][time_step] == 0:
+                    raise ValueError("Trying to apply a neuman boundary condition for "
+                                     "purely advective flow (diffusion coefficient is 0).")
                 h = self.BC['neumann'][comp][marker][time_step]
                 L += -dt * r.Trace() * h * self._ds(marker)
 
