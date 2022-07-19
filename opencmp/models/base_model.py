@@ -215,7 +215,7 @@ class Model(ABC):
         # Load any boundary conditions saved as gridfunctions.
         self.BC = self.bc_functions.load_bc_gridfunctions(self.BC, self.fes, self.model_components)
         # TODO: Give good description of this variable here
-        self.g_D = self.bc_functions.set_dirichlet_boundary_conditions(self.BC, self.mesh, self.construct_gfu(),
+        self.g_D = self.bc_functions.set_dirichlet_boundary_conditions(self.BC, self.mesh, self.construct_gfu_ic(),
                                                                        self.model_components)
 
         # Load the model functions and model parameters.

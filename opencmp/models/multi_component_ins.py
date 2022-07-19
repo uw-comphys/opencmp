@@ -73,7 +73,11 @@ class MultiComponentINS(INS):
             self.time_derivative_components[0][component]   = new_components_in_time_deriv[component]
 
     def _construct_fes(self) -> FESpace:
-        fes_total = []
+        if self.fixed_velocity:
+            fes_total = []
+        else:
+            # Create the FE spaces for velocity and pressure
+            fes_total = self._contruct_fes_helper()
 
         # Iterate over each component and add a fes for each
         for component in self.extra_components:
