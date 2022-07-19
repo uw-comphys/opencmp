@@ -74,14 +74,20 @@ def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: 
         model_class = get_model_class(model_name)
         model = model_class(config_parser, [Parameter(0.0)])
 
+    # Ensure that the output folder exists
+    sol_component_path = output_dir_path + 'sol_components/'
+    Path(sol_component_path).mkdir(parents=True, exist_ok=True)
+
     # Generate a lsit of all .sol file paths
-    sol_paths = sorted(str(sol_path) for sol_path in Path(output_dir_path + 'sol/').rglob('*.sol'))
+    sol_paths_all = [str(sol_path) for sol_path in Path(output_dir_path + 'sol/').rglob('*.sol')]
     sol_path_final = ""
-    # Since the list may include .sol files used as IC for the current simulation, find the final .sol file for THIS model
-    for i in range(len(sol_paths)):
-        if model.name in sol_paths[-i]:
-            sol_path_final = sol_paths[-i]
-            break
+    split_str = model.name + "_"
+    time_max = -1.0
+    for sol_path in filter(lambda path: model.name in path, sol_paths_all):
+        time_i = float(sol_path.split(split_str)[1][:-4])
+        if time_i > time_max:
+            time_max = time_i
+            sol_path_final = sol_path
 
     if len(sol_path_final) == 0:
         raise FileNotFoundError('A .sol file for model \"' + model.name
@@ -94,7 +100,7 @@ def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: 
     gfu_for_saving.Load(sol_path_final)
 
     for component_name in model.model_components:
-        gfu_for_saving.components[model.model_components[component_name]].Save(output_dir_path + "sol_ic/" + component_name + ".sol")
+        gfu_for_saving.components[model.model_components[component_name]].Save(sol_component_path + component_name + '.sol')
 
 
 def sol_to_vtu(config_parser: ConfigParser, solver: Solver) -> None:
