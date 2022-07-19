@@ -35,6 +35,13 @@ class BCFunctions(ConfigFunctions):
                                                                                new_variables,
                                                                                ignore=['VERTICES', 'CENTROIDS'])
 
+        # Used to keep track of which unknown variables the user has already been warned about
+        # A variable present in the config file that is not in the current model is not necessarily a bug.
+        # It may occur (and not be a bug) when the user has a config file to generate the initial conditions inside
+        # the same folder as their main simulation (e.g. Running INS to get the initial condition for MCINS).
+        self.already_warned_about_dirichlet = set()
+        self.already_warned_about_pinned = set()
+
     def load_bc_gridfunctions(self, bc_dict: Dict, fes: FESpace, model_components: Dict[str, Optional[int]]) -> Dict:
         """
         Function to load any saved gridfunctions that should be used to specify BCs.
@@ -152,6 +159,11 @@ class BCFunctions(ConfigFunctions):
 
         if len(bc_dict['dirichlet']) > 0:
             for var in bc_dict['dirichlet']:
+                if var not in model_components:
+                    if var not in self.already_warned_about_dirichlet:
+                        self.already_warned_about_dirichlet.add(var)
+                        print('Ignoring variable \"{}\" while loading dirichlet boundary conditions since not part of the model.'.format(var))
+                    continue
 
                 # List of values for Dirichlet BCs for each variable
                 dirichlet_lst: List = [[] for _ in self.t_param]
@@ -185,6 +197,12 @@ class BCFunctions(ConfigFunctions):
 
         if len(bc_dict.get('pinned', {})) > 0:
             for var in bc_dict['pinned']:
+                if var not in model_components:
+                    if var not in self.already_warned_about_pinned:
+                        self.already_warned_about_pinned.add(var)
+                        print('Ignoring variable \"{}\" while loading pinned conditions since not part of the model.'.format(var))
+                    continue
+
                 if var in g_D.keys():
                     # Check that the variable doesn't already have Dirichlet BCs specified.
                     raise ValueError('Dirichlet boundary conditions have been specified for {0}. It is unnecessary to '
