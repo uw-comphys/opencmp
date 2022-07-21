@@ -1,0 +1,5 @@
+[REFERENCE SOLUTIONS]
+a = 1.0
+
+[METRICS]
+L2_norm = a

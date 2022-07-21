@@ -1,0 +1,6 @@
+[PARAMETERS]
+kinematic_viscosity    = all -> 1
+diffusion_coefficients = a -> 0.0001
+
+[FUNCTIONS]
+source = a -> 0

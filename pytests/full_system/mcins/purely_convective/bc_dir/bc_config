@@ -1,0 +1,5 @@
+[DIRICHLET]
+a = left -> ramp(0.0, 1.0, 10.0)
+
+[neumann]
+a = right -> 0
