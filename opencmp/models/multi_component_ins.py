@@ -19,8 +19,8 @@ from ..helpers.ngsolve_ import get_special_functions
 from . import INS
 from ..config_functions import ConfigParser
 from typing import Dict, List, Optional, Union
-from ngsolve import BilinearForm, FESpace, Grad, InnerProduct, LinearForm, GridFunction, Preconditioner, dx, \
-    Parameter, CoefficientFunction
+from ngsolve import BilinearForm, FESpace, Grad, IfPos, InnerProduct, LinearForm, GridFunction, Preconditioner, dx, \
+                    Parameter, CoefficientFunction
 from ngsolve.comp import ProxyFunction
 
 import ngsolve
@@ -112,10 +112,7 @@ class MultiComponentINS(INS):
         if self.DIM or self.DG:
             raise NotImplementedError('DIM and DG are not yet implemented.')
 
-        if self.fixed_velocity:
-            self.W = self._construct_linearization_terms()
-        else:
-            super()._post_init()
+        super()._post_init()
 
     def _pre_init(self) -> None:
         # Read in and add the multiple components
@@ -146,20 +143,6 @@ class MultiComponentINS(INS):
             # Calculate the hydrodynamic contribution to the bilinear terms
             a = super().construct_bilinear_time_coefficient(U, V, dt, time_step)[0]
 
-        # TODO: Not sure that this has actually been split up correctly.
-        #       Convection term is currently the only term that must always be solved implicitly.
-        # Transport of mixture components.
-        if self.linearize == 'Oseen':
-            w = self._get_wind(U, time_step)
-
-            for comp in self.extra_components:
-                # Trial and test functions
-                c = U[self.model_components[comp]]
-                r = V[self.model_components[comp]]
-
-                # Additional convection term.
-                a += -dt * c * InnerProduct(w, Grad(r)) * dx
-
         return [a]
 
     def construct_bilinear_time_ODE(self, U: Union[List[ProxyFunction], List[GridFunction]], V: List[ProxyFunction],
@@ -171,8 +154,7 @@ class MultiComponentINS(INS):
             # Calculate the hydrodynamic contribution to the bilinear terms
             a = super().construct_bilinear_time_ODE(U, V, dt, time_step)[0]
 
-        if self.linearize == 'Oseen':
-            w = self._get_wind(U, time_step)
+        w = self._get_wind(U, time_step)
 
         # Get unit normal
         n = get_special_functions(self.mesh, self.nu)[0]
@@ -186,6 +168,10 @@ class MultiComponentINS(INS):
             # Domain integrals.
             if self.Ds[comp][time_step] > 0:  # If the diffusion coefficient is 0, don't add diffusion term
                 a += dt * self.Ds[comp][time_step] * InnerProduct(Grad(c), Grad(r)) * dx
+            # Convection
+            # TODO: What happens for IMEX?
+            if self.linearize == 'Oseen':
+                a += -dt * c * InnerProduct(w, Grad(r)) * dx
 
             # NOTE: Reaction terms can go in either the bilinear form or the linear form depending on if the reaction
             #       coefficients are functions of the trial functions. Basic type-checking can't be used since the
@@ -213,16 +199,20 @@ class MultiComponentINS(INS):
                 else:
                     a += -dt * val * r * dx
 
-            if self.linearize == 'Oseen':
+            # 1/2 of Total Flux BC, other half in linear term
+            for marker in self.BC.get('total_flux', {}).get(comp, {}):
+                a += dt * r.Trace() * c * IfPos(InnerProduct(w, n), InnerProduct(w, n), 0) * self._ds(marker)
+
+            if self.linearize == 'Oseen':  # 1/2 of the neuman BC, other half in the linear form
                 # Neumann BC for C
                 for marker in self.BC.get('neumann', {}).get(comp, {}):
                     if self.Ds[comp][time_step] == 0:
                         raise ValueError("Trying to apply a neuman boundary condition for "
                                          "purely advective flow (diffusion coefficient is 0).")
-                    h = self.BC['neumann'][comp][marker][time_step]
-                    a += -dt * r.Trace() * (h - c * InnerProduct(w, n)) * self._ds(marker)
+                    a += dt * r.Trace() * c * InnerProduct(w, n) * self._ds(marker)
 
         return [a]
+
 
     def construct_linear(self, V: List[ProxyFunction], gfu_0: Optional[List[GridFunction]],
                          dt: Parameter, time_step: int) -> List[LinearForm]:
@@ -238,10 +228,10 @@ class MultiComponentINS(INS):
             # Test function
             r = V[self.model_components[comp]]
 
-            # Total Flux BC
+            # 1/2 of Total Flux BC, other half in bilinear term
             for marker in self.BC.get('total_flux', {}).get(comp, {}):
                 h = self.BC['total_flux'][comp][marker][time_step]
-                L += dt * r.Trace() * h * self._ds(marker)
+                L += -dt * r.Trace() * h * self._ds(marker)
 
             # NOTE: Reaction terms can go in either the bilinear form or the linear form depending on if the reaction
             #       coefficients are functions of the trial functions. Basic type-checking can't be used since the
@@ -265,6 +255,16 @@ class MultiComponentINS(INS):
                     L += dt * val * r * self._ds(marker)
                 else:
                     L += dt * val * r * dx
+
+            # 1/2 of the Neumann BC, other half in the bilinear form
+            if self.linearize == 'Oseen':
+                # Neumann BC for C
+                for marker in self.BC.get('neumann', {}).get(comp, {}):
+                    if self.Ds[comp][time_step] == 0:
+                        raise ValueError("Trying to apply a neuman boundary condition for "
+                                         "purely advective flow (diffusion coefficient is 0).")
+                    h = self.BC['neumann'][comp][marker][time_step]
+                    L += -dt * r.Trace() * h * self._ds(marker)   # Negative sign applied since moved to other side of equal sign
 
         return [L]
 
