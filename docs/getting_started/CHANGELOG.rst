@@ -8,6 +8,7 @@ July , 2022 (v1.0.2)
   removing all of the diffusive terms from the weak form
 * Refactored error analysis and sol-to-vtu post-processing into a separate directory
 * Added post-processing step to split the final .sol file by variable for easier importing of individual variables into other simulations
+* When multiple different models are run from the same folder, each gets a uniquely named .pvd and vtu folder
 
 June 6, 2022 (v1.0.1)
 

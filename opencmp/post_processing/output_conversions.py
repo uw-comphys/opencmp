@@ -164,7 +164,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
         subdivision = model.interp_ord
 
     # Generate a list of all .sol files
-    sol_path_generator  = Path(output_dir_path+'sol/').rglob('*' + model.name + '*.sol')
+    sol_path_generator  = Path(output_dir_path + 'sol/').rglob('*' + model.name + '*.sol')
     sol_path_list       = [str(sol_path) for sol_path in sol_path_generator]
 
     # Number of files to convert
@@ -193,7 +193,8 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
         # Create the pool and start it. It will automatically take and run the next entry when it needs it
         a = [
                 pool.apply_async(_sol_to_vtu_parallel_runner, (gfus[i % n_threads], sol_path_list[i], output_dir_path,
-                                                               model.save_names, delete_sol_file, subdivision, model.mesh)
+                                                               model.save_names, model.name, delete_sol_file,
+                                                               subdivision, model.mesh)
                                  ) for i in range(n_files)
         ]
 
@@ -208,13 +209,13 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
     output_list.append('</Collection>\n</VTKFile>')
 
     # Write each line to the file
-    with open(output_dir_path + 'transient.pvd', 'a+') as file:
+    with open(output_dir_path + model.name + '_transient.pvd', 'a+') as file:
         for line in output_list:
             file.write(line)
 
 
-def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir_path: str,
-                                save_names: str, delete_sol_file: bool, subdivision: int, mesh: Mesh) -> str:
+def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir_path: str, save_names: str,
+                                model_name: str, delete_sol_file: bool, subdivision: int, mesh: Mesh) -> str:
     """
     Function that gets parallelized and does the actual sol-to-vtu conversion.
 
@@ -223,6 +224,7 @@ def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir
         sol_path_str:       The path to the solve file to load
         output_dir_path:    The path to the directory to save the .vtu into
         save_names:         The names of the variables to save
+        model_name:         The name of the model
         delete_sol_file:    Whether or not to delete the sol file after
         subdivision:        Number of subdivisions on each mesh element
         mesh:               The mesh on which the gfu was solved.
@@ -236,7 +238,7 @@ def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir
     time_str = sol_name.split('_')[-1]
 
     # Name for the .vtu
-    filename = output_dir_path + 'vtu/' + sol_name
+    filename = output_dir_path + model_name + '_vtu/' + sol_name
 
     # Load data into gfu
     gfu.Load(sol_path_str)
@@ -261,4 +263,4 @@ def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir
 
     # Write timestep in .pvd
     return '<DataSet timestep=\"%e\" group=\"\" part=\"0\" file=\"%s\"/>\n'\
-           % (float(time_str), 'vtu/' + filename.split('/')[-1] + '.vtu')
+           % (float(time_str), model_name + '_vtu/' + filename.split('/')[-1] + '.vtu')
