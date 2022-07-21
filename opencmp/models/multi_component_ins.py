@@ -77,7 +77,7 @@ class MultiComponentINS(INS):
             fes_total = []
         else:
             # Create the FE spaces for velocity and pressure
-            fes_total = self._contruct_fes_helper()
+            fes_total = self._construct_fes_helper()
 
         # Iterate over each component and add a fes for each
         for component in self.extra_components:
@@ -91,7 +91,7 @@ class MultiComponentINS(INS):
 
     def _construct_ic_fes(self) -> FESpace:
         # Create the FE spaces for velocity and pressure
-        fes_total = self._contruct_fes_helper()
+        fes_total = self._construct_fes_helper()
 
         # Iterate over each component and add a fes for each
         for component in self.extra_components:

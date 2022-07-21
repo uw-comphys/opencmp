@@ -21,7 +21,7 @@ from ..helpers.dg import jump, grad_avg
 from ..models import INS
 from ngsolve.comp import ProxyFunction
 from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
-from typing import List, Union, Optional
+from typing import Dict, List, Union, Optional
 
 
 class Stokes(INS):
@@ -118,8 +118,8 @@ class Stokes(INS):
                 ) * self._ds(marker)
 
         # Stress BCs
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker][time_step]
+        for marker in self.BC.get('stress', {}).get('u', {}):
+            h = self.BC['stress']['u'][marker][time_step]
             if self.DG:
                 L += dt * v * h * self._ds(marker)
             else:

@@ -14,4 +14,4 @@ b = top    -> 0
     right  -> 0
 
 [STRESS]
-stress = right -> [0.0, 0.0]
+u = right -> [0.0, 0.0]

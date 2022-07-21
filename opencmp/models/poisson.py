@@ -50,7 +50,7 @@ class Poisson(Model):
         return 1
 
     def _define_bc_types(self) -> List[str]:
-        return ['robin', 'dirichlet', 'neumann']
+        return ['dirichlet', 'neumann', 'robin']
 
     @staticmethod
     def allows_explicit_schemes() -> bool:

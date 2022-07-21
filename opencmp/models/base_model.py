@@ -63,7 +63,8 @@ class Model(ABC):
         self.run_dir = self.config.get_item(['OTHER', 'run_dir'], str)
 
         # Dictionary to map variable name to index inside fes/gridfunctions, and for labeling variables in vtk output.
-        self.model_components = self._define_model_components()
+        # These are currently the same, but will be changed in other functions. E.g. MCINS._add_multiple_components()
+        self.model_components    = self._define_model_components()
         self.model_components_ic = self._define_model_components()
 
         # Dictionary to specify if a particular component should be used for error calculations
@@ -182,8 +183,8 @@ class Model(ABC):
         # Note: Need dirichlet_names before constructing fes, but need to construct fes before gridfunctions can be
         #       loaded for ex: BCs, ICs, reference solutions. So, get the BC dict before constructing fes,
         #       but then actually load the BCs etc after constructing fes.
-        self.bc_functions = BCFunctions(self.run_dir + '/bc_dir/bc_config', self.run_dir, self.mesh, self.t_param,
-                                        self.update_variables)
+        self.bc_functions = BCFunctions(self.run_dir + '/bc_dir/bc_config', self.run_dir, self.mesh, self._define_bc_types(),
+                                        self.t_param, self.update_variables)
 
         # 1/2: Create BCs.
         # Needs to be done in two steps since initializing the BC gridfunctions requires a FES, which in turn requires
@@ -235,6 +236,7 @@ class Model(ABC):
             self.DIM_solver.get_DIM_gridfunctions(self.mesh, self.interp_ord)
             # DIM_dirichlet_names should never be used and a DIM g_D is not needed.
             self.DIM_bc_functions = BCFunctions(self.DIM_dir + '/bc_dir/dim_bc_config', self.run_dir, self.mesh,
+                                                self._define_bc_types(),
                                                 self.t_param, self.update_variables)
             self.DIM_BC, DIM_dirichlet_names = self.DIM_bc_functions.set_boundary_conditions(self._define_bc_types())
             self.DIM_BC = self.DIM_bc_functions.load_bc_gridfunctions(self.DIM_BC, self.fes, self.model_components)

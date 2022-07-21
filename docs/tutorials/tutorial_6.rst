@@ -100,7 +100,7 @@ The same boundary conditions are used for the Stokes solve and the incompressibl
    cyl   -> [0.0, 0.0]
 
    [STRESS]
-   stress = outlet -> [0.0, 0.0]
+   u = outlet -> [0.0, 0.0]
 
 Note that the wall of the cylinder has been marked "cyl" on the mesh.
 

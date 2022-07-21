@@ -141,8 +141,8 @@ class StokesDIM(Stokes):
             ) * self.DIM_solver.mask_gfu_dict[marker] * ngs.dx
 
         # Stress BCs
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker][time_step]
+        for marker in self.BC.get('stress', {}).get('u', {}):
+            h = self.BC['stress']['u'][marker][time_step]
             if self.DG:
                 L += dt * v * h * self._ds(marker)
             else:

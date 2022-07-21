@@ -85,14 +85,14 @@ class INSDIM(INS):
 
         if self.linearize == 'Oseen':
             # Conformal stress BC needs a no-backflow component in the bilinear form.
-            for marker in self.BC.get('stress', {}).get('stress', {}):
+            for marker in self.BC.get('stress', {}).get('u', {}):
                 if self.DG:
                     a += dt * v * (IfPos(w * n, w * n, 0.0) * u) * self._ds(marker)
                 else:
                     a += dt * v.Trace() * (IfPos(w * n, w * n, 0.0) * u.Trace()) * self._ds(marker)
 
         # Conformal parallel flow BC
-        for marker in self.BC.get('parallel', {}).get('parallel', {}):
+        for marker in self.BC.get('parallel', {}).get('u', {}):
             if self.DG:
                 a += dt * v * (u - n * InnerProduct(u, n)) * self._ds(marker)
             else:
@@ -196,8 +196,8 @@ class INSDIM(INS):
                 ) * self.DIM_solver.mask_gfu_dict[marker] * dx
 
         # Conformal stress BC
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker][time_step]
+        for marker in self.BC.get('stress', {}).get('u', {}):
+            h = self.BC['stress']['u'][marker][time_step]
             if self.DG:
                 L += dt * v * h * self._ds(marker)
             else:

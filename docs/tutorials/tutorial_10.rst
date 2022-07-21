@@ -70,7 +70,7 @@ The same boundary conditions are used for the Stokes solve and the incompressibl
         inlet -> [0.0, 0.0, 32.0*0.45*x*y*(0.41-x)*(0.41-y)/0.41^4]
 
     [STRESS]
-    stress = outlet -> [0.0, 0.0, 0.0]
+    u = outlet -> [0.0, 0.0, 0.0]
 
 Note that the wall of the cylinder has been marked "cyl" on the mesh.
 
