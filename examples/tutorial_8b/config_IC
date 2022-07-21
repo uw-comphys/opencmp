@@ -1,0 +1,39 @@
+[MESH]
+filename = reaction.vol 
+curved_elements = True
+
+[FINITE ELEMENT SPACE]
+elements = u -> VectorH1
+           p -> H1
+interpolant_order = 2
+
+[DG]
+DG = False
+
+[SOLVER]
+solver = default
+preconditioner = default
+linearization_method = Oseen
+nonlinear_tolerance = relative -> 1e-5
+                      absolute -> 1e-6
+nonlinear_max_iterations = 10
+
+[TRANSIENT]
+transient = True
+scheme = adaptive three step
+time_range = 0, 20
+dt = 1e-3
+dt_range = 1e-6, 20
+dt_tolerance = relative -> 1e-3
+               absolute -> 1e-4
+
+[VISUALIZATION]
+save_to_file = True
+save_type = .sol
+save_frequency = 1, numit
+split_components = True
+
+[OTHER]
+model = INS
+run_dir = .
+num_threads = 6
