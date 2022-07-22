@@ -229,10 +229,10 @@ class INS(Model):
         v, q = V[self.model_components['u']], V[self.model_components['p']]
 
         # Domain integrals.
-        a = dt * (
-                - div(u) * q     # Conservation of mass
+        a = dt * (               # TODO: Why is conservation of mass multiplied by a time-step??
+                - div(u) * q     # Conservation of mass  TODO: Why this here?
                 - div(v) * p     # Pressure
-                - 1e-10 * p * q  # Stabilization term
+                - 1e-10 * p * q  # Stabilization term   TODO: This should not be needed (at least not for DG)
         ) * dx
 
         if self.DG:
@@ -244,6 +244,11 @@ class INS(Model):
             avg_grad_v = grad_avg(v)
 
             # Penalty for discontinuities
+            # TODO: Why are these in here?
+            #       James believes that these operations (jump, grad, etc.) may be returning a known value, one in terms
+            #       of previous values (timestep/iteration/something) of the operand.
+            #       E.g. p is an unknown, grad(p) would be fixed in terms of a previous value of p and could NOT be
+            #       solved for.
             a += dt * (
                     self.kv[time_step] * alpha * InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I from ∇u^
                     - self.kv[time_step] * InnerProduct(avg_grad_u, OuterProduct(jump_v, n))  # Stress
