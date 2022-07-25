@@ -41,13 +41,13 @@ class SolutionFileSaver:
             print('Can\'t output to file type {}.'.format(base_type))
 
         self.save_dir = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output/'
-        self.save_dir_sol = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output/sol/'
-        self.save_dir_vtu = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output/' + model.name + '_vtu/'
+        self.save_dir_sol = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output/sol_' + model.name + '/'
+        self.save_dir_vtu = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output/vtu_' + model.name + '/'
 
         # Specifically for diffuse interface rigid body motion.
         self.save_dir_phi = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output_phi/'
-        self.save_dir_phi_sol = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output_phi/sol/'
-        self.save_dir_phi_vtu = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output_phi/' + model.name + '_vtu/'
+        self.save_dir_phi_sol = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output_phi/sol_' + model.name + '/'
+        self.save_dir_phi_vtu = model.config.get_item(['OTHER', 'run_dir'], str, quiet) + '/output_phi/vtu_' + model.name + '/'
 
         self.base_filename_sol = self.save_dir_sol + model.name + '_'
         self.base_filename_phi_sol = self.save_dir_phi_sol + 'phi' + '_'

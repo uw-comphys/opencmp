@@ -164,7 +164,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
         subdivision = model.interp_ord
 
     # Generate a list of all .sol files
-    sol_path_generator  = Path(output_dir_path + 'sol/').rglob('*' + model.name + '*.sol')
+    sol_path_generator  = Path(output_dir_path + 'sol_' + model.name + '/').rglob('*' + model.name + '*.sol')
     sol_path_list       = [str(sol_path) for sol_path in sol_path_generator]
 
     # Number of files to convert
@@ -238,7 +238,7 @@ def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir
     time_str = sol_name.split('_')[-1]
 
     # Name for the .vtu
-    filename = output_dir_path + model_name + '_vtu/' + sol_name
+    filename = output_dir_path + 'vtu_' + model_name + '/' + sol_name
 
     # Load data into gfu
     gfu.Load(sol_path_str)
@@ -263,4 +263,4 @@ def _sol_to_vtu_parallel_runner(gfu: GridFunction, sol_path_str: str, output_dir
 
     # Write timestep in .pvd
     return '<DataSet timestep=\"%e\" group=\"\" part=\"0\" file=\"%s\"/>\n'\
-           % (float(time_str), model_name + '_vtu/' + filename.split('/')[-1] + '.vtu')
+           % (float(time_str), 'vtu_' + model_name + '/' + filename.split('/')[-1] + '.vtu')
