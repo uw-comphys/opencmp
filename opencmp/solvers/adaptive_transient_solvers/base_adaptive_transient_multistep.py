@@ -65,9 +65,12 @@ class BaseAdaptiveTransientMultiStepSolver(TransientMultiStepSolver, ABC):
         all_dt_from_local_error: List[float] = []
         for i in range(len(local_error)):
             safety_factor = 0.9
-            error_factor  = min(max(math.sqrt((self.dt_abs_tol + self.dt_rel_tol * gfu_norm[i]) / local_error[i]), 0.3), 2.0)
-
+            error_factor = math.sqrt((self.dt_abs_tol + self.dt_rel_tol * gfu_norm[i]) / local_error[i])
+            # Limit error_factor to [0.3, 2.0]
+            error_factor = max(0.3, error_factor)
+            error_factor = min(2.0, error_factor)
             all_dt_from_local_error.append(self.dt_param[0].Get() * safety_factor * error_factor)
+
         # Pick the smallest of the timestep values.
         dt_from_local_error = min(all_dt_from_local_error)
 

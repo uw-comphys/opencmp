@@ -63,10 +63,15 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
                 gfu_norm[i] = 1e-10
 
         # Calculate the next timestep based on the relative local error and multiply by 0.9 for a safety margin.
-        all_dt_from_local_error = [0.9 * self.dt_param[0].Get() * min(max(math.sqrt((self.dt_abs_tol
-                                                                                     + self.dt_rel_tol * gfu_norm[i])
-                                                                                    / local_error[i]), 0.3), 2.0)
-                                   for i in range(len(local_error))]
+        all_dt_from_local_error: List[float] = []
+        for i in range(len(local_error)):
+            safety_factor = 0.9
+            error_factor = math.sqrt((self.dt_abs_tol + self.dt_rel_tol * gfu_norm[i]) / local_error[i])
+            # Limit error_factor to [0.3, 2.0]
+            error_factor = max(0.3, error_factor)
+            error_factor = min(2.0, error_factor)
+            all_dt_from_local_error.append(self.dt_param[0].Get() * safety_factor * error_factor)
+
         # Pick the smallest of the timestep values.
         dt_from_local_error = min(all_dt_from_local_error)
 
@@ -89,8 +94,11 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
         dt_new = min([dt_from_local_error, self._dt_for_next_time_to_hit(), dt_max_allowed])
 
         # Accept the time step if all local errors are less than the absolute and relative tolerance.
-        accept_timestep = all([local_error[i] <= self.dt_abs_tol + self.dt_rel_tol * gfu_norm[i]
-                               for i in range(len(local_error))])
+        accept_timestep = True
+        for i in range(len(local_error)):
+            if local_error[i] > self.dt_abs_tol + self.dt_rel_tol * gfu_norm[i]:
+                accept_timestep = False
+                break
 
         if accept_timestep:
             # Keep the solution and move to the next time step with the new dt.
