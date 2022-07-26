@@ -307,12 +307,7 @@ class Model(ABC):
         Returns:
             The appropriate ds.
         """
-        if self.DG:
-            ds = ngs.ds(skeleton=True, definedon=self.mesh.Boundaries(marker))
-        else:
-            ds = ngs.ds(definedon=self.mesh.Boundaries(marker))
-
-        return ds
+        return ngs.ds(skeleton=self.DG, definedon=self.mesh.Boundaries(marker))
 
     def apply_dirichlet_bcs_to(self, gfu: GridFunction, time_step: int = 0) -> None:
         """
