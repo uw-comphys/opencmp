@@ -1,14 +1,15 @@
 OpenCMP Changelog
 =================
 
-July , 2022 (v1.0.2)
+August , 2022 (v1.0.2)
 
-* Added ability for multi-component INS code to run with a fixed velocity profile using the `velocity_fixed` config option
-* If a diffusion coefficient of 0 is provided for multi-component INS, the code now solves a purely convective problem by
-  removing all of the diffusive terms from the weak form
-* Refactored error analysis and sol-to-vtu post-processing into a separate directory
-* Added post-processing step to split the final .sol file by variable for easier importing of individual variables into other simulations
-* When multiple different models are run from the same folder, each gets a uniquely named .pvd and vtu folder
+* Implemented the DG version fo the multi-component INS code.
+* Added ability for multi-component INS code to run with a fixed velocity profile using the `velocity_fixed` config option.
+* If a diffusion coefficient of 0 is provided for multi-component INS, the code now solves a purely convective problem by removing all of the diffusive terms from the weak form.
+* Added ability to weakly impose Dirichlet BC conditions on L2 spaces.
+* Refactored error analysis and sol-to-vtu post-processing into a separate directory.
+* Added post-processing step to split the final .sol file by variable for easier importing of individual variables into other simulations.
+* When multiple different models are run from the same folder, each gets a uniquely named .pvd and vtu folder.
 
 June 6, 2022 (v1.0.1)
 
