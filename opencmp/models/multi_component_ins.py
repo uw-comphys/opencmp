@@ -82,10 +82,20 @@ class MultiComponentINS(INS):
 
         # Iterate over each component and add a fes for each
         for component in self.extra_components:
+            element_type_for_component = self.element[component]
+            kwargs = {'mesh': self.mesh,
+                      'order': self.interp_ord,
+                      'dgjumps': self.DG}
+            if element_type_for_component == "L2":
+                if ~self.DG:
+                    print('We recommended that you NOT use L2 spaces without DG due to numerical issues.')
+            else:
+                if self.DG:
+                    raise ValueError("DG is only compatiable with L2 space. Running with, e.g., an H1 space will effectively result in a slower CG solve.")
+                kwargs['dirichlet'] = self.dirichlet_names.get(component, '')
+
             fes_total.append(
-                getattr(ngsolve, self.element[component])(self.mesh, order=self.interp_ord,
-                                                          dirichlet=self.dirichlet_names.get(component, ''),
-                                                          dgjumps=self.DG)
+                getattr(ngsolve, element_type_for_component)(**kwargs)
             )
 
         return FESpace(fes_total, dgjumps=self.DG)

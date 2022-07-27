@@ -325,10 +325,11 @@ class Model(ABC):
                 gfu.Set(self.g_D['u'][time_step], definedon=self.mesh.Boundaries(self.dirichlet_names['u']))
             else:  # Multiple trial functions.
                 for component_name in self.g_D.keys():
-                    # Apply Dirichlet or pinned BCs.
                     i = self.model_components[component_name]
-                    gfu.components[i].Set(self.g_D[component_name][time_step],
-                                          definedon=self.mesh.Boundaries(self.dirichlet_names[component_name]))
+                    # Apply Dirichlet or pinned BCs, but only to non-L2 space
+                    if 'L2' not in self.fes.components[i].name:
+                        gfu.components[i].Set(self.g_D[component_name][time_step],
+                                              definedon=self.mesh.Boundaries(self.dirichlet_names[component_name]))
 
     # TODO: This needs a better name
     def construct_and_run_solver(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner,
