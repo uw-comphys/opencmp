@@ -87,7 +87,7 @@ class MultiComponentINS(INS):
                       'order': self.interp_ord,
                       'dgjumps': self.DG}
             if element_type_for_component == "L2":
-                if ~self.DG:
+                if not self.DG:
                     print('We recommended that you NOT use L2 spaces without DG due to numerical issues.')
             else:
                 if self.DG:
