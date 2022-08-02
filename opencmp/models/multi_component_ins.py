@@ -123,6 +123,12 @@ class MultiComponentINS(INS):
         if self.DIM:
             raise NotImplementedError('DIM is not yet implemented.')
 
+        if self.DG and self.linearize == 'IMEX':
+            raise NotImplementedError('DG IMEX is not yet implemented.')
+
+        if self.linearize == 'IMEX' and self.config.get_item(['TRANSIENT', 'scheme'], str) != 'euler IMEX':
+            raise NotImplementedError('Higher order IMEX schemes not yet implemeted for this model')
+
         if self.fixed_velocity:
             self.W = self._construct_linearization_terms()
 
