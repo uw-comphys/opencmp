@@ -84,7 +84,7 @@ def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: 
     split_str = model.name + "_"
     time_max = -1.0
     for sol_path in filter(lambda path: model.name in path, sol_paths_all):
-        time_i = float(sol_path.split(split_str)[1][:-4])
+        time_i = float(sol_path.split(split_str)[2][:-4])
         if time_i > time_max:
             time_max = time_i
             sol_path_final = sol_path
