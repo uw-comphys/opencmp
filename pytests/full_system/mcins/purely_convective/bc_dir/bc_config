@@ -1,5 +1,7 @@
 [DIRICHLET]
-a = left -> ramp(0.0, 1.0, 10.0)
+a = left -> -4*(y-0.5)*(y+0.5) * ramp(t)
 
-[neumann]
-a = right -> 0
+[TOTAL_FLUX]
+a = right  -> 0
+    top    -> 0
+    bottom -> 0

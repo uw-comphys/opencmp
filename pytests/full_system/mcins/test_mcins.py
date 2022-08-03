@@ -672,3 +672,34 @@ class TestFirstOrderRxnCoupled:
     #     # Run
     #     expected_errors = [7.5e-5, 4e-5, 1e-4]
     #     automated_output_check(capsys, first_order_rxn_coupled, expected_errors)
+
+
+class TestPureConvection:
+    # NOTE: CG Performs very poorly for purely convective flows. It's not recommended
+
+    def test_implicit_euler_dg(self, capsys: CaptureFixture, purely_convective: ConfigParser) -> None:
+        # Run
+        expected_errors = [1e-8]
+        automated_output_check(capsys, purely_convective, expected_errors)
+
+    def test_crank_nicolson_dg(self, capsys: CaptureFixture, purely_convective: ConfigParser) -> None:
+        # Change time discretization
+        purely_convective['TRANSIENT']['scheme'] = 'crank nicolson'
+        # Run
+        expected_errors = [1e-8]
+        automated_output_check(capsys, purely_convective, expected_errors)
+
+    def test_adaptive_2_step_dg(self, capsys: CaptureFixture, purely_convective: ConfigParser) -> None:
+
+        # Change time discretization
+        purely_convective['TRANSIENT']['scheme'] = 'adaptive two step'
+        # Run
+        expected_errors = [1e-8]
+        automated_output_check(capsys, purely_convective, expected_errors)
+
+    def test_adaptive_3_step_dg(self, capsys: CaptureFixture, purely_convective: ConfigParser) -> None:
+        # Change time discretization
+        purely_convective['TRANSIENT']['scheme'] = 'adaptive three step'
+        # Run
+        expected_errors = [1e-8]
+        automated_output_check(capsys, purely_convective, expected_errors)

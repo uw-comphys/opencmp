@@ -1,5 +1,5 @@
 [REFERENCE SOLUTIONS]
-a = 1.0
+a = -4*(y-0.5)*(y+0.5)
 
 [METRICS]
 L2_norm = a
