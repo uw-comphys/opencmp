@@ -51,8 +51,7 @@ class PhaseFieldModelMimic:
         return GridFunction(self.fes)
 
 
-def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: Optional[Model] = None,
-                             delete_sol_file: bool = False, allow_all_threads: bool = False) -> None:
+def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: Optional[Model] = None) -> None:
     """
     Function which takes the final .sol file in the output_dir and splits each component out into its own .sol file.
     Allows for easily loading only part of a previous solution into a different simulation.
@@ -78,7 +77,7 @@ def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: 
     sol_component_path = output_dir_path + 'components_sol/'
     Path(sol_component_path).mkdir(parents=True, exist_ok=True)
 
-    # Generate a lsit of all .sol file paths
+    # Generate a list of all .sol file paths
     sol_paths_all = [str(sol_path) for sol_path in Path(output_dir_path + model.name + '_sol/').rglob('*.sol')]
     sol_path_final = ""
     split_str = model.name + "_"
