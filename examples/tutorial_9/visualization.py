@@ -22,7 +22,7 @@ stl_filename = 'dim_dir/led.stl'
 boundary_lst, bounds_lst = mesh_helpers.get_stl_faces(stl_filename)
 binary = interface.get_binary_3d(boundary_lst, N, scale, offset, mnum=1, close=False)
 
-data_filename = 'output/sol/poisson_0.0.sol'
+data_filename = 'output/poisson_sol/poisson_0.0.sol'
 data_gfu = ngs.GridFunction(fes)
 data_gfu.Load(data_filename)
 

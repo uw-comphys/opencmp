@@ -85,7 +85,7 @@ The Stokes solve is a steady-state solve so needs no initial conditions. ::
 The incompressible Navier-Stokes solve does require initial conditions, but to facilitate convergence of the nonlinear solver the results of the Stokes solve will be saved to file and this file will be reloaded to provide initial conditions for the incompressible Navier-Stokes solve::
 
    [INS]
-   all = all -> output/sol/stokes_0.0.sol
+   all = all -> output/stokes_sol/stokes_0.0.sol
 
 The Model Configuration File
 ----------------------------

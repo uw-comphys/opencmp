@@ -42,5 +42,5 @@ component_in_error_calc = a -> True
 component_in_time_deriv = a -> True
                           b -> True
 run_dir = .
-num_threads = 7
+num_threads = 6
 velocity_fixed = True

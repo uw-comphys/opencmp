@@ -117,7 +117,7 @@ The Stokes solve is a steady-state solve so needs no initial conditions. ::
 The incompressible Navier-Stokes solve does require initial conditions. Unlike previous tutorials, the initial conditions are not known in closed-form. Instead, the results of the Stokes solve will be saved to file and this file will be reloaded to provide initial conditions for the incompressible Navier-Stokes solve. Data can only be loaded from .sol files and the given filepath points to where simulation results are saved. Alternatively, the results of the Stokes solve could be moved to a different folder and that filepath could be given. ::
 
    [INS]
-   all = all -> output/sol/stokes_0.0.sol
+   all = all -> output/stokes_sol/stokes_0.0.sol
 
 The Model Configuration File
 ----------------------------
