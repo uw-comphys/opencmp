@@ -257,14 +257,16 @@ class MultiComponentINS(INS):
                 # Convection
                 a -= dt * c * InnerProduct(w, Grad(r)) * dx
 
+                # The upwinding term needs to be added this way since it must be present even if a BC
+                # is not specified for that boundary.
+                # By removing the neumann, dirichlet, and reaction BCs, all that is left are the total_flux and "unlabelled"
+                # BCs, both of which need the upwinding term.
                 markers: Set[str] = set(self.mesh.GetBoundaries())
-                for marker in self.BC.get('neumann', {}).get(comp, {}):
-                    if marker in markers:
-                        markers.remove(marker)
-
-                for marker in self.BC.get('dirichlet', {}).get(comp, {}):
-                    if marker in markers:
-                        markers.remove(marker)
+                _bc_names = ['dirichlet', 'neumann', 'surface_rxn']
+                for _bc_name in _bc_names:
+                    for marker in self.BC.get(_bc_name, {}).get(comp, {}):
+                        if marker in markers:
+                            markers.remove(marker)
 
                 for marker in markers:
                     # 1/2 of Total Flux BC, other half in linear term
@@ -279,7 +281,6 @@ class MultiComponentINS(INS):
                     if self.Ds[comp][time_step] == 0:
                         raise ValueError('Trying to apply a neuman boundary condition for '
                                          'purely advective flow (diffusion coefficient is 0).')
-                    # NOTE: The IfPos is there to not add an extra upwinding term
                     if self.DG:
                         a += dt * r * c * InnerProduct(w, n) * self._ds(marker)
                     else:
