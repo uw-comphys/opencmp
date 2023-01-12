@@ -14,14 +14,14 @@
 # You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
-from ..helpers.dg import avg, grad_avg, jump
+from ..helpers.dg import grad_avg, jump
+from ..helpers.math import Min, Max
 from ..helpers.ngsolve_ import get_special_functions
 from . import INS
 from ..config_functions import ConfigParser
 from typing import Dict, List, Optional, Set, Union
-from ngsolve import BilinearForm, FESpace, Grad, IfPos, InnerProduct, LinearForm, GridFunction, Norm, Preconditioner, \
-    ds, dx, \
-    Parameter, CoefficientFunction
+from ngsolve import BilinearForm, FESpace, Grad, InnerProduct, LinearForm, GridFunction, Preconditioner, \
+    ds, dx, Parameter, CoefficientFunction
 from ngsolve.comp import ProxyFunction
 
 import ngsolve
@@ -175,7 +175,6 @@ class MultiComponentINS(INS):
                 c = U[self.model_components[comp]]
                 r = V[self.model_components[comp]]
 
-                avg_c = avg(c)
                 jump_c = jump(c)
                 avg_grad_c = grad_avg(c)
 
@@ -190,8 +189,8 @@ class MultiComponentINS(INS):
 
                 if self.linearize == 'Oseen':
                     a += dt * jump_r * (
-                            InnerProduct(w, n) * avg_c
-                            + 1/2 * Norm(InnerProduct(w, n)) * jump_c
+                            c * Max(InnerProduct(w, n), 0)
+                            + c.Other() * Min(InnerProduct(w, n), 0)
                     ) * dx(skeleton=True)
 
         return [a]
@@ -272,9 +271,9 @@ class MultiComponentINS(INS):
                     # 1/2 of Total Flux BC, other half in linear term
                     # Upwinding term, always add.
                     if self.DG:
-                        a += dt * r * c * IfPos(InnerProduct(w, n), InnerProduct(w, n), 0) * self._ds(marker)
+                        a += dt * r * c * Max(InnerProduct(w, n), 0) * self._ds(marker)
                     else:
-                        a += dt * r.Trace() * c * IfPos(InnerProduct(w, n), InnerProduct(w, n), 0) * self._ds(marker)
+                        a += dt * r.Trace() * c * Max(InnerProduct(w, n), 0) * self._ds(marker)
 
                 # 1/2 of the Neumann BC, other half in the linear form
                 for marker in self.BC.get('neumann', {}).get(comp, {}):
@@ -298,7 +297,7 @@ class MultiComponentINS(INS):
 
                     # 1/2 of convection penalty on dirichlet BCs
                     for marker in self.BC.get('dirichlet', {}).get(comp, {}):
-                        a += dt * r * c * 1/2 * (InnerProduct(w, n) + Norm(InnerProduct(w, n))) * self._ds(marker)
+                        a += dt * r * c * Max(InnerProduct(w, n), 0) * self._ds(marker)
 
         return [a]
 
@@ -381,7 +380,7 @@ class MultiComponentINS(INS):
                                 - alpha * r
                         ) * self._ds(marker)
                     if self.linearize == 'Oseen':  # Additional 1/2 of cw^ (convection)
-                        L -= dt * r * g * 1/2 * (w * n - Norm(w * n)) * self._ds(marker)
+                        L -= dt * r * g * Min(InnerProduct(w, n), 0) * self._ds(marker)
 
         return [L]
 
@@ -435,7 +434,7 @@ class MultiComponentINS(INS):
                     if self.Ds[comp][time_step] > 0:  # 1/2 of penalty for u=g on 𝚪_D
                         L -= dt * self.Ds[comp][time_step] * g * (InnerProduct(Grad(r), n) - alpha * r) * self._ds(marker)
                     # Additional 1/2 of cw^ (convection)
-                    L -= dt * r * g * 1/2 * (gfu_u * n - Norm(gfu_u * n)) * self._ds(marker)
+                    L -= dt * r * g * Min(InnerProduct(gfu_u, n), 0) * self._ds(marker)
 
         return [L]
 
