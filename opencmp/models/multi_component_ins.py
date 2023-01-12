@@ -181,12 +181,14 @@ class MultiComponentINS(INS):
                 jump_r = jump(r)
                 avg_grad_r = grad_avg(r)
 
+                # Diffusion on internal facets
                 if self.Ds[comp][time_step] != 0:
                     a += dt * self.Ds[comp][time_step] * (
                         InnerProduct(alpha*jump_c*n - avg_grad_c, jump_r*n)
                         - InnerProduct(avg_grad_r, jump_c * n)
                     ) * dx(skeleton=True)
 
+                # Advection on internal facets
                 if self.linearize == 'Oseen':
                     a += dt * jump_r * (
                             c * Max(InnerProduct(w, n), 0)
@@ -216,8 +218,8 @@ class MultiComponentINS(INS):
             c = U[self.model_components[comp]]
             r = V[self.model_components[comp]]
 
-            # Domain integrals.
-            if self.Ds[comp][time_step] > 0:  # If the diffusion coefficient is 0, don't add diffusion term
+            # Diffusion in bulk
+            if self.Ds[comp][time_step] > 0:
                 a += dt * self.Ds[comp][time_step] * InnerProduct(Grad(c), Grad(r)) * dx
 
             # NOTE: Reaction terms can go in either the bilinear form or the linear form depending on if the reaction
@@ -253,22 +255,18 @@ class MultiComponentINS(INS):
                     a += -dt * val * r * dx
 
             if self.linearize == 'Oseen':
-                # Convection
+                # Advection in bulk
                 a -= dt * c * InnerProduct(w, Grad(r)) * dx
 
-                # The upwinding term needs to be added this way since it must be present even if a BC
-                # is not specified for that boundary.
-                # By removing the neumann, dirichlet, and reaction BCs, all that is left are the total_flux and "unlabelled"
-                # BCs, both of which need the upwinding term.
-                markers: Set[str] = set(self.mesh.GetBoundaries())
-                _bc_names = ['dirichlet', 'neumann', 'surface_rxn']
-                for _bc_name in _bc_names:
-                    for marker in self.BC.get(_bc_name, {}).get(comp, {}):
-                        if marker in markers:
-                            markers.remove(marker)
-
-                for marker in markers:
-                    # 1/2 of Total Flux BC, other half in linear term
+                # 1/2 of Total Flux BC ("Natural" BC), other half in linear term
+                #   The upwinding term needs to be added this way since it must be present even if a value for h
+                #   is not specified for that boundary.
+                #   By removing the neumann, dirichlet, and reaction BCs, all that is left are the total_flux
+                #   and "unlabelled" BCs, both of which need the upwinding term.
+                total_flux_bc_markers: Set[str] = set(self.mesh.GetBoundaries())
+                for _bc_name in ['dirichlet', 'neumann', 'surface_rxn']:
+                    total_flux_bc_markers.difference_update(set(self.BC.get(_bc_name, {}).get(comp, {})))
+                for marker in total_flux_bc_markers:
                     # Upwinding term, always add.
                     if self.DG:
                         a += dt * r * c * Max(InnerProduct(w, n), 0) * self._ds(marker)
@@ -286,16 +284,18 @@ class MultiComponentINS(INS):
                         a += dt * r.Trace() * c * InnerProduct(w, n) * self._ds(marker)
 
                 if self.DG:
-                    # 1/2 of penalty for u=g on 𝚪_D
+                    # 1/2 of diffusion on Dirichlet BC (1st & 2nd line)
+                    # AND
+                    # 1/2 of penalty on Dirichlet BC (3rd line)
                     if self.Ds[comp][time_step] != 0:
                         for marker in self.BC.get('dirichlet').get(comp, {}):
                             a += dt * self.Ds[comp][time_step] * (
                                 alpha * r * c
-                                - c * InnerProduct(Grad(r), n)
                                 - r * InnerProduct(Grad(c), n)
+                                - c * InnerProduct(Grad(r), n)
                             ) * self._ds(marker)
 
-                    # 1/2 of convection penalty on dirichlet BCs
+                    # 1/2 of advection on dirichlet BCs
                     for marker in self.BC.get('dirichlet', {}).get(comp, {}):
                         a += dt * r * c * Max(InnerProduct(w, n), 0) * self._ds(marker)
 
@@ -347,7 +347,7 @@ class MultiComponentINS(INS):
                 else:
                     L += dt * val * r * dx
 
-            # 1/2 of Total Flux BC, other half in bilinear term
+            # 1/2 of Total Flux BC ("Natural" BC), other half in bilinear term
             for marker in self.BC.get('total_flux', {}).get(comp, {}):
                 h = self.BC['total_flux'][comp][marker][time_step]
                 if self.DG:
@@ -356,10 +356,8 @@ class MultiComponentINS(INS):
                     L -= dt * r.Trace() * h * self._ds(marker)
 
             # 1/2 of the Neumann BC, other half in the bilinear form
-            # if self.linearize == 'Oseen':
-            # Neumann BC for C
             for marker in self.BC.get('neumann', {}).get(comp, {}):
-                if self.Ds[comp][time_step] == 0:  # TODO: Can this be moved into post_init()?
+                if self.Ds[comp][time_step] == 0:
                     raise ValueError("Trying to apply a neuman boundary condition for "
                                      "purely advective flow (diffusion coefficient is 0).")
                 h = self.BC['neumann'][comp][marker][time_step]
@@ -369,17 +367,21 @@ class MultiComponentINS(INS):
                 else:
                     L -= dt * r.Trace() * h * self._ds(marker)
 
-            # 1/2 of penalty on Dirichlet BC
             if self.DG:
                 for marker in self.BC.get('dirichlet', {}).get(comp, {}):
                     g = self.BC['dirichlet'][comp][marker][time_step]
-                    # NOTE: Multiplied by a negative sign when moved over to the linear form
-                    if self.Ds[comp][time_step] > 0:  # 1/2 of penalty for u=g on 𝚪_D
-                        L -= dt * self.Ds[comp][time_step] * g * (
-                                InnerProduct(Grad(r), n)
-                                - alpha * r
+
+                    # 1/2 of diffusion on Dirichlet BC (1st line)
+                    # AND
+                    # 1/2 of penalty on Dirichlet BC (2nd line)
+                    if self.Ds[comp][time_step] > 0:
+                        L += dt * self.Ds[comp][time_step] * g * (
+                                alpha * r
+                                - InnerProduct(Grad(r), n)
                         ) * self._ds(marker)
-                    if self.linearize == 'Oseen':  # Additional 1/2 of cw^ (convection)
+
+                    # 1/2 of advection on Dirichlet BC
+                    if self.linearize == 'Oseen':
                         L -= dt * r * g * Min(InnerProduct(w, n), 0) * self._ds(marker)
 
         return [L]
@@ -410,7 +412,7 @@ class MultiComponentINS(INS):
             # Multiplied by a negative since brought to linear side
             L += dt * c_prev * InnerProduct(gfu_u, Grad(r)) * dx
 
-            # Neumann BC for C
+            # 1/2 of Neuman BC
             # TODO: Is this implemented correctly?
             for marker in self.BC.get('neumann', {}).get(comp, {}):
                 if self.Ds[comp][time_step] == 0:
@@ -430,10 +432,17 @@ class MultiComponentINS(INS):
             if self.DG:
                 for marker in self.BC.get('dirichlet', {}).get(comp, {}):
                     g = self.BC['dirichlet'][comp][marker][time_step]
-                    # NOTE: Multiplied by a negative sign when moved over to the linear form
-                    if self.Ds[comp][time_step] > 0:  # 1/2 of penalty for u=g on 𝚪_D
-                        L -= dt * self.Ds[comp][time_step] * g * (InnerProduct(Grad(r), n) - alpha * r) * self._ds(marker)
-                    # Additional 1/2 of cw^ (convection)
+
+                    # 1/2 of diffusion on Dirichlet BC (1st line)
+                    # AND
+                    # 1/2 of penalty on Dirichlet BC (2nd line)
+                    if self.Ds[comp][time_step] > 0:
+                        L += dt * self.Ds[comp][time_step] * g * (
+                                alpha * r
+                                - InnerProduct(Grad(r), n)
+                        ) * self._ds(marker)
+
+                    # 1/2 of advection on Dirichlet BC
                     L -= dt * r * g * Min(InnerProduct(gfu_u, n), 0) * self._ds(marker)
 
         return [L]
