@@ -16,9 +16,9 @@
 ########################################################################################################################
 
 from pytest import fixture
-from opencmp.helpers.math import tanh, sig, H_t, H_s
+from opencmp.helpers.math import tanh, sig, H_t, H_s, Max, Min
 from numpy import isclose
-from ngsolve import Parameter, CoefficientFunction, Mesh
+from ngsolve import Parameter, CoefficientFunction, Mesh, x
 from typing import Tuple
 from opencmp.config_functions.expanded_config_parser import ConfigParser
 from opencmp.helpers.io import load_mesh
@@ -43,7 +43,7 @@ def simple_mesh() -> Mesh:
     return mesh
 
 
-def _val_from_coeff(c: CoefficientFunction, mesh: Mesh) -> Tuple[float]:
+def _val_from_coeff(c: CoefficientFunction, mesh: Mesh, x, y) -> Tuple[float]:
     """
     Helper function to evaluate a coefficient function and return values as a tuple.
 
@@ -53,12 +53,17 @@ def _val_from_coeff(c: CoefficientFunction, mesh: Mesh) -> Tuple[float]:
     | NOTE: It is assumed that the coefficient function does not vary in space.
 
     Args:
-         c: The coefficient function to evaluate.
+         c:     The coefficient function to evaluate.
+         mesh:  The mesh to evaluate on
+         x:     The x-coordinate to evaluate at
+         y:     The y-coordinate to evaluate at
 
     Returns:
         Tuple containing the values of the coefficient function.
+        :param x:
+        :param y:
     """
-    val = c(mesh(0, 0))
+    val = c(mesh(x, y))
 
     # Convert
     if type(val) is float:
@@ -74,7 +79,7 @@ class TestTanh:
     def test_0(self, simple_mesh: Mesh):
         num_val   = tanh(0)
         param_res = tanh(Parameter(0))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   0)
         assert isclose(param_val, 0)
@@ -82,7 +87,7 @@ class TestTanh:
     def test_pos_inf(self, simple_mesh: Mesh):
         num_val   = tanh(1e30)
         param_res = tanh(Parameter(1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,  1)
         assert isclose(param_val, 1)
@@ -90,7 +95,7 @@ class TestTanh:
     def test_neg_inf(self, simple_mesh: Mesh):
         num_val   = tanh(-1e30)
         param_res = tanh(Parameter(-1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   -1)
         assert isclose(param_val, -1)
@@ -103,7 +108,7 @@ class TestSig:
     def test_0(self, simple_mesh: Mesh):
         num_val   = sig(0)
         param_res = sig(Parameter(0))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   0.5)
         assert isclose(param_val, 0.5)
@@ -111,7 +116,7 @@ class TestSig:
     def test_neg_inf_num(self, simple_mesh: Mesh):
         num_val   = sig(-1e30)
         param_res = sig(Parameter(-1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   0)
         assert isclose(param_val, 0)
@@ -119,7 +124,7 @@ class TestSig:
     def test_pos_inf_num(self, simple_mesh: Mesh):
         num_val   = sig(1e30)
         param_res = sig(Parameter(1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   1)
         assert isclose(param_val, 1)
@@ -132,7 +137,7 @@ class TestHT:
     def test_neg_inf_num(self, simple_mesh: Mesh):
         num_val   = H_t(-1e30)
         param_res = H_t(Parameter(-1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   0)
         assert isclose(param_val, 0)
@@ -140,7 +145,7 @@ class TestHT:
     def test_pos_inf_num(self, simple_mesh: Mesh):
         num_val  = H_t(1e30)
         param_res = H_t(Parameter(1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   1)
         assert isclose(param_val, 1)
@@ -148,11 +153,11 @@ class TestHT:
     def test_width(self, simple_mesh: Mesh):
         num_val_0   = H_t(0)
         param_res_0 = H_t(Parameter(0))
-        param_val_0 = _val_from_coeff(param_res_0, simple_mesh)[0]
+        param_val_0 = _val_from_coeff(param_res_0, simple_mesh, 0, 0)[0]
 
         num_val_1   = H_t(0.1)
         param_res_1 = H_t(Parameter(0.1))
-        param_val_1 = _val_from_coeff(param_res_1, simple_mesh)[0]
+        param_val_1 = _val_from_coeff(param_res_1, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val_0,   0, atol=0.0001)
         assert isclose(param_val_0, 0, atol=0.0001)
@@ -162,7 +167,7 @@ class TestHT:
     def test_0(self, simple_mesh: Mesh):
         num_val   = H_t(0.05)
         param_res = H_t(Parameter(0.05))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   0.5)
         assert isclose(param_val, 0.5)
@@ -173,8 +178,8 @@ class TestHT:
         result_0 = H_t(t - 1)
         result_1 = H_t(t + 1)
 
-        result_0 = _val_from_coeff(result_0, simple_mesh)
-        result_1 = _val_from_coeff(result_1, simple_mesh)
+        result_0 = _val_from_coeff(result_0, simple_mesh, 0, 0)
+        result_1 = _val_from_coeff(result_1, simple_mesh, 0, 0)
 
         assert isclose(result_0, 0)
         assert isclose(result_1, 1)
@@ -184,13 +189,13 @@ class TestHT:
 
         h = H_t(t)
 
-        result_0 = _val_from_coeff(h, simple_mesh)
+        result_0 = _val_from_coeff(h, simple_mesh, 0, 0)
 
         t.Set(t.Get() + 1.05)
-        result_05 = _val_from_coeff(h, simple_mesh)
+        result_05 = _val_from_coeff(h, simple_mesh, 0, 0)
 
         t.Set(t.Get() + 0.95)
-        result_1 = _val_from_coeff(h, simple_mesh)
+        result_1 = _val_from_coeff(h, simple_mesh, 0, 0)
 
         assert isclose(result_0,  0)
         assert isclose(result_05, 0.5)
@@ -204,7 +209,7 @@ class TestHS:
     def test_neg_inf_num(self, simple_mesh: Mesh):
         num_val   = H_s(-1e30)
         param_res = H_s(Parameter(-1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   0)
         assert isclose(param_val, 0)
@@ -212,7 +217,7 @@ class TestHS:
     def test_pos_inf_num(self, simple_mesh: Mesh):
         num_val  = H_s(1e30)
         param_res = H_s(Parameter(1e30))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   1)
         assert isclose(param_val, 1)
@@ -220,11 +225,11 @@ class TestHS:
     def test_width(self, simple_mesh: Mesh):
         num_val_0   = H_s(0)
         param_res_0 = H_s(Parameter(0))
-        param_val_0 = _val_from_coeff(param_res_0, simple_mesh)[0]
+        param_val_0 = _val_from_coeff(param_res_0, simple_mesh, 0, 0)[0]
 
         num_val_1   = H_s(0.1)
         param_res_1 = H_s(Parameter(0.1))
-        param_val_1 = _val_from_coeff(param_res_1, simple_mesh)[0]
+        param_val_1 = _val_from_coeff(param_res_1, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val_0,   0, atol=0.0001)
         assert isclose(param_val_0, 0, atol=0.0001)
@@ -234,7 +239,7 @@ class TestHS:
     def test_0(self, simple_mesh: Mesh):
         num_val   = H_s(0.05)
         param_res = H_s(Parameter(0.05))
-        param_val = _val_from_coeff(param_res, simple_mesh)[0]
+        param_val = _val_from_coeff(param_res, simple_mesh, 0, 0)[0]
 
         assert isclose(num_val,   0.5)
         assert isclose(param_val, 0.5)
@@ -245,8 +250,8 @@ class TestHS:
         result_0 = H_s(t - 1)
         result_1 = H_s(t + 1)
 
-        result_0 = _val_from_coeff(result_0, simple_mesh)
-        result_1 = _val_from_coeff(result_1, simple_mesh)
+        result_0 = _val_from_coeff(result_0, simple_mesh, 0, 0)
+        result_1 = _val_from_coeff(result_1, simple_mesh, 0, 0)
 
         assert isclose(result_0, 0)
         assert isclose(result_1, 1)
@@ -256,14 +261,210 @@ class TestHS:
 
         h = H_s(t)
 
-        result_0 = _val_from_coeff(h, simple_mesh)
+        result_0 = _val_from_coeff(h, simple_mesh, 0, 0)
 
         t.Set(t.Get() + 1.05)
-        result_05 = _val_from_coeff(h, simple_mesh)
+        result_05 = _val_from_coeff(h, simple_mesh, 0, 0)
 
         t.Set(t.Get() + 0.95)
-        result_1 = _val_from_coeff(h, simple_mesh)
+        result_1 = _val_from_coeff(h, simple_mesh, 0, 0)
 
         assert isclose(result_0,  0)
         assert isclose(result_05, 0.5)
         assert isclose(result_1,  1)
+
+
+class TestMax:
+    """
+    Test that the Max function is working properly
+    """
+
+    def test_both_pos(self, simple_mesh: Mesh):
+        a = 10.0
+        b = CoefficientFunction(9.5 + x)
+
+        max_a_first = Max(a, b)
+        max_b_first = Max(b, a)
+
+        max_left_a  = _val_from_coeff(max_a_first, simple_mesh, 0,   0)[0]
+        max_left_b  = _val_from_coeff(max_b_first, simple_mesh, 0,   0)[0]
+        max_mid_a   = _val_from_coeff(max_a_first, simple_mesh, 0.5, 0)[0]
+        max_mid_b   = _val_from_coeff(max_b_first, simple_mesh, 0.5, 0)[0]
+        max_right_a = _val_from_coeff(max_a_first, simple_mesh, 1,   0)[0]
+        max_right_b = _val_from_coeff(max_b_first, simple_mesh, 1,   0)[0]
+
+        assert isclose(10, max_left_a)
+        assert isclose(max_left_a, max_left_b)
+
+        assert isclose(10, max_mid_a)
+        assert isclose(max_mid_a, max_mid_b)
+
+        assert isclose(10.5, max_right_a)
+        assert isclose(max_right_a, max_right_b)
+
+    def test_one_pos_one_neg(self, simple_mesh: Mesh):
+        a = 10.0
+        b = CoefficientFunction(-9.5 + x)
+
+        max_a_first = Max(a, b)
+        max_b_first = Max(b, a)
+
+        max_left_a = _val_from_coeff(max_a_first, simple_mesh, 0, 0)[0]
+        max_left_b = _val_from_coeff(max_b_first, simple_mesh, 0, 0)[0]
+        max_mid_a = _val_from_coeff(max_a_first, simple_mesh, 0.5, 0)[0]
+        max_mid_b = _val_from_coeff(max_b_first, simple_mesh, 0.5, 0)[0]
+        max_right_a = _val_from_coeff(max_a_first, simple_mesh, 1, 0)[0]
+        max_right_b = _val_from_coeff(max_b_first, simple_mesh, 1, 0)[0]
+
+        assert isclose(10, max_left_a)
+        assert isclose(max_left_a, max_left_b)
+
+        assert isclose(10, max_mid_a)
+        assert isclose(max_mid_a, max_mid_b)
+
+        assert isclose(10, max_right_a)
+        assert isclose(max_right_a, max_right_b)
+
+    def test_one_zero(self, simple_mesh: Mesh):
+        a = 0.0
+        b = CoefficientFunction(x - 0.5)
+
+        max_a_first = Max(a, b)
+        max_b_first = Max(b, a)
+
+        max_left_a  = _val_from_coeff(max_a_first, simple_mesh, 0,   0)[0]
+        max_left_b  = _val_from_coeff(max_b_first, simple_mesh, 0,   0)[0]
+        max_mid_a   = _val_from_coeff(max_a_first, simple_mesh, 0.5, 0)[0]
+        max_mid_b   = _val_from_coeff(max_b_first, simple_mesh, 0.5, 0)[0]
+        max_right_a = _val_from_coeff(max_a_first, simple_mesh, 1,   0)[0]
+        max_right_b = _val_from_coeff(max_b_first, simple_mesh, 1,   0)[0]
+
+        assert isclose(0, max_left_a)
+        assert isclose(max_left_a, max_left_b)
+
+        assert isclose(0, max_mid_a)
+        assert isclose(max_mid_a, max_mid_b)
+
+        assert isclose(0.5, max_right_a)
+        assert isclose(max_right_a, max_right_b)
+
+    def test_both_neg(self, simple_mesh: Mesh):
+        a = -10.0
+        b = CoefficientFunction(-9.5 - x)
+
+        max_a_first = Max(a, b)
+        max_b_first = Max(b, a)
+
+        max_left_a  = _val_from_coeff(max_a_first, simple_mesh, 0,   0)[0]
+        max_left_b  = _val_from_coeff(max_b_first, simple_mesh, 0,   0)[0]
+        max_mid_a   = _val_from_coeff(max_a_first, simple_mesh, 0.5, 0)[0]
+        max_mid_b   = _val_from_coeff(max_b_first, simple_mesh, 0.5, 0)[0]
+        max_right_a = _val_from_coeff(max_a_first, simple_mesh, 1,   0)[0]
+        max_right_b = _val_from_coeff(max_b_first, simple_mesh, 1,   0)[0]
+
+        assert isclose(-9.5, max_left_a)
+        assert isclose(max_left_a, max_left_b)
+
+        assert isclose(-10, max_mid_a)
+        assert isclose(max_mid_a, max_mid_b)
+
+        assert isclose(-10, max_right_a)
+        assert isclose(max_right_a, max_right_b)
+
+
+class TestMin:
+    """
+    Test that the Min function is working properly
+    """
+
+    def test_both_pos(self, simple_mesh: Mesh):
+        a = 10.0
+        b = CoefficientFunction(9.5 + x)
+
+        min_a_first = Min(a, b)
+        min_b_first = Min(b, a)
+
+        min_left_a  = _val_from_coeff(min_a_first, simple_mesh, 0, 0)[0]
+        min_left_b  = _val_from_coeff(min_b_first, simple_mesh, 0, 0)[0]
+        min_mid_a   = _val_from_coeff(min_a_first, simple_mesh, 0.5, 0)[0]
+        min_mid_b   = _val_from_coeff(min_b_first, simple_mesh, 0.5, 0)[0]
+        min_right_a = _val_from_coeff(min_a_first, simple_mesh, 1, 0)[0]
+        min_right_b = _val_from_coeff(min_b_first, simple_mesh, 1, 0)[0]
+
+        assert isclose(9.5, min_left_a)
+        assert isclose(min_left_a, min_left_b)
+
+        assert isclose(10, min_mid_a)
+        assert isclose(min_mid_a, min_mid_b)
+
+        assert isclose(10, min_right_a)
+        assert isclose(min_right_a, min_right_b)
+
+    def test_one_neg(self, simple_mesh: Mesh):
+        a = 10.0
+        b = CoefficientFunction(-9.5 - x)
+
+        min_a_first = Min(a, b)
+        min_b_first = Min(b, a)
+
+        min_left_a = _val_from_coeff(min_a_first, simple_mesh, 0, 0)[0]
+        min_left_b = _val_from_coeff(min_b_first, simple_mesh, 0, 0)[0]
+        min_mid_a = _val_from_coeff(min_a_first, simple_mesh, 0.5, 0)[0]
+        min_mid_b = _val_from_coeff(min_b_first, simple_mesh, 0.5, 0)[0]
+        min_right_a = _val_from_coeff(min_a_first, simple_mesh, 1, 0)[0]
+        min_right_b = _val_from_coeff(min_b_first, simple_mesh, 1, 0)[0]
+
+        assert isclose(-9.5, min_left_a)
+        assert isclose(min_left_a, min_left_b)
+
+        assert isclose(-10, min_mid_a)
+        assert isclose(min_mid_a, min_mid_b)
+
+        assert isclose(-10.5, min_right_a)
+        assert isclose(min_right_a, min_right_b)
+
+    def test_one_zero(self, simple_mesh: Mesh):
+        a = 0.0
+        b = CoefficientFunction(x - 0.5)
+
+        min_a_first = Min(a, b)
+        min_b_first = Min(b, a)
+
+        min_left_a = _val_from_coeff(min_a_first, simple_mesh, 0, 0)[0]
+        min_left_b = _val_from_coeff(min_b_first, simple_mesh, 0, 0)[0]
+        min_mid_a = _val_from_coeff(min_a_first, simple_mesh, 0.5, 0)[0]
+        min_mid_b = _val_from_coeff(min_b_first, simple_mesh, 0.5, 0)[0]
+        min_right_a = _val_from_coeff(min_a_first, simple_mesh, 1, 0)[0]
+        min_right_b = _val_from_coeff(min_b_first, simple_mesh, 1, 0)[0]
+
+        assert isclose(-0.5, min_left_a)
+        assert isclose(min_left_a, min_left_b)
+
+        assert isclose(0, min_mid_a)
+        assert isclose(min_mid_a, min_mid_b)
+
+        assert isclose(0, min_right_a)
+        assert isclose(min_right_a, min_right_b)
+
+    def test_both_neg(self, simple_mesh: Mesh):
+        a = -10.0
+        b = CoefficientFunction(-9.5 - x)
+
+        min_a_first = Min(a, b)
+        min_b_first = Min(b, a)
+
+        min_left_a = _val_from_coeff(min_a_first, simple_mesh, 0, 0)[0]
+        min_left_b = _val_from_coeff(min_b_first, simple_mesh, 0, 0)[0]
+        min_mid_a = _val_from_coeff(min_a_first, simple_mesh, 0.5, 0)[0]
+        min_mid_b = _val_from_coeff(min_b_first, simple_mesh, 0.5, 0)[0]
+        min_right_a = _val_from_coeff(min_a_first, simple_mesh, 1, 0)[0]
+        min_right_b = _val_from_coeff(min_b_first, simple_mesh, 1, 0)[0]
+
+        assert isclose(-10, min_left_a)
+        assert isclose(min_left_a, min_left_b)
+
+        assert isclose(-10, min_mid_a)
+        assert isclose(min_mid_a, min_mid_b)
+
+        assert isclose(-10.5, min_right_a)
+        assert isclose(min_right_a, min_right_b)
