@@ -153,7 +153,8 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
     if model is None:
         # Load model
         model_name  = config_parser.get_item(['OTHER', 'model'], str)
-        model_class = get_model_class(model_name)
+        dim_used    = config_parser.get_item(['DIM', 'diffuse_interface_method'], bool)
+        model_class = get_model_class(model_name, dim_used)
         model       = model_class(config_parser, [Parameter(0.0)])
 
     # Number of subdivisions per element
