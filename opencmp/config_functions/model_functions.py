@@ -26,9 +26,14 @@ class ModelFunctions(ConfigFunctions):
     Class to hold the model functions and parameters.
     """
 
-    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = [Parameter(0.0)],
-                 new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction, None]]] = [{}])\
+    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = None,
+                 new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction, None]]] = None)\
             -> None:
+        if t_param is None:
+            t_param = [Parameter(0.0)]
+        if new_variables is None:
+            new_variables = [{}]
+
         super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the model functions/parameters/components dict from the main config file.
