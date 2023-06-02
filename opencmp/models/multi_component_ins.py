@@ -90,8 +90,6 @@ class MultiComponentINS(INS):
                 if not self.DG:
                     print('We recommended that you NOT use L2 spaces without DG due to numerical issues.')
             else:
-                if self.DG:
-                    raise ValueError("DG is only compatiable with L2 space. Running with, e.g., an H1 space will effectively result in a slower CG solve.")
                 kwargs['dirichlet'] = self.dirichlet_names.get(component, '')
 
             fes_total.append(
