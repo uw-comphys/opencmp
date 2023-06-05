@@ -83,6 +83,7 @@ class Solver(ABC):
         # If the simulation is allowed to resume from a previous simulation
         # TODO: Come back and add one where the IC is chosen and loaded automatically from the .sol
         #       That was not done here since it would involve deep changes with ICFunctions.
+        # TODO: Have LATEST be a special keyword to read in
         if self.config.get_item(['OTHER', 'resume_from_previous'], bool):
             # Find the .sol files
             output_dir = Path(self.config.get_item(['OTHER', 'run_dir'], str) + '/output/' + model_class.name() + '_sol/')
@@ -125,9 +126,14 @@ class Solver(ABC):
 
                     print("Resuming from previous solution: {}".format(latest_file_name))
 
-                    # If there is more than one saved file, calculate and set the initial dt from them
+                    # If there is more than one saved file, calculate a dt from it.
                     if latest != second_latest:
-                        self.config.set('TRANSIENT', 'dt', str(latest - second_latest))
+                        self.dt_range = self.config.get_list(['TRANSIENT', 'dt_range'], float)
+                        dt_proposed = latest - second_latest
+
+                        # Set that dt if it's within the acceptable range:
+                        if self.dt_range[0] < dt_proposed < self.dt_range[1]:
+                            self.config.set('TRANSIENT', 'dt', str(dt_proposed))
 
         self.transient = self.config.get_item(['TRANSIENT', 'transient'], bool)
 
