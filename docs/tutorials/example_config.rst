@@ -194,6 +194,17 @@ This is the main configuration file for the simulation run. It is kept in the ru
 |               |                              |                    |                | an adaptive time-stepping  |
 |               |                              |                    |                | scheme.                    |
 |               +------------------------------+--------------------+----------------+----------------------------+
+|               | velocity_fixed               | True/False         | False          | Only for multicomponent    |
+|               |                              |                    |                | flow model. Whether or not |
+|               |                              |                    |                | to solve the fluid flow at |
+|               |                              |                    |                | each timestep, or to keep  |
+|               |                              |                    |                | it fixed. Enable if the    |
+|               |                              |                    |                | velocity does not need to  |
+|               |                              |                    |                | be solved as it results in |
+|               |                              |                    |                | significantly faster       |
+|               |                              |                    |                | solves, and lower memory   |
+|               |                              |                    |                | usage.                     |
+|               +------------------------------+--------------------+----------------+----------------------------+
 |               | parameter_names              | name, name...      | Nothing        | Names of parameters that   |
 |               |                              |                    |                | will be used as additional |
 |               |                              |                    |                | variables in the model.    |
@@ -223,15 +234,15 @@ Below is an example of a simulation with a Dirichlet boundary condition applied 
    [NEUMANN]
    u = right -> -11.5
    
-One special case is stress boundary conditions, which do not need to have a model variable specified. Instead, the model variable should be left as "stress". ::
+One special case is stress boundary conditions. It also specifies u as the model variable even though it includes the pressure contribution. This is because when the term is derived in the weak form it will use the test function associated with velocity. ::
 
    [STRESS]
-   stress = left -> [5, 2*t]
+   u = left -> [5, 2*t]
    
-The other special case is no-tangential-flow boundary conditions, which do not need to have a model variable specified and do not need to have a value specified. Instead, the model variable should be left as "parallel" and the value can be any value. ::
+The other special case is no-tangential-flow boundary conditions. It also uses the velocity model variable. Importantly, the value provided does not matter, any provided value will enable this term. ::
 
    [PARALLEL]
-   parallel = left -> 1
+   u = left -> 1
 
 
 Initial Condition Configuration File

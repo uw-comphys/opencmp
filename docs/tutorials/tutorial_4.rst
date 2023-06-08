@@ -56,7 +56,7 @@ The boundary condition are similar to those used in :ref:`tutorial_4` with the e
        wall  -> [0.0, 0.0]
 
    [STRESS]
-   stress = outlet -> [0.0, 0.0]
+   u = outlet -> [0.0, 0.0]
 
 The Initial Condition Configuration File
 ----------------------------------------

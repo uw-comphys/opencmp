@@ -22,7 +22,7 @@ transient = False
 check_error = False
 
 [OTHER]
-num_threads = 4
+num_threads = 8
 model = Poisson
 run_dir = .
 

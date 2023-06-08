@@ -3,11 +3,4 @@ u = inlet -> [50*y*(0.2 - y), 0.0]
     wall  -> [0.0, 0.0]
 
 [STRESS]
-stress = outlet -> [0.0, 0.0]
-
-
-
-
-
-
-
+u = outlet -> [0.0, 0.0]

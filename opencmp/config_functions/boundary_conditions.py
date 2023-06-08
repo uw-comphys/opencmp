@@ -26,23 +26,39 @@ class BCFunctions(ConfigFunctions):
     Class to hold the boundary condition functions.
     """
 
-    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter] = [Parameter(0.0)],
+    def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, bc_types: List[str],
+                 t_param: List[Parameter] = [Parameter(0.0)],
                  new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
+        bc_types = [type.upper() for type in bc_types]
         super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the BC dict from the BC configfile.
         self.bc_dict, self.bc_re_parse_dict = self.config.get_three_level_dict(self.import_dir, None, self.t_param,
                                                                                new_variables,
+                                                                               white_list=bc_types,
                                                                                ignore=['VERTICES', 'CENTROIDS'])
+
+        # Used to keep track of which unknown variables the user has already been warned about
+        # A variable present in the config file that is not in the current model is not necessarily a bug.
+        # It may occur (and not be a bug) when the user has a config file to generate the initial conditions inside
+        # the same folder as their main simulation (e.g. Running INS to get the initial condition for MCINS).
+        self.already_warned_about_dirichlet = set()
+        self.already_warned_about_pinned = set()
 
     def load_bc_gridfunctions(self, bc_dict: Dict, fes: FESpace, model_components: Dict[str, Optional[int]]) -> Dict:
         """
         Function to load any saved gridfunctions that should be used to specify BCs.
 
         Args:
-            bc_dict: Dictionary specifying the BCs and their mesh markers for each variable.
-            fes: The finite element space of the model.
-            model_components: Maps between variable names and their component in the finite element space.
+            bc_dict:                Dictionary specifying the BCs and their mesh markers for each variable.
+            fes:                    The finite element space of the model.
+            model_components:       Maps between variable names and their component in the finite element space.
+                                    initial conditions.
+                                    This value is used in order to exclude BCs that were used to generate the initial
+                                    conditions for this simulations.
+                                    It is needed when the same config files are used for both the initial condition
+                                    and the main simulation and when they used different models.
+                                    E.g. INS for initial condition, and MCINS with a fixed velocity as the final simulation.
 
         Returns:
             The input dict now, where appropriate, holding gridfunctions in place of strings holding the paths to those
@@ -54,27 +70,25 @@ class BCFunctions(ConfigFunctions):
                 if var in model_components:
                     component = model_components[var]
                 else:
-                    # For things like stress... All of these flux-type boundary conditions use the same finite element
-                    # space as the velocity component.
-                    component = model_components['u']
+                    # Variable left over from running the simulation to get the IC or fixed velocity profile for MCINS
+                    # Or variables which will be used by subsequent presentations
+                    # OR typos
+                    # TODO: This can fail silently
+                    continue
+
                 for marker, val_lst in bc_dict[bc_type][var].items():
                     for val in val_lst:
-                        if isinstance(val, str):
-                            # Need to load a gridfunction from file.
-
+                        if isinstance(val, str):  # Need to load a gridfunction from file.
                             # Check that the file exists.
                             val = self._find_rel_path_for_file(val)
 
                             # Use a component of the finite element space.
                             gfu_val = ngs.GridFunction(fes.components[component])
-
                             gfu_val.Load(val)
 
                             # Replace the value in the BC dictionary.
                             bc_dict[bc_type][var][marker] = gfu_val
-
-                        else:
-                            # Already parsed
+                        else:  # Already parsed
                             pass
 
         return bc_dict
@@ -152,6 +166,11 @@ class BCFunctions(ConfigFunctions):
 
         if len(bc_dict['dirichlet']) > 0:
             for var in bc_dict['dirichlet']:
+                if var not in model_components:
+                    if var not in self.already_warned_about_dirichlet:
+                        self.already_warned_about_dirichlet.add(var)
+                        print('Ignoring variable \"{}\" while loading dirichlet boundary conditions since not part of the model.'.format(var))
+                    continue
 
                 # List of values for Dirichlet BCs for each variable
                 dirichlet_lst: List = [[] for _ in self.t_param]
@@ -185,6 +204,12 @@ class BCFunctions(ConfigFunctions):
 
         if len(bc_dict.get('pinned', {})) > 0:
             for var in bc_dict['pinned']:
+                if var not in model_components:
+                    if var not in self.already_warned_about_pinned:
+                        self.already_warned_about_pinned.add(var)
+                        print('Ignoring variable \"{}\" while loading pinned conditions since not part of the model.'.format(var))
+                    continue
+
                 if var in g_D.keys():
                     # Check that the variable doesn't already have Dirichlet BCs specified.
                     raise ValueError('Dirichlet boundary conditions have been specified for {0}. It is unnecessary to '

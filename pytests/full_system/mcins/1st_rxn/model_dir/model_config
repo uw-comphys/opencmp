@@ -4,6 +4,5 @@ diffusion_coefficients = a -> 1
                          b -> 1
 
 [FUNCTIONS]
-source = u -> [0.0, 0.0]
-         a -> - 1*a
+source = a -> - 1*a
          b -> -10*b

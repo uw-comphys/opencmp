@@ -1,0 +1,8 @@
+[INS]
+all = all -> None
+
+[MultiComponentINS]
+u = all -> output/components_sol/u.sol
+p = all -> output/components_sol/p.sol
+a = all -> 0.0
+b = all -> 0.0

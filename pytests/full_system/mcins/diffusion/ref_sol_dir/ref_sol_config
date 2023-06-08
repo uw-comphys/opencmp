@@ -6,5 +6,4 @@ b = 1.0
 c = 1 - x
 
 [METRICS]
-L2_norm = u, p, a, b, c
-divergence = u
+L2_norm = a, b, c

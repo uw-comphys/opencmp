@@ -63,7 +63,9 @@ class Model(ABC):
         self.run_dir = self.config.get_item(['OTHER', 'run_dir'], str)
 
         # Dictionary to map variable name to index inside fes/gridfunctions, and for labeling variables in vtk output.
-        self.model_components = self._define_model_components()
+        # These are currently the same, but will be changed in other functions. E.g. MCINS._add_multiple_components()
+        self.model_components    = self._define_model_components()
+        self.model_components_ic = self._define_model_components()
 
         # Dictionary to specify if a particular component should be used for error calculations
         self.model_local_error_components = self._define_model_local_error_components()
@@ -85,6 +87,9 @@ class Model(ABC):
         # Ensure that every variable is specified for the time derivative terms for each weak form
         for form in self.time_derivative_components:
             assert len(self.model_components) == len(form)
+
+        # For MCINS, whether or not the velocity is fixed in time at the initial condition, and thus does not have to be solved
+        self.fixed_velocity = self.config.get_item(['OTHER', 'velocity_fixed'], bool)
 
         # Run any model-specific work now that some things have been initialized.
         self._pre_init()
@@ -113,7 +118,7 @@ class Model(ABC):
         self.interp_ord = self.config.get_item(['FINITE ELEMENT SPACE', 'interpolant_order'], int)
 
         # Ensure that each component has an associated element
-        assert len(self.model_components) == len(self.element)
+        assert len(self.model_components) == len(self.element) - (2 if self.fixed_velocity else 0)
 
         # Check if DG should be used.
         self.DG = self.config.get_item(['DG', 'DG'], bool)
@@ -178,8 +183,8 @@ class Model(ABC):
         # Note: Need dirichlet_names before constructing fes, but need to construct fes before gridfunctions can be
         #       loaded for ex: BCs, ICs, reference solutions. So, get the BC dict before constructing fes,
         #       but then actually load the BCs etc after constructing fes.
-        self.bc_functions = BCFunctions(self.run_dir + '/bc_dir/bc_config', self.run_dir, self.mesh, self.t_param,
-                                        self.update_variables)
+        self.bc_functions = BCFunctions(self.run_dir + '/bc_dir/bc_config', self.run_dir, self.mesh, self._define_bc_types(),
+                                        self.t_param, self.update_variables)
 
         # 1/2: Create BCs.
         # Needs to be done in two steps since initializing the BC gridfunctions requires a FES, which in turn requires
@@ -190,6 +195,7 @@ class Model(ABC):
         # Create the finite element space.
         # This needs to be done before the initial conditions are loaded.
         self.fes = self._construct_fes()
+        self.fes_ic = self._construct_ic_fes()
 
         self._test, self._trial = self._create_test_and_trial_functions()
 
@@ -202,15 +208,15 @@ class Model(ABC):
                                                  self.t_param, self.update_variables)
 
         # Load initial condition.
-        self.IC = self.construct_gfu()
-        self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components)
+        self.IC = self.construct_gfu_ic()
+        self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components_ic)
 
         # 2/2: Create BCs
         # Now that we have the FES, we can load in the bc gridfunctions
         # Load any boundary conditions saved as gridfunctions.
         self.BC = self.bc_functions.load_bc_gridfunctions(self.BC, self.fes, self.model_components)
         # TODO: Give good description of this variable here
-        self.g_D = self.bc_functions.set_dirichlet_boundary_conditions(self.BC, self.mesh, self.construct_gfu(),
+        self.g_D = self.bc_functions.set_dirichlet_boundary_conditions(self.BC, self.mesh, self.construct_gfu_ic(),
                                                                        self.model_components)
 
         # Load the model functions and model parameters.
@@ -230,6 +236,7 @@ class Model(ABC):
             self.DIM_solver.get_DIM_gridfunctions(self.mesh, self.interp_ord)
             # DIM_dirichlet_names should never be used and a DIM g_D is not needed.
             self.DIM_bc_functions = BCFunctions(self.DIM_dir + '/bc_dir/dim_bc_config', self.run_dir, self.mesh,
+                                                self._define_bc_types(),
                                                 self.t_param, self.update_variables)
             self.DIM_BC, DIM_dirichlet_names = self.DIM_bc_functions.set_boundary_conditions(self._define_bc_types())
             self.DIM_BC = self.DIM_bc_functions.load_bc_gridfunctions(self.DIM_BC, self.fes, self.model_components)
@@ -300,12 +307,7 @@ class Model(ABC):
         Returns:
             The appropriate ds.
         """
-        if self.DG:
-            ds = ngs.ds(skeleton=True, definedon=self.mesh.Boundaries(marker))
-        else:
-            ds = ngs.ds(definedon=self.mesh.Boundaries(marker))
-
-        return ds
+        return ngs.ds(skeleton=self.DG, definedon=self.mesh.Boundaries(marker))
 
     def apply_dirichlet_bcs_to(self, gfu: GridFunction, time_step: int = 0) -> None:
         """
@@ -323,10 +325,11 @@ class Model(ABC):
                 gfu.Set(self.g_D['u'][time_step], definedon=self.mesh.Boundaries(self.dirichlet_names['u']))
             else:  # Multiple trial functions.
                 for component_name in self.g_D.keys():
-                    # Apply Dirichlet or pinned BCs.
                     i = self.model_components[component_name]
-                    gfu.components[i].Set(self.g_D[component_name][time_step],
-                                          definedon=self.mesh.Boundaries(self.dirichlet_names[component_name]))
+                    # Apply Dirichlet or pinned BCs, but only to non-L2 space
+                    if 'L2' not in self.fes.components[i].name:
+                        gfu.components[i].Set(self.g_D[component_name][time_step],
+                                              definedon=self.mesh.Boundaries(self.dirichlet_names[component_name]))
 
     # TODO: This needs a better name
     def construct_and_run_solver(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner,
@@ -396,6 +399,17 @@ class Model(ABC):
             A GridFunction initialized on the finite element space of the model.
         """
         gfu = ngs.GridFunction(self.fes)
+
+        return gfu
+
+    def construct_gfu_ic(self) -> GridFunction:
+        """
+        Function to construct a solution GridFunction.
+
+        Returns:
+            A GridFunction initialized on the finite element space of the model.
+        """
+        gfu = ngs.GridFunction(self.fes_ic)
 
         return gfu
 
@@ -676,7 +690,7 @@ class Model(ABC):
         if ic_update:
             # Update the initial conditions.
             self.ic_functions.update_initial_conditions(self.t_param, self.update_variables, self.mesh)
-            self.IC = self.construct_gfu()
+            self.IC = self.construct_gfu_ic()
             self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components)
 
         if ref_sol_update:
@@ -713,6 +727,19 @@ class Model(ABC):
         Returns:
             The finite element space.
         """
+
+    def _construct_ic_fes(self) -> FESpace:
+        """
+        Function to construct the finite element space for the model's initial condition.
+        In more circumstances this is identical to self._construct_fes.
+        The exception is the MCINS model when the velocity and pressure do not wish to be solved in time.
+        In that case, this method will return a mixed function space which contains a function space for the velocity in pressure
+        while the result from self._construct_fes will NOT have a function space for velocity and pressure.
+
+        Returns:
+            The finite element space onto which to load the initial condition
+        """
+        return self._construct_fes()
 
     @abstractmethod
     def _define_bc_types(self) -> List[str]:

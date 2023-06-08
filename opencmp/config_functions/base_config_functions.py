@@ -33,11 +33,12 @@ class ConfigFunctions:
         Initializer
 
         Args:
-            config_rel_path: The filename, and relative path, for the config file for this controller.
-            import_dir: The path to the main run directory containing the file from which to import any Python functions.
-            t_param: List of parameters representing the current time and previous time steps.
-            new_variables: List of dictionaries containing any new model variables and their values at each time step
-                used in the time discretization scheme.
+            config_rel_path:    The filename, and relative path, for the config file for this controller.
+            import_dir:         The path to the main run directory containing the file from which to import any Python functions.
+            mesh:
+            t_param:            List of parameters representing the current time and previous time steps.
+            new_variables:      List of dictionaries containing any new model variables and their values at each time step
+                                used in the time discretization scheme.
         """
         # Set the run directory for the config functions.
         # Files could get accessed at run_dir + '/' + <path>. Make sure that if the config file is in the current

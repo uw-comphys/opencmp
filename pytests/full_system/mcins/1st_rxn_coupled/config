@@ -14,6 +14,7 @@ interpolant_order = 3
 
 [DG]
 DG = False
+interior_penalty_coefficient =  10.0
 
 [SOLVER]
 solver = default
@@ -51,4 +52,5 @@ component_in_error_calc = a -> True
 component_in_time_deriv = a -> True
                           b -> True
                           c -> True
+velocity_fixed = True
 run_dir = pytests/full_system/mcins/1st_rxn_coupled

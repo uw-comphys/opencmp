@@ -57,6 +57,12 @@ class ModelFunctions(ConfigFunctions):
                 name = parameter + '_' + var
                 self.model_parameters_names[name] = [parameter, var]
 
+        # Used to keep track of which unknown variables the user has already been warned about
+        # A variable present in the config file that is not in the current model is not necessarily a bug.
+        # It may occur (and not be a bug) when the user has a config file to generate the initial conditions inside
+        # the same folder as their main simulation (e.g. Running INS to get the initial condition for MCINS).
+        self.already_warned_about_model_functions = set()
+
     def set_model_functions(self, fes: FESpace, model_components: Dict[str, int]) -> None:
         """
         Function to load saved model functions into gridfunctions.
@@ -74,6 +80,11 @@ class ModelFunctions(ConfigFunctions):
                 if var == 'all':
                     component = None
                 else:
+                    if var not in model_components:
+                        if var not in self.already_warned_about_model_functions:  # Print the warning only once
+                            self.already_warned_about_model_functions.add(var)
+                            print('Ignoring variable \"{}\" while loading source terms/model functions since its not part of the model.'.format(var))
+                        continue
                     component = model_components[var]
 
                 # If the model function is a gridfunction saved to a file it needs to be loaded. The re_parse dictionary

@@ -55,7 +55,6 @@ class ICFunctions(ConfigFunctions):
             # Determine which component of the gridfunction the initial condition is for
             if var == 'all':
                 component = None
-
             else:
                 component = model_components[var]
 

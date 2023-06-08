@@ -78,13 +78,16 @@ class INS(Model):
         return False
 
     def _set_model_parameters(self) -> None:
-        self.kv = self.model_functions.model_parameters_dict['kinematic_viscosity']['all']
-        self.f = self.model_functions.model_functions_dict['source']
+        self.kv: Dict = self.model_functions.model_parameters_dict['kinematic_viscosity']['all']
+        self.f: Dict  = self.model_functions.model_functions_dict['source']
+        if self.fixed_velocity and 'u' in self.f:
+            # Remove the source term for the conservation of momentum if it's not being solved.
+            self.f.pop('u')
 
     def _construct_fes(self) -> FESpace:
-        return FESpace(self._contruct_fes_helper(), dgjumps=self.DG)
+        return FESpace(self._construct_fes_helper(), dgjumps=self.DG)
 
-    def _contruct_fes_helper(self) -> List[FESpace]:
+    def _construct_fes_helper(self) -> List[FESpace]:
         """
         Helper function for creating the FESpace.
 
@@ -117,7 +120,7 @@ class INS(Model):
         return [fes_u, fes_p]
 
     def _construct_linearization_terms(self) -> Optional[List[GridFunction]]:
-        tmp = GridFunction(self.fes.components[0])
+        tmp = GridFunction(self._construct_ic_fes().components[0])  # Read a new FES
         tmp.vec.data = self.IC.components[0].vec
 
         return [tmp]
@@ -198,14 +201,14 @@ class INS(Model):
 
         if self.linearize == 'Oseen':
             # Stress needs a no-backflow component in the bilinear form.
-            for marker in self.BC.get('stress', {}).get('stress', {}):
+            for marker in self.BC.get('stress', {}).get('u', {}):
                 if self.DG:
                     a += dt * v * (IfPos(w * n, w * n, 0.0) * u) * self._ds(marker)
                 else:
                     a += dt * v.Trace() * (IfPos(w * n, w * n, 0.0) * u.Trace()) * self._ds(marker)
 
         # Parallel Flow BC
-        for marker in self.BC.get('parallel', {}).get('parallel', {}):
+        for marker in self.BC.get('parallel', {}).get('u', {}):
             if self.DG:
                 a += dt * v * (u - n * InnerProduct(u, n)) * self._ds(marker)
             else:
@@ -226,10 +229,10 @@ class INS(Model):
         v, q = V[self.model_components['u']], V[self.model_components['p']]
 
         # Domain integrals.
-        a = dt * (
-                - div(u) * q     # Conservation of mass
+        a = dt * (               # TODO: Why is conservation of mass multiplied by a time-step??
+                - div(u) * q     # Conservation of mass  TODO: Why this here?
                 - div(v) * p     # Pressure
-                - 1e-10 * p * q  # Stabilization term
+                - 1e-10 * p * q  # Stabilization term   TODO: This should not be needed (at least not for DG)
         ) * dx
 
         if self.DG:
@@ -241,6 +244,11 @@ class INS(Model):
             avg_grad_v = grad_avg(v)
 
             # Penalty for discontinuities
+            # TODO: Why are these in here?
+            #       James believes that these operations (jump, grad, etc.) may be returning a known value, one in terms
+            #       of previous values (timestep/iteration/something) of the operand.
+            #       E.g. p is an unknown, grad(p) would be fixed in terms of a previous value of p and could NOT be
+            #       solved for.
             a += dt * (
                     self.kv[time_step] * alpha * InnerProduct(jump_u, jump_v)  # Penalty term for u+=u- on 𝚪_I from ∇u^
                     - self.kv[time_step] * InnerProduct(avg_grad_u, OuterProduct(jump_v, n))  # Stress
@@ -281,8 +289,8 @@ class INS(Model):
                     L += dt * v * (-0.5 * w * n * g + 0.5 * Norm(w * n) * g) * self._ds(marker)
 
         # Stress BC
-        for marker in self.BC.get('stress', {}).get('stress', {}):
-            h = self.BC['stress']['stress'][marker][time_step]
+        for marker in self.BC.get('stress', {}).get('u', {}):
+            h = self.BC['stress']['u'][marker][time_step]
             if self.DG:
                 L += dt * v * h * self._ds(marker)
             else:

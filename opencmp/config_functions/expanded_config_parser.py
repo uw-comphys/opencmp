@@ -56,11 +56,13 @@ config_defaults: Dict = {
               'model': 'REQUIRED',
               'component_names': [],
               'parameter_names': [],
+              'velocity_fixed': False,
               'run_dir': 'REQUIRED'},
     'VISUALIZATION': {'save_to_file': False,
                       'save_type': '.sol',
                       'save_frequency': ['1', 'numit'],
-                      'subdivision': -1},
+                      'subdivision': -1,
+                      'split_components': False},
     'DIM': {'diffuse_interface_method': False,
             'dim_dir': 'REQUIRED',
             'mesh_dimension': 2,
@@ -208,7 +210,8 @@ class ConfigParser(configparser.ConfigParser):
                              new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction,
                                                                  None]]]
                              = [{}],
-                             ignore=[]) -> Tuple[Dict, Dict]:
+                             white_list: List[str] = [],
+                             ignore: List[str] = []) -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a three-level dictionary.
 
@@ -224,14 +227,16 @@ class ConfigParser(configparser.ConfigParser):
                           }
 
         Args:
-            import_dir: The path to the main run directory containing the file from which to import any Python
-                functions.
-            t_param: List of parameters representing the current time and previous time steps. If None, the re-parsed
-                values have no possible time dependence and one single value is returned instead of a list of values
-                corresponding to the re-parsed value at each time step.
-            new_variables: List of dictionaries containing any new model variables and their values at each time
-                step used in the time discretization scheme.
-            ignore: List of section headers to ignore if only part of the config file should be read.
+            import_dir:     The path to the main run directory containing the file from which to import any Python
+                            functions.
+            t_param:        List of parameters representing the current time and previous time steps.
+                            If None, the re-parsed values have no possible time dependence and one single value is
+                            returned instead of a list of values corresponding to the re-parsed value at each time step.
+            new_variables:  List of dictionaries containing any new model variables and their values at each time
+                            step used in the time discretization scheme.
+            white_list:     The name of the highlevel entries to look at. All others will be ignored.
+                            Used for running
+            ignore:         List of section headers to ignore if only part of the config file should be read.
 
         Returns:
             Tuple[Dict, Dict]:
@@ -242,6 +247,9 @@ class ConfigParser(configparser.ConfigParser):
 
         # Keys for the top level dictionaries
         keys_one = [item for item in self.sections() if item not in ignore]
+
+        if white_list:
+            keys_one = [item for item in keys_one if item in white_list]
 
         # Top level dictionaries
         dict_one: Dict[str, Dict[str, Dict[str, Union[str, float, CoefficientFunction, list]]]] = {}

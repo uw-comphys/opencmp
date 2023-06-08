@@ -4,7 +4,7 @@
 Tutorial 8 - Multi-Component Flow
 =================================
 
-The files for this tutorial can be found in "examples/tutorial_8".
+The files for this tutorial can be found in "examples/tutorial_8a" and "examples/tutorial_8b".
 
 Governing Equations
 -------------------
@@ -56,9 +56,9 @@ The transient solve parameters should also be modified to increase the simulatio
 
    [TRANSIENT]
    transient = True
-   scheme = implicit euler
-   time_range = 0.0, 10.0
-   dt = 1e-2
+    scheme = adaptive three step
+    time_range = 0, 3
+    dt = 1e-3
 
 Finally, the model type must be changed to "MultiComponentINS" and the model must be given information about the additional components. The components must be named according to how they are referenced in the configuration files and it must be noted that the component results should be used in any error calculations and that the governing equations for both components include time derivative terms. ::
 
@@ -69,8 +69,6 @@ Finally, the model type must be changed to "MultiComponentINS" and the model mus
                              b -> True
    component_in_time_deriv = a -> True
                              b -> True
-   run_dir = .
-   num_threads = 2
 
 The Boundary Condition Configuration File
 -----------------------------------------
@@ -78,14 +76,14 @@ The Boundary Condition Configuration File
 The boundary condition configuration file now must include boundary conditions for component transport and reaction in addition to the usual flow boundary conditions. ::
 
    [DIRICHLET]
-   u = inlet  -> [y*(0.5-y)/0.5^2, 0.0]
+   u = inlet  -> [ramp(t, 0.0, 1.0, 1.0)*y*(0.5-y)/0.5^2, 0.0]
        wall   -> [0.0, 0.0]
        circle -> [0.0, 0.0]
-   a = inlet -> 1.0
+   a = inlet -> ramp(t, 0.0, 1.0, 2.5)*1.0
    b = inlet -> 0.0
 
    [STRESS]
-   stress = outlet -> [0.0, 0.0]
+   u = outlet -> [0.0, 0.0]
 
    [TOTAL_FLUX]
    a = outlet -> 0.0
@@ -158,3 +156,12 @@ and the velocity and pressure distributions:
    :width: 600
    :align: center
    :alt: Steady-state pressure profile.
+
+Part B: Decoupling the equations
+----------------------
+
+In certain circumstances, we may wish to decouple the hydrodynamics of the system from the transport and reaction of the dissolved species. Once such instance is when we wish to solve for the final steady state of the system, and know that the dissolved species has only a negligible impact on the hydrodynamics.
+
+The simulations files in tutorial_8b/ re-do the simulation above using this decoupling. First the steady state velocity and pressure profile are solved by running the simulation with the main configuration file :code:`config_IC`. The resulting velocity and pressure fields are then used by the simulation run with :code:`config` to solve for the steady state concentration profiles.
+
+The advantage of this approach is that it is less CPU and RAM intensive. When solving the hydrodynamics, the resulting system is much smaller since it does not have to solve for the dissolved species. Likewise, when the dissolved species are solved the velocity is kept constant and thus no longer requires solving INS.

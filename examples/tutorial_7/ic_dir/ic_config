@@ -2,4 +2,4 @@
 all = all -> None
 
 [INS]
-all = all -> output/sol/stokes_0.0.sol
+all = all -> output/stokes_sol/stokes_0.0.sol

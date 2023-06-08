@@ -52,4 +52,5 @@ component_in_error_calc = a -> True
 component_in_time_deriv = a -> True
                           b -> True
                           c -> True
+velocity_fixed = True
 run_dir = pytests/full_system/mcins/diffusion

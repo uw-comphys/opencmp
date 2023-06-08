@@ -84,10 +84,10 @@ The Stokes equation has different types of possible boundary conditions than the
    u = inlet -> [50*y*(0.2-y), 0.0]
        wall  -> [0.0, 0.0]
 
-The stress boundary condition is slightly different since it does not apply to a specific model variable. Instead, "stress" is given in place of a model variable name. ::
+The stress boundary condition follows the same syntax. ::
 
    [STRESS]
-   stress = outlet -> [0.0, 0.0]
+   u = outlet -> [0.0, 0.0]
 
 Note that all of the boundary conditions are vectors, which are denoted by square brackets. For more information about configuration file syntax see :ref:`syntax`.
 

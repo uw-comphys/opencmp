@@ -129,3 +129,93 @@ def ramp_cos(t: Union[int, float, Parameter], p1: float = 0.0, p2: float = 1.0,
     """
 
     return IfPos(tr - t, 0.5 * (p1 - p2) * cos(t * pi / tr) + 0.5 * (p1 + p2), p2)
+
+
+def Max(a: Union[CoefficientFunction, float], b: Union[CoefficientFunction, float]) -> CoefficientFunction:
+    """
+    Wrapper function to create a maximum function out of IfPos for use in creating the weak form.
+    This was created in order to make the resulting weak for easier to read.
+
+    Args:
+        a: The first value to compare.
+        b: The second value to compare.
+
+    Return:
+        A wrapped IfPos which will return the greater of a or b at every point in space.
+    """
+    return IfPos(
+        a,
+        # a > 0
+        IfPos(
+            b,
+            # b > 0
+            IfPos(
+                a - b,
+                # a > b
+                a,
+                # a <= a
+                b
+            ),
+            # b < 0
+            a
+        ),
+        # a <= 0
+        IfPos(
+            b,
+            # b > 0
+            b,
+            # b <= 0
+            IfPos(  # Both a & b are <= 0
+                b - a,  # (-a) - (-b)
+                # b > a
+                b,
+                # b <= a
+                a
+            )
+        )
+    )
+
+
+def Min(a: Union[CoefficientFunction, float], b: Union[CoefficientFunction, float]) -> CoefficientFunction:
+    """
+    Wrapper function to create a minimum function out of IfPos for use in creating the weak form.
+    This was created in order to make the resulting weak for easier to read.
+
+    Args:
+        a: The first value to compare.
+        b: The second value to compare.
+
+    Return:
+        A wrapped IfPos which will return the lesser of a or b at every point in space.
+    """
+    return IfPos(
+        a,
+        # a > 0
+        IfPos(
+            b,
+            # b > 0
+            IfPos(
+                a - b,
+                # a > b
+                b,
+                # a <= a
+                a
+            ),
+            # b < 0
+            b
+        ),
+        # a <= 0
+        IfPos(
+            b,
+            # b > 0
+            a,
+            # b <= 0
+            IfPos(  # Both a & b are <= 0
+                b - a,  # (-a) - (-b)
+                # b > a
+                a,
+                # b <= a
+                b
+            )
+        )
+    )

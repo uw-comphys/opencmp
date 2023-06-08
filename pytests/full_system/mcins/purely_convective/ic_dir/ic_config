@@ -1,0 +1,4 @@
+[MultiComponentINS]
+u = all -> [0.1, 0.0]
+p = all -> 0
+a = all -> 0

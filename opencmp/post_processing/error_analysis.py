@@ -15,36 +15,56 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-from opencmp.config_functions import ConfigParser
-from .error import norm
-from opencmp.solvers import Solver
+from ..config_functions import ConfigParser
+from ..helpers.error import norm
+from ..solvers import Solver
 from ngsolve import GridFunction
 import math
-from typing import List, Union
-from .misc import can_import_module
+from typing import Dict, List, Union
+from ..helpers.misc import can_import_module
 
-if can_import_module('tabulate'):
-    missing_tabulate = False
+missing_tabulate = not can_import_module('tabulate')
+if not missing_tabulate:
     import tabulate
-else:
-    missing_tabulate = True
 
 
-def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: str) -> None:
+def convergence_analysis(config_parser: ConfigParser, solver: Solver, sol: GridFunction) -> None:
+    """
+    Helper function to runthe mesh element and polynomial order convergence tests.
+
+    Args:
+        config_parser:  The config_parser for the simulation to perform post-processing on
+        solver:         The solver object created from the config_parser and which produced sol
+        sol:            Gridfunction containing the final solution produced by the model from solver.model
+    """
+
+    # Suppressing the warning about using the default value for convergence_test.
+    convergence_test: Dict[str, str] = config_parser.get_dict(['ERROR ANALYSIS', 'convergence_test'],
+                                                              None, quiet=True)
+    for key, var_lst in convergence_test.items():
+        if key == 'h' and var_lst:
+            for var in var_lst:
+                h_convergence(config_parser, solver, sol, var)
+        elif key == 'p' and var_lst:
+            for var in var_lst:
+                p_convergence(config_parser, solver, sol, var)
+
+
+def h_convergence(config_parser: ConfigParser, solver: Solver, sol: GridFunction, var: str) -> None:
     """
     Function to check h (mesh element size) convergence and print results.
 
     Args:
-        config: Config file from which to grab.
-        solver: The solver used.
-        sol: Gridfunction that contains the current solution.
-        var: The variable of interest.
+        config_parser:  Config file from which to grab.
+        solver:         The solver used.
+        sol:            Gridfunction that contains the current solution.
+        var:            The name of the variable of interest.
     """
     if missing_tabulate:
         raise ImportError('tabulate module is not installed. Install it with `pip install tabulate`.')
 
-    num_refinements = config.get_item(['ERROR ANALYSIS', 'num_refinements'], int)
-    average_lst = config.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
+    num_refinements = config_parser.get_item(['ERROR ANALYSIS', 'num_refinements'], int)
+    average_lst = config_parser.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
     component = solver.model.model_components[var]
     average = component in average_lst
 
@@ -87,18 +107,18 @@ def h_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: 
     print(tabulate.tabulate(convergence_table, headers='firstrow', floatfmt=('.1f', '.1f', '.3e', '.2f')))
 
 
-def p_convergence(config: ConfigParser, solver: Solver, sol: GridFunction, var: str) -> None:
+def p_convergence(config_parser: ConfigParser, solver: Solver, sol: GridFunction, var: str) -> None:
     """
     Function to check p (interpolat polynomial order) convergence and print results.
 
     Args:
-        config: Config file from which to grab.
+        config_parser: Config file from which to grab.
         solver: The solver used.
         sol: Gridfunction that contains the current solution.
         var: The variable of interest.
     """
-    num_refinements = config.get_item(['ERROR ANALYSIS', 'num_refinements'], int)
-    average_lst = config.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
+    num_refinements = config_parser.get_item(['ERROR ANALYSIS', 'num_refinements'], int)
+    average_lst = config_parser.get_list(['ERROR ANALYSIS', 'error_average'], str, quiet=True)
     component = solver.model.model_components[var]
     average = component in average_lst
 

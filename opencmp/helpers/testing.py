@@ -18,9 +18,9 @@
 from numpy import isclose
 from multiprocessing import Process
 from pytest import CaptureFixture
-from opencmp.config_functions import ConfigParser
-#from opencmp.entry_points import run_opencmp -- This is for switching from python3 -m opencmp to opencmp (command line)
-from opencmp.run import run
+from ..config_functions import ConfigParser
+#from ..entry_points import run_opencmp - This is for switching from python3 -m opencmp to opencmp (command line)
+from ..run import run
 from typing import Callable, List, Tuple
 
 

@@ -2,5 +2,5 @@
 u = wall -> [0.0, 0.0]
 
 [STRESS]
-stress = inlet  -> [10.0, 0.0]
-         outlet -> [-5.0, 0.0]
+u = inlet  -> [10.0, 0.0]
+    outlet -> [-5.0, 0.0]
