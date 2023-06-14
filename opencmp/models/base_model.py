@@ -15,17 +15,21 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
+from abc import ABC, abstractmethod
+import logging
+from typing import Dict, List, Optional, Tuple, Union, cast
+
 import ngsolve as ngs
+from ngsolve.comp import ProxyFunction, FESpace, DifferentialSymbol
+from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner, CoefficientFunction
+from pyngcore import BitArray
+
 from ..helpers import merge_bc_dict
 from ..config_functions import ConfigParser, BCFunctions, ICFunctions, ModelFunctions, RefSolFunctions
 from ..config_functions.load_config import parse_str
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Union, cast
-from ngsolve.comp import ProxyFunction, FESpace, DifferentialSymbol
-from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner, CoefficientFunction
 from ..diffuse_interface import DIM
 from ..helpers.io import load_mesh
-from pyngcore import BitArray
+
 
 """
 Module for the base model class.
@@ -48,6 +52,8 @@ class Model(ABC):
         # The name of the model (helper variable). It is the name of the class.
         self.name = self.__class__.__name__.lower()
 
+        logging.info('Initializing model: ' + self.name)
+
         # Remove the trailing "dim" from the model name if the Diffuse Interface Method version is used
         # Lets us continue using "Poisson" or "INS" in config files without adding the DIM
         if "dim" == self.name[-3:]:
@@ -61,6 +67,8 @@ class Model(ABC):
 
         # Get the run directory.
         self.run_dir = self.config.get_item(['OTHER', 'run_dir'], str)
+
+        logging.info('Initializing with run directory: ' + self.run_dir)
 
         # Dictionary to map variable name to index inside fes/gridfunctions, and for labeling variables in vtk output.
         # These are currently the same, but will be changed in other functions. E.g. MCINS._add_multiple_components()
@@ -90,6 +98,8 @@ class Model(ABC):
 
         # For MCINS, whether or not the velocity is fixed in time at the initial condition, and thus does not have to be solved
         self.fixed_velocity = self.config.get_item(['OTHER', 'velocity_fixed'], bool)
+
+        logging.info('Initializing using fixed velocity for convective fluxes.')
 
         # Run any model-specific work now that some things have been initialized.
         self._pre_init()
@@ -126,9 +136,11 @@ class Model(ABC):
         if self.DG:
             # Load the DG parameters.
             self.ipc = self.config.get_item(['DG', 'interior_penalty_coefficient'], float)
+            logging.info('Using DIScontinuous Galerkin method')
         else:
             # Need to define this parameter, but won't end up using it so suppress the default value warning.
             self.ipc = self.config.get_item(['DG', 'interior_penalty_coefficient'], float, quiet=True)
+            logging.info('Using continuous Galerkin method')
 
         self.no_constrained_dofs = self.config.get_item(['FINITE ELEMENT SPACE', 'no_constrained_dofs'],
                                                         bool, quiet=True)
@@ -140,8 +152,7 @@ class Model(ABC):
             # over all DOFs, not just the free DOFs. This will not work in CG, hence the warning to the user.
             if self.no_constrained_dofs:
                 if not self.DG:
-                    print('WARNING: It is strongly recommended to use DG with HDiv if'
-                          'tangential Dirichlet boundary conditions need to be applied.')
+                    logging.warning('It is strongly recommended to use DG with HDiv if tangential Dirichlet boundary conditions need to be applied.')
 
         # TODO: we should probably rename self.nu to something else so it doesnt conflict with kinematic viscosity
         # Construct nu as ipc*interp_ord^2.
@@ -154,8 +165,7 @@ class Model(ABC):
             self.solver = 'direct'
 
         if self.solver == 'direct':
-            print("WARNING: The direct linear solver does not respect the num_threads parameter you may have set. "
-                  "This is an NGSolve issue")
+            logging.warning("The direct linear solver does not respect the num_threads parameter you may have set. \\This is an NGSolve issue")
 
         # Load the preconditioner types
         self.preconditioners = self.config.get_list(['SOLVER', 'preconditioner'], str)
@@ -172,10 +182,14 @@ class Model(ABC):
                 self.preconditioners[i] = None
                 if self.solver in ['CG', 'MinRes']:
                     # CG and MinRes require a preconditioner or they fail with an AssertionError.
-                    raise ValueError('Preconditioner can\'t be None if using CG or MinRes solvers.')
+                    logging.error('Preconditioner cannot be None if using CG or MinRes solvers.')
+                    raise ValueError('Preconditioner cannot be None if using CG or MinRes solvers.')
 
         self.solver_tolerance = self.config.get_item(['SOLVER', 'solver_tolerance'], float, quiet=True)
         self.solver_max_iters = self.config.get_item(['SOLVER', 'solver_max_iterations'], int, quiet=True)
+
+        # assume model is linear by default
+        self.nonlinear = False
 
         self.verbose = self.config.get_item(['OTHER', 'messaging_level'], int, quiet=True) > 0
 
@@ -330,66 +344,6 @@ class Model(ABC):
                     if 'L2' not in self.fes.components[i].name:
                         gfu.components[i].Set(self.g_D[component_name][time_step],
                                               definedon=self.mesh.Boundaries(self.dirichlet_names[component_name]))
-
-    # TODO: This needs a better name
-    def construct_and_run_solver(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner,
-                                 gfu: GridFunction):
-        """
-        Function to construct the solver and run one solve on the provided gridfunction.
-
-        Args:
-            a_assembled: The assembled bilinear form.
-            L_assembled: The assembled linear form.
-            precond: The preconditioner.
-            gfu: The gridfunction holding information about any Dirichlet BCs which will be updated to hold the
-                solution.
-        """
-
-        if precond is None:
-            # If there's no preconditioner, then the freedofs argument must be provided for the solver.
-            # Confirm that the user hasn't specified that all dofs should be free dofs.
-            if self.no_constrained_dofs:
-                raise ValueError('Must constrain Dirichlet DOFs if not providing a preconditioner.')
-
-        freedofs: Optional[BitArray] = self.fes.FreeDofs()
-
-        if self.solver == 'direct':
-            # prefer PARDISO if available, else use UMFPACK, note that pip version of NGSolve does
-            # does not seem to populate the ngsolve.config.USE_PARDISO etc. variables correctly
-            if ngs.config.USE_PARDISO or ngs.config.USE_MKL:
-                inverse_solver = "pardiso"
-            elif ngs.config.USE_UMFPACK:
-                inverse_solver = "umfpack"
-            else:
-                raise NameError("NGSolve compiled without PARDISO or UMFPACK support.")
-
-            inv = a_assembled.mat.Inverse(freedofs=freedofs, inverse=inverse_solver)
-
-            r = L_assembled.vec.CreateVector()
-            r.data = L_assembled.vec - a_assembled.mat * gfu.vec
-            gfu.vec.data += inv * r
-
-        elif self.solver == 'CG':
-            ngs.solvers.CG(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
-                           tol=self.solver_tolerance, maxsteps=self.solver_max_iters, printrates=self.verbose,
-                           initialize=False)
-
-        elif self.solver == 'MinRes':
-            ngs.solvers.MinRes(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
-                               tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
-                               printrates=self.verbose)
-
-        elif self.solver == 'GMRes':
-            ngs.solvers.GMRes(A=a_assembled.mat, b=L_assembled.vec, pre=precond, freedofs=freedofs,
-                              x=gfu.vec, tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
-                              printrates=self.verbose)
-
-        elif self.solver == 'Richardson':
-            # TODO: User should be able to set a damping factor.
-            ret = ngs.solvers.PreconditionedRichardson(a=a_assembled, rhs=L_assembled.vec, pre=precond,
-                                                       freedofs=freedofs, tol=self.solver_tolerance,
-                                                       maxit=self.solver_max_iters, printing=self.verbose)
-            gfu.vec.data = ret
 
     def construct_gfu(self) -> GridFunction:
         """
@@ -563,20 +517,6 @@ class Model(ABC):
         self.BC = self.bc_functions.load_bc_gridfunctions(self.BC, self.fes, self.model_components)
         self.g_D = self.bc_functions.set_dirichlet_boundary_conditions(self.BC, self.mesh, self.construct_gfu(),
                                                                        self.model_components)
-
-    def update_linearization_terms(self, gfu: GridFunction) -> None:
-        """
-        Function to update the values in the linearization terms.
-
-        Required for Runge Kutta-type solvers if the model's weak form involves linearization terms. Assumes that
-        linearization terms (self.W) have already been created for the model.
-
-        Args:
-            gfu: The gridfunction to use to update the linearization terms.
-        """
-
-        # Most models do not have nonlinear terms (or use IMEX-type linearization) so default to doing nothing.
-        return None
 
     def update_model_variables(self, updated_gfu: Union[GridFunction, List[ProxyFunction]], ic_update: bool = False,
                                ref_sol_update: bool = False, time_step: Optional[int] = None) -> None:
@@ -930,3 +870,99 @@ class Model(ABC):
             gfu: The gridfunction to store the solution from the current iteration.
             time_step: What time step values to use if _apply_dirichlet_bcs_to must be called.
         """
+
+    def linear_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner,
+                                 gfu: GridFunction) -> None:
+        """
+        Function to solve of the linear system associated with the model.
+
+        This function performs a linear solve of the linear system associated with the model.
+        Args:
+            a_assembled: The assembled bilinear form.
+            L_assembled: The assembled linear form.
+            precond: The preconditioner.
+            gfu: The gridfunction holding information about any Dirichlet BCs which will be updated to hold the
+                solution.
+        """
+
+        if precond is None:
+            # If there's no preconditioner, then the freedofs argument must be provided for the solver.
+            # Confirm that the user hasn't specified that all dofs should be free dofs.
+            if self.no_constrained_dofs:
+                raise ValueError('Must constrain Dirichlet DOFs if not providing a preconditioner.')
+
+        freedofs: Optional[BitArray] = self.fes.FreeDofs()
+
+        if self.solver == 'direct':
+            # prefer PARDISO if available, else use UMFPACK, note that pip version of NGSolve does
+            # does not seem to populate the ngsolve.config.USE_PARDISO etc. variables correctly
+            if ngs.config.USE_PARDISO or ngs.config.USE_MKL:
+                inverse_solver = "pardiso"
+            elif ngs.config.USE_UMFPACK:
+                inverse_solver = "umfpack"
+            else:
+                raise NameError("NGSolve compiled without PARDISO or UMFPACK support.")
+
+            inv = a_assembled.mat.Inverse(freedofs=freedofs, inverse=inverse_solver)
+
+            r = L_assembled.vec.CreateVector()
+            r.data = L_assembled.vec - a_assembled.mat * gfu.vec
+            gfu.vec.data += inv * r
+
+        elif self.solver == 'CG':
+            ngs.solvers.CG(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
+                           tol=self.solver_tolerance, maxsteps=self.solver_max_iters, printrates=self.verbose,
+                           initialize=False)
+
+        elif self.solver == 'MinRes':
+            ngs.solvers.MinRes(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
+                               tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
+                               printrates=self.verbose)
+
+        elif self.solver == 'GMRes':
+            ngs.solvers.GMRes(A=a_assembled.mat, b=L_assembled.vec, pre=precond, freedofs=freedofs,
+                              x=gfu.vec, tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
+                              printrates=self.verbose)
+
+        elif self.solver == 'Richardson':
+            # TODO: User should be able to set a damping factor.
+            ret = ngs.solvers.PreconditionedRichardson(a=a_assembled, rhs=L_assembled.vec, pre=precond,
+                                                       freedofs=freedofs, tol=self.solver_tolerance,
+                                                       maxit=self.solver_max_iters, printing=self.verbose)
+            gfu.vec.data = ret
+        else:
+            logging.error('No linear solver specified.')
+            raise ValueError("No linear solver specified.")
+
+    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> None:
+        """
+        Function to prepare for and perform the linear/linearized solve of the linear/nonlinear model.
+
+        This function prepares for and solves the linear/linearized system associated with the model. This is included in the model class itself because, for nonlinear models, the linearization method(s) are model specific and are not
+        generalized. For a linear model, this is called once in order to approximate the solution, but for a nonlinear
+        model this function is repeatedly used by the nonlinear solver to approxiamte the solution.
+
+        Args:
+            a_lst: A list of the bilinear forms.
+            L_lst: A list of the linear forms.
+            precond_lst: A list of preconditioners to use.
+            gfu: The gridfunction to store the solution of the linear system.
+        """
+        # assume linear model, will be overriden for nonlinear models
+        self.linear_solve(a_assembled, L_assembled, precond, gfu)
+
+        return(0., 0.)
+
+    def update_linearization(self, gfu: GridFunction):
+        """
+        Function to update variables needed to linearize the model (if nonlinear).
+
+        This function updates variables used for linearization of nonlinear models, which is used by the solver class to
+        construct a nonlinear solver.
+
+        Args:
+            gfu: The gridfunction to store the solution from the previous iteration or solution.
+        """
+
+        # assuming linear model
+        pass

@@ -84,7 +84,7 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
 
         # Update the linearization terms back to their t^n values.
         # gfu_short needs to be solved with the same values for W as gfu_long since they have the same initial time
-        self.model.update_linearization_terms(self.gfu_0_list[0])
+        self.model.update_linearization(self.gfu_0_list[0])
 
         # Single solve for the first half of the time step.
         for i in range(len(self.a_short)):

@@ -44,7 +44,7 @@ class INSDIM(INS):
 
         # Domain integrals.
         a = dt * (
-                self.kv[time_step] * InnerProduct(Grad(u).Grad(v))  # Stress, Newtonian
+                self.kv[time_step] * InnerProduct(Grad(u), Grad(v))  # Stress, Newtonian
         ) * self.DIM_solver.phi_gfu * dx
 
         if self.linearize == 'Oseen':

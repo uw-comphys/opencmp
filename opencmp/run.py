@@ -15,13 +15,15 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
+import logging
 from typing import Optional, cast
+
+from ngsolve import ngsglobals
+import pyngcore as ngcore
 
 from .models import get_model_class
 from .solvers import get_solver_class
 from .config_functions import ConfigParser
-import pyngcore as ngcore
-from ngsolve import ngsglobals
 from .post_processing import run_post_processing
 
 
@@ -44,6 +46,8 @@ def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> 
     num_threads = config_parser.get_item(['OTHER', 'num_threads'], int)
     msg_level = config_parser.get_item(['OTHER', 'messaging_level'], int, quiet=True)
     model_name = config_parser.get_item(['OTHER', 'model'], str)
+
+    logging.basicConfig(filename='opencmp.log', level=logging.INFO)
 
     # Set parameters for ngsolve
     ngcore.SetNumThreads(num_threads)

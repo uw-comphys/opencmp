@@ -129,7 +129,7 @@ class TransientRKSolver(Solver):
         self._re_assemble()
 
         # Solve the time step.
-        self.model.solve_single_step(self.a_list[0], self.L_list[0], self.preconditioner_list[0], self.gfu, 0)
+        self.model.linearized_solve(self.a_list[0], self.L_list[0], self.preconditioner_list[0], self.gfu, 0)
 
     def _update_time_step(self) -> Tuple[bool, float, float, str]:
         # Set all intermediate step solutions to the current solution. Set all dt values to the next dt (may vary to
@@ -163,4 +163,3 @@ class TransientRKSolver(Solver):
 
         # Update self.step.
         self.step += 1
-

@@ -125,7 +125,7 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
             # Repeat the time step with the new dt.
             #
             # Update the linearization terms back to their starting values for the time step that will be rerun.
-            self.model.update_linearization_terms(self.gfu_0_list[0])
+            self.model.update_linearization(self.gfu_0_list[0])
 
             # Update the values of the model variables based on the last accepted timestep
             # and re-parse the model functions as necessary.

@@ -164,4 +164,4 @@ class Poisson(Model):
     def solve_single_step(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
                          precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
 
-        self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
+        self.linearized_solve(a_lst[0], L_lst[0], precond_lst[0], gfu)

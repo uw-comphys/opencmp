@@ -15,15 +15,18 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
-import ngsolve
-from ..helpers.ngsolve_ import get_special_functions
-from ..helpers.dg import avg, jump, grad_avg
-from . import Model
+import logging
 from typing import Dict, List, Optional, Union
+
+import ngsolve
 from ngsolve.comp import ProxyFunction
 from ngsolve import Grad, HDiv, IfPos, InnerProduct, Norm, OuterProduct, Parameter, GridFunction, FESpace, BilinearForm, \
     LinearForm, \
     Preconditioner, div, dx
+
+from ..helpers.ngsolve_ import get_special_functions
+from ..helpers.dg import avg, jump, grad_avg
+from . import Model
 from ..helpers.error import norm, mean
 
 
@@ -38,9 +41,14 @@ class INS(Model):
 
     def _post_init(self) -> None:
         # Load the solver parameters.
+
+        # indicate that the model is nonlinear
+        self.nonlinear = True
+
         self.linearize = self.config.get_item(['SOLVER', 'linearization_method'], str)
         if self.linearize not in ['Oseen', 'IMEX']:
-            raise TypeError('Don\'t recognize the linearization method.')
+            self.linearize = 'Oseen'
+            logging.info('Linearization method not specified, using Oseen by default.')
 
         if self.linearize == 'Oseen':
             nonlinear_tolerance = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'], self.run_dir, None)
@@ -152,7 +160,7 @@ class INS(Model):
 
         return w
 
-    def update_linearization_terms(self, gfu: GridFunction) -> None:
+    def update_linearization(self, gfu: GridFunction) -> None:
         if self.linearize == 'Oseen':
             # Update the velocity linearization term.
             try:
@@ -333,7 +341,7 @@ class INS(Model):
                 if precond_lst[0] is not None:
                     precond_lst[0].Update()
 
-                self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
+                self.linear_solve(a_lst[0], L_lst[0], precond_lst[0], gfu)
 
                 err = norm("l2_norm", self.W[comp_index], gfu.components[comp_index], self.mesh, component, average=False)
                 gfu_norm = mean(gfu.components[comp_index], self.mesh)
@@ -346,6 +354,33 @@ class INS(Model):
                 self.W[comp_index].vec.data = gfu.components[comp_index].vec
                 done_iterating = (err < self.abs_nonlinear_tolerance + self.rel_nonlinear_tolerance * gfu_norm) or (num_iteration > self.nonlinear_max_iters)
         elif self.linearize == 'IMEX':
-            self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
+            self.linear_solve(a_lst[0], L_lst[0], precond_lst[0], gfu)
         else:
+            raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
+
+    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> None:
+        if self.linearize == 'Oseen':
+            # The component index representing velocity
+            component = self.fes.components[self.model_components['u']]
+            comp_index = self.model_components['u']
+
+            # not sure how to handle the dependence of BC on time currently
+            self.apply_dirichlet_bcs_to(gfu, time_step=0)
+
+            # solver linearized model
+            self.linear_solve(a_assembled, L_assembled, precond, gfu)
+
+            # calculate error and norm of solution
+            err = norm("l2_norm", self.W[comp_index], gfu.components[comp_index], self.mesh, component, average=False)
+            gfu_norm = mean(gfu.components[comp_index], self.mesh)
+
+            self.W[comp_index].vec.data = gfu.components[comp_index].vec
+
+            return(err, gfu_norm)
+
+        elif self.linearize == 'IMEX':
+            logging.error('Linearization scheme \"{}\" is appropriate for stationary solve.'.format(self.linearize))
+            raise ValueError('Linearization scheme \"{}\" is appropriate for stationary solve.'.format(self.linearize))
+        else:
+            logging.error('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
             raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))

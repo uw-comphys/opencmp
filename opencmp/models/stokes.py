@@ -134,4 +134,13 @@ class Stokes(INS):
     def solve_single_step(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
                          precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
 
-        self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
+        self.linearized_solve(a_lst[0], L_lst[0], precond_lst[0], gfu)
+
+    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> None:
+        """
+        Because Stokes inherits from INS, we need to override with the version of this function for linear models!
+        """
+        # assume linear model, will be overriden for nonlinear models
+        self.linear_solve(a_assembled, L_assembled, precond, gfu)
+
+        return(0., 0.)

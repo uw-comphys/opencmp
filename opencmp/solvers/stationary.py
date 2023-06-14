@@ -83,6 +83,8 @@ class StationarySolver(Solver):
         self._assemble()
 
     def _single_solve(self) -> None:
+
+        # performs a single linear solve in order to determine the current iterate value
         self.model.solve_single_step(self.a, self.L, self.preconditioners, self.gfu)
 
     def _startup(self) -> None:

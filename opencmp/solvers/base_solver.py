@@ -16,20 +16,22 @@
 ########################################################################################################################
 
 from __future__ import annotations
-from ..models import Model
+from abc import ABC, abstractmethod
+import math
+import logging
+from typing import Dict, List, Optional, Tuple, Type
+import sys
+
 import ngsolve as ngs
 from ngsolve import CoefficientFunction, GridFunction, Preconditioner
-import math
-from typing import Dict, List, Optional, Tuple, Type
-from abc import ABC, abstractmethod
-from ..config_functions import ConfigParser
-import sys
-from ..helpers.saving import SolutionFileSaver
-from ..helpers.error import calc_error
-from ..helpers.ngsolve_ import gridfunction_rigid_body_motion
 import numpy as np
 from pathlib import Path
 
+from ..models import Model
+from ..config_functions import ConfigParser
+from ..helpers.saving import SolutionFileSaver
+from ..helpers.error import calc_error
+from ..helpers.ngsolve_ import gridfunction_rigid_body_motion
 from ..controllers.controller_group import ControllerGroup
 
 """
@@ -81,6 +83,8 @@ class Solver(ABC):
         self.transient = self.config.get_item(['TRANSIENT', 'transient'], bool)
 
         self.gfu_0_list: List[ngs.GridFunction] = []
+
+        self.nonlinear_max_iters = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
 
         if self.transient:
             self.scheme = self.config.get_item(['TRANSIENT', 'scheme'], str)
@@ -294,9 +298,10 @@ class Solver(ABC):
         Function to perform a single iteration of the solve.
         """
 
-        # Loop until an iteration is accepted, or until the max number of attempts is reached
-        while True:
-            if self.transient:
+        # currently using different nonlinear solver approaches for transient versus stationary problems
+        if self.transient:
+            # Loop until an iteration is accepted, or until the max number of attempts is reached
+            while True:
                 # Update time. The calculation for the new dt ensures we don't overshoot the final time.
                 # The new time step (dt) gets updated at the end of the solve (in the case of adaptive time-stepping,
                 # otherwise it is constant).
@@ -315,71 +320,131 @@ class Solver(ABC):
                                                    self.model.mesh, self.model.DIM_solver.N,
                                                    self.model.DIM_solver.scale, self.model.DIM_solver.offset)
 
-            self._apply_boundary_conditions()
 
-            self._re_assemble()
+                self._apply_boundary_conditions()
 
-            self._single_solve()
+                self._re_assemble()
 
-            # Calculate local error, accept/reject current result, and update timestep
-            accept_this_iteration, local_error_abs, local_error_rel, component = self._update_time_step()
+                self._single_solve()
 
-            # Log information about the current timestep
-            self._log_timestep(accept_this_iteration, local_error_abs, local_error_rel, component)
+                # Calculate local error, accept/reject current result, and update timestep
+                accept_this_iteration, local_error_abs, local_error_rel, component = self._update_time_step()
 
-            # If this iteration met all all requirements for accepting the solution
-            if accept_this_iteration:
-                # Reset counter
-                self.num_rejects = 0
-                # Increment
+                # Log information about the current timestep
+                self._log_timestep(accept_this_iteration, local_error_abs, local_error_rel, component)
+
+                # If this iteration met all all requirements for accepting the solution
+                if accept_this_iteration:
+                    # Reset counter
+                    self.num_rejects = 0
+                    # Increment
+                    self.num_iters += 1
+
+                    if self.save_to_file and self.transient:
+                        if self.save_freq[1] == 'time':
+                            # This is ugly, but it's needed to make the modulo math work.
+                            # 0.9999999 % 1 = 0.999999 but 1.000001 % 1 = 0 as expected.
+                            if self.save_freq[0] < 1.0:
+                                tmp_delta = (self.t_param[0].Get() - self.t_range[0]) * (1/self.save_freq[0])
+                                if tmp_delta < 1.0:
+                                    tmp = tmp_delta - 1.0
+                                else:
+                                    tmp = tmp_delta % 1.0
+                            else:
+                                tmp = (self.t_param[0].Get() - self.t_range[0]) % self.save_freq[0]
+                            if math.isclose(tmp, 0.0, abs_tol=self.dt_param[0].Get() * 1e-2):
+                                self.saver.save(self.gfu, self.t_param[0].Get())
+
+                                if self.model.DIM:
+                                    self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+                        elif self.save_freq[1] == 'numit':
+                            if self.num_iters % self.save_freq[0] == 0:
+                                self.saver.save(self.gfu, self.t_param[0].Get())
+
+                                if self.model.DIM:
+                                    self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+
+                    # This iteration was accepted, break out of the while loop
+                    break
+                else:
+                    self.num_rejects += 1
+
+                    # Prevent an infinite loop of rejections by ending the run.
+                    if self.num_rejects > self.max_rejects:
+                        # Save the current solution before ending the run.
+                        if self.save_to_file:
+                            self.saver.save(self.gfu, self.t_param[0].Get())
+
+                            if self.model.DIM:
+                                self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+                        else:
+                            tmp_saver = SolutionFileSaver(self.model, quiet=True)
+                            tmp_saver.save(self.gfu, self.t_param[0].Get())
+
+                            if self.model.DIM:
+                                tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+
+                        sys.exit('At t = {0} the maximum number of rejected time steps has been exceeded. Saving current '
+                                 'solution to file and ending the run.'.format(self.t_param[0].Get()))
+        else:
+            # Loop until an iteration is accepted, or until the max number of attempts is reached
+            accept_this_iteration = False
+            self.num_iters = 0
+            self.num_rejects = 0
+
+            while (not accept_this_iteration):
+                self._apply_boundary_conditions()
+
+                self._re_assemble()
+
+                # this method solves a linear model (no iteration) or solves a single
+                # linearized iteration of a nonlinear
+                err, gfu_norm = self.model.linearized_solve(self.a[0], self.L[0], self.preconditioners[0], self.gfu)
+
+                # communicate to the model class the result of the current nonlinear iteration, this
+                self.model.update_linearization(self.gfu)
+
                 self.num_iters += 1
 
-                if self.save_to_file and self.transient:
-                    if self.save_freq[1] == 'time':
-                        # This is ugly, but it's needed to make the modulo math work.
-                        # 0.9999999 % 1 = 0.999999 but 1.000001 % 1 = 0 as expected.
-                        if self.save_freq[0] < 1.0:
-                            tmp_delta = (self.t_param[0].Get() - self.t_range[0]) * (1/self.save_freq[0])
-                            if tmp_delta < 1.0:
-                                tmp = tmp_delta - 1.0
-                            else:
-                                tmp = tmp_delta % 1.0
-                        else:
-                            tmp = (self.t_param[0].Get() - self.t_range[0]) % self.save_freq[0]
-                        if math.isclose(tmp, 0.0, abs_tol=self.dt_param[0].Get() * 1e-2):
-                            self.saver.save(self.gfu, self.t_param[0].Get())
+                if self.model.nonlinear:
+                    # If this iteration met all all requirements for accepting the solution
+                    if (err < self.model.abs_nonlinear_tolerance + self.model.rel_nonlinear_tolerance * gfu_norm) or (self.num_iters > self.model.nonlinear_max_iters):
+                        # Reset counter
+                        self.num_rejects = 0
+                        # Increment
+                        self.num_iters += 1
 
-                            if self.model.DIM:
-                                self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
-                    elif self.save_freq[1] == 'numit':
-                        if self.num_iters % self.save_freq[0] == 0:
-                            self.saver.save(self.gfu, self.t_param[0].Get())
-
-                            if self.model.DIM:
-                                self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
-
-                # This iteration was accepted, break out of the while loop
-                break
-            else:
-                self.num_rejects += 1
-
-                # Prevent an infinite loop of rejections by ending the run.
-                if self.num_rejects > self.max_rejects:
-                    # Save the current solution before ending the run.
-                    if self.save_to_file:
-                        self.saver.save(self.gfu, self.t_param[0].Get())
-
-                        if self.model.DIM:
-                            self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+                        # This iteration was accepted, break out of the while loop
+                        break
                     else:
-                        tmp_saver = SolutionFileSaver(self.model, quiet=True)
-                        tmp_saver.save(self.gfu, self.t_param[0].Get())
+                        self.num_rejects += 1
 
-                        if self.model.DIM:
-                            tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+                        # nasser@matthew, is there anything we can adjust if the nonlinear solver
+                        # does not converge after some max number of iterations? If so, it would go here
+                        print('Nonlinear iterations exceeded, solve attempt', self.num_rejects, "out of", self.model.nonlinear_max_iters," maximum attempts.")
 
-                    sys.exit('At t = {0} the maximum number of rejected time steps has been exceeded. Saving current '
-                             'solution to file and ending the run.'.format(self.t_param[0].Get()))
+                        # Prevent an infinite loop of rejections by ending the run.
+                        if self.num_rejects > self.nonlinear_max_iters:
+                            # Save the current solution before ending the run.
+                            if self.save_to_file:
+                                self.saver.save(self.gfu, self.t_param[0].Get())
+
+                                if self.model.DIM:
+                                    self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+                            else:
+                                tmp_saver = SolutionFileSaver(self.model, quiet=True)
+                                tmp_saver.save(self.gfu, self.t_param[0].Get())
+
+                                if self.model.DIM:
+                                    tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+
+                            sys.exit('Maximum number of nonlinear iterations has been exceeded. Saving current '
+                                     'solution to file and ending the run.'.format(self.t_param[0].Get()))
+
+                else:
+                    accept_this_iteration = True
+
+
 
     def _update_bcs(self, bc_dict_patch: Dict[str, Dict[str, Dict[str, List[Optional[CoefficientFunction]]]]]) -> None:
         """
@@ -455,7 +520,7 @@ class Solver(ABC):
 
         self._load_and_apply_initial_conditions()
 
-        self.model.update_linearization_terms(self.model.IC)
+        self.model.update_linearization(self.model.IC)
 
         self.num_iters = 0
         self.num_rejects = 0  # Flag to prevent an infinite loop of rejected runs.
@@ -562,6 +627,11 @@ class Solver(ABC):
         """
         Assemble the linear and bilinear forms of the model.
         """
+        self.a[0].Assemble()
+        self.L[0].Assemble()
+
+        if self.preconditioners[0] is not None:
+            self.preconditioners[0].Update()
 
     @abstractmethod
     def _create_linear_and_bilinear_forms(self) -> None:
@@ -593,6 +663,7 @@ class Solver(ABC):
         """
         Assemble the linear and bilinear forms of the model and update the preconditioner.
         """
+        self.assemble()
 
     @abstractmethod
     def _single_solve(self) -> None:

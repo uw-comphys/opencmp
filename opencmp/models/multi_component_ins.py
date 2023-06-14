@@ -14,17 +14,20 @@
 # You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
-from ..helpers.dg import grad_avg, jump
-from ..helpers.math import Min, Max
-from ..helpers.ngsolve_ import get_special_functions
-from . import INS
-from ..config_functions import ConfigParser
+
+import logging
 from typing import Dict, List, Optional, Set, Union
+
+import ngsolve
 from ngsolve import BilinearForm, FESpace, Grad, InnerProduct, LinearForm, GridFunction, Preconditioner, \
     ds, dx, Parameter, CoefficientFunction
 from ngsolve.comp import ProxyFunction
 
-import ngsolve
+from ..helpers.dg import grad_avg, jump
+from ..helpers.math import Min, Max
+from ..helpers.ngsolve_ import get_special_functions
+from ..config_functions import ConfigParser
+from . import INS
 
 # TODO: These might be a good reference
 # https://github.com/NGSolve/modeltemplates/tree/master/templates
@@ -448,6 +451,6 @@ class MultiComponentINS(INS):
     def solve_single_step(self, a_lst: List[BilinearForm], L_lst: List[LinearForm],
                           precond_lst: List[Preconditioner], gfu: GridFunction, time_step: int = 0) -> None:
         if self.fixed_velocity:
-            self.construct_and_run_solver(a_lst[0], L_lst[0], precond_lst[0], gfu)
+            self.linear_solve(a_lst[0], L_lst[0], precond_lst[0], gfu)
         else:
-            super().solve_single_step(a_lst, L_lst, precond_lst, gfu, time_step)
+            super().solve_single_step(a_lst[0], L_lst[0], precond_lst[0], gfu, time_step)
