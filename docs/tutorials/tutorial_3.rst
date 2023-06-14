@@ -58,10 +58,10 @@ The HDiv-L2 pair should only be used with a DG formulation, so a new section is 
 A new solver and preconditioner will be used to demonstrate OpenCMP's functionality. The solver's residual error tolerance and maximum number of iterations are both specified, but it's generally reasonable to leave the default values. ::
 
    [SOLVER]
-   solver = CG
+   linear_solver = CG
    preconditioner = direct
-   solver_tolerance = 1e-12
-   solver_max_iterations = 100
+   linear_tolerance = 1e-12
+   linear_max_iterations = 100
 
 A full error analysis will be performed on the final simulation results. Most of the error analysis parameters are specified in the error analysis configuration file, but "check_error" must be set to "True" for the error metrics to be computed. ::
 

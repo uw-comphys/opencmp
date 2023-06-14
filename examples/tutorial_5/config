@@ -11,7 +11,7 @@ DG = True
 interior_penalty_coefficient = 10.0
 
 [SOLVER]
-solver = direct
+linear_solver = direct
 preconditioner = None
 
 [TRANSIENT]

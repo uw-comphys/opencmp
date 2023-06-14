@@ -159,12 +159,12 @@ class Model(ABC):
         self.nu = self.ipc * self.interp_ord ** 2
 
         # Load the solver parameters.
-        self.solver = self.config.get_item(['SOLVER', 'solver'], str)
-        if self.solver == 'default':
+        self.linear_solver = self.config.get_item(['SOLVER', 'linear_solver'], str)
+        if self.linear_solver == 'default':
             # Default to a direct solve.
-            self.solver = 'direct'
+            self.linear_solver = 'direct'
 
-        if self.solver == 'direct':
+        if self.linear_solver == 'direct':
             logging.warning("The direct linear solver does not respect the num_threads parameter you may have set. \\This is an NGSolve issue")
 
         # Load the preconditioner types
@@ -180,13 +180,13 @@ class Model(ABC):
             if self.preconditioners[i] == 'None':
                 # Parse the string value.
                 self.preconditioners[i] = None
-                if self.solver in ['CG', 'MinRes']:
+                if self.linear_solver in ['CG', 'MinRes']:
                     # CG and MinRes require a preconditioner or they fail with an AssertionError.
                     logging.error('Preconditioner cannot be None if using CG or MinRes solvers.')
                     raise ValueError('Preconditioner cannot be None if using CG or MinRes solvers.')
 
-        self.solver_tolerance = self.config.get_item(['SOLVER', 'solver_tolerance'], float, quiet=True)
-        self.solver_max_iters = self.config.get_item(['SOLVER', 'solver_max_iterations'], int, quiet=True)
+        self.linear_tolerance = self.config.get_item(['SOLVER', 'linear_tolerance'], float, quiet=True)
+        self.linear_max_iters = self.config.get_item(['SOLVER', 'linear_max_iterations'], int, quiet=True)
 
         # assume model is linear by default
         self.nonlinear = False
@@ -893,7 +893,7 @@ class Model(ABC):
 
         freedofs: Optional[BitArray] = self.fes.FreeDofs()
 
-        if self.solver == 'direct':
+        if self.linear_solver == 'direct':
             # prefer PARDISO if available, else use UMFPACK, note that pip version of NGSolve does
             # does not seem to populate the ngsolve.config.USE_PARDISO etc. variables correctly
             if ngs.config.USE_PARDISO or ngs.config.USE_MKL:
@@ -909,22 +909,22 @@ class Model(ABC):
             r.data = L_assembled.vec - a_assembled.mat * gfu.vec
             gfu.vec.data += inv * r
 
-        elif self.solver == 'CG':
+        elif self.linear_solver == 'CG':
             ngs.solvers.CG(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
                            tol=self.solver_tolerance, maxsteps=self.solver_max_iters, printrates=self.verbose,
                            initialize=False)
 
-        elif self.solver == 'MinRes':
+        elif self.linear_solver == 'MinRes':
             ngs.solvers.MinRes(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
                                tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
                                printrates=self.verbose)
 
-        elif self.solver == 'GMRes':
+        elif self.linear_solver == 'GMRes':
             ngs.solvers.GMRes(A=a_assembled.mat, b=L_assembled.vec, pre=precond, freedofs=freedofs,
                               x=gfu.vec, tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
                               printrates=self.verbose)
 
-        elif self.solver == 'Richardson':
+        elif self.linear_solver == 'Richardson':
             # TODO: User should be able to set a damping factor.
             ret = ngs.solvers.PreconditionedRichardson(a=a_assembled, rhs=L_assembled.vec, pre=precond,
                                                        freedofs=freedofs, tol=self.solver_tolerance,

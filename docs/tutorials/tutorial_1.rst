@@ -44,7 +44,7 @@ The next section specifies the finite element space. As some models use differen
 Next the solver is specified. Since the mesh is quite small a direct solver can be used and no preconditioner is necessary. For a full list of the solvers and preconditioners available see :ref:`example_config`. ::
 
    [SOLVER]
-   solver = direct
+   linear_solver = direct
    preconditioner = None
 
 The next section specifies if and how the simulation results should be saved to file. If "save_to_file" is set to "True" results are automatically saved to the Netgen .sol format. In this case, "save_type" is specified as ".vtu" so the results will also be saved to a .vtu file to be visualized in ParaView. ::

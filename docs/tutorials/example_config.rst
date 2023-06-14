@@ -48,7 +48,7 @@ This is the main configuration file for the simulation run. It is kept in the ru
 |               |                              |                    |                | penalty method DG.         |
 |               |                              |                    |                | C in C*n^2/h.              |
 +---------------+------------------------------+--------------------+----------------+----------------------------+
-| SOLVER        | solver                       | name               | default        | The type of solver to use. |
+| SOLVER        | linear_solver                | name               | default        | The type of solver to use. |
 |               |                              |                    |                | Options are direct, CG,    |
 |               |                              |                    |                | MinRes, GMRes, Richardson. |
 |               |                              |                    |                | Defaults to direct.        |
@@ -59,16 +59,18 @@ This is the main configuration file for the simulation run. It is kept in the ru
 |               |                              |                    |                | h1amg, bddc. Defaults to   |
 |               |                              |                    |                | local.                     |
 |               +------------------------------+--------------------+----------------+----------------------------+
-|               | solver_tolerance             | number             | 1e-8           | Stopping tolerance for an  |
+|               | linear_tolerance             | number             | 1e-8           | Stopping tolerance for an  |
 |               |                              |                    |                | iterative solve.           |
 |               +------------------------------+--------------------+----------------+----------------------------+
-|               | solver_max_iterations        | integer            | 100            | Maximum number of          |
+|               | linear_max_iterations        | integer            | 100            | Maximum number of          |
 |               |                              |                    |                | iterations for an          |
 |               |                              |                    |                | iterative solve.           |
 |               +------------------------------+--------------------+----------------+----------------------------+
 |               | linearization_method         | name               | Oseen          | Method for linearizing a   | 
 |               |                              |                    |                | nonlinear model. Options   |
 |               |                              |                    |                | are Oseen or IMEX.         |
+|		+------------------------------+--------------------+----------------+----------------------------+
+|               | nonlinear_solver             | name               | default        | Only default currently     |
 |               +------------------------------+--------------------+----------------+----------------------------+
 |               | nonlinear_tolerance          | relative -> number | 0 for          | Tolerance between          |
 |               |                              +--------------------+ absolute       | successive iterations when |

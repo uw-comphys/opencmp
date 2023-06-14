@@ -75,9 +75,10 @@ There are now two main configuration files: "config_IC" to specify the Stokes so
 The "linearization_method" parameter is only applicable to non-linear models and dictates whether the model will be linearized using the Oseen equations (or Oseen-type equations) or using an IMEX time discretization scheme. In this case, the Oseen equations are being used. The wind in the Oseen equations is obtained through Picard iterations using the previous time step's velocity as an initial guess. Therefore, an error tolerance and maximum number of iterations must also be specified for the Picard iteration. ::
 
    [SOLVER]
-   solver = default
+   linear_solver = default
    preconditioner = default
    linearization_method = Oseen
+   nonlinear_solver = default
    nonlinear_tolerance = relative -> 1e-6
                          absolute -> 1e-6
    nonlinear_max_iterations = 3

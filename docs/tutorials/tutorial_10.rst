@@ -46,9 +46,10 @@ First, since this is a low Reynolds number problem we may use a continuous Galer
 Second, the linear solver and preconditioner are changed, along with the maximum number of nonlinear iterations, so that less memory will be used compared to a direct linear solver::
 
    [SOLVER]
-   solver = CG
+   linear_solver = CG
    preconditioner = default
    linearization_method = Oseen
+   nonlinear_solver = default
    nonlinear_tolerance = relative -> 1e-6
                          absolute -> 1e-6
    nonlinear_max_iterations = 500

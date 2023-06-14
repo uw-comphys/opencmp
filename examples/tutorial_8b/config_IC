@@ -11,7 +11,7 @@ interpolant_order = 2
 DG = False
 
 [SOLVER]
-solver = default
+linear_solver = default
 preconditioner = default
 linearization_method = Oseen
 nonlinear_tolerance = relative -> 1e-5

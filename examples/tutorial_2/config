@@ -6,7 +6,7 @@ elements = u -> H1
 interpolant_order = 2
 
 [SOLVER]
-solver = direct
+linear_solver = direct
 preconditioner = None
 
 [TRANSIENT]

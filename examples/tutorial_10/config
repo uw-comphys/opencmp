@@ -11,9 +11,10 @@ interpolant_order = 2
 DG = False
 
 [SOLVER]
-solver = direct
+linear_solver = direct
 preconditioner = direct
 linearization_method = Oseen
+nonlinear_solver = default
 nonlinear_tolerance = relative -> 1e-3
                       absolute -> 1e-3
 nonlinear_max_iterations = 500

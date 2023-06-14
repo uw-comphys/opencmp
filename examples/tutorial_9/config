@@ -12,7 +12,7 @@ interpolant_order = 2
 DG = False
 
 [SOLVER]
-solver = GMRes
+linear_solver = GMRes
 preconditioner = None
 
 [TRANSIENT]

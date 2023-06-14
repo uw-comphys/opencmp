@@ -12,7 +12,7 @@ DG = True
 interior_penalty_coefficient = 10.0
 
 [SOLVER]
-solver = direct
+linear_solver = direct
 preconditioner = direct
 linearization_method = Oseen
 nonlinear_tolerance = relative -> 1e-6
