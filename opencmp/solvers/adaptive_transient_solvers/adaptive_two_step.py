@@ -66,11 +66,6 @@ class AdaptiveTwoStep(BaseAdaptiveTransientMultiStepSolver):
         self.preconditioner_pred = self.model.construct_preconditioners(self.a_pred)
         self.preconditioner_corr = self.model.construct_preconditioners(self.a_corr)
 
-    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
-        for preconditioner in precond_lst:
-            if preconditioner is not None:
-                preconditioner.Update()
-
     def _re_assemble(self) -> None:
         self._assemble()
 

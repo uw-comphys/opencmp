@@ -69,11 +69,6 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
         self.preconditioner_short   = self.model.construct_preconditioners(self.a_short)
         self.preconditioner         = self.model.construct_preconditioners(self.a)
 
-    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
-        for preconditioner in precond_lst:
-            if preconditioner is not None:
-                preconditioner.Update()
-
     def _re_assemble(self) -> None:
         self._assemble()
         self._update_preconditioners(self.preconditioner_long)
