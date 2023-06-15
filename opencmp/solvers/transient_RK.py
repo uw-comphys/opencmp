@@ -77,11 +77,6 @@ class TransientRKSolver(Solver):
         # consistent with the order of t_param, dt_param, and gfu_0_list.
         self.preconditioner_list = [self.model.construct_preconditioners(a) for a in self.a_list]
 
-    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
-        for preconditioner in precond_lst:
-            if preconditioner is not None:
-                preconditioner.Update()
-
     def _load_and_apply_initial_conditions(self) -> None:
         self.gfu_0_list: List[ngs.GridFunction] = []
 

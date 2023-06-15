@@ -224,6 +224,17 @@ class Solver(ABC):
             if self.model.DIM:
                 self.saver.save(self.model.DIM_solver.phi_gfu_orig, self.t_param[0].Get(), DIM=True)
 
+    def _assemble(self) -> None:
+        """
+        Assemble the linear and bilinear forms of the model.
+        """
+        assert len(self.a) == len(self.L)
+        for i in range(len(self.a)):
+            self.a[i].Assemble()
+            self.L[i].Assemble()
+
+        self._update_preconditioners()
+
     def _dt_for_next_time_to_hit(self) -> float:
         """
         Function that calculate the time step till the next time that the model MUST be solved at due to a variety of
@@ -444,8 +455,6 @@ class Solver(ABC):
                 else:
                     accept_this_iteration = True
 
-
-
     def _update_bcs(self, bc_dict_patch: Dict[str, Dict[str, Dict[str, List[Optional[CoefficientFunction]]]]]) -> None:
         """
         Function to update the model's BCs to arbitrary values, and then recreate the linear/bilinear forms and the
@@ -463,6 +472,16 @@ class Solver(ABC):
         self._create_linear_and_bilinear_forms()
         self._assemble()
         self._create_preconditioners()
+
+    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
+        """
+        Update the preconditioner(s) used by this time integration scheme. This is needed because the preconditioner(s)
+        can't be updated if it is None.
+        """
+        preconditioners = precond_lst if precond_lst else self.preconditioners
+        for preconditioner in preconditioners:
+            if preconditioner is not None:
+                preconditioner.Update()
 
     def reset_model(self) -> None:
         """
@@ -623,17 +642,6 @@ class Solver(ABC):
         """
 
     @abstractmethod
-    def _assemble(self) -> None:
-        """
-        Assemble the linear and bilinear forms of the model.
-        """
-        self.a[0].Assemble()
-        self.L[0].Assemble()
-
-        if self.preconditioners[0] is not None:
-            self.preconditioners[0].Update()
-
-    @abstractmethod
     def _create_linear_and_bilinear_forms(self) -> None:
         """
         Create the linear and bilinear forms of the model and add any required time integration terms.
@@ -643,13 +651,6 @@ class Solver(ABC):
     def _create_preconditioners(self) -> None:
         """
         Create the preconditioner(s) used by this time integration scheme.
-        """
-
-    @abstractmethod
-    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
-        """
-        Update the preconditioner(s) used by this time integration scheme. This is needed because the preconditioner(s)
-        can't be updated if it is None.
         """
 
     @abstractmethod

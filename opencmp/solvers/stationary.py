@@ -34,12 +34,6 @@ class StationarySolver(Solver):
     def _apply_boundary_conditions(self) -> None:
         self.model.apply_dirichlet_bcs_to(self.gfu)
 
-    def _assemble(self) -> None:
-        for i in range(len(self.a)):
-            self.a[i].Assemble()
-            self.L[i].Assemble()
-        self._update_preconditioners()
-
     def _create_linear_and_bilinear_forms(self) -> None:
         U, V = self.model.get_trial_and_test_functions()
 
@@ -66,11 +60,6 @@ class StationarySolver(Solver):
 
     def _create_preconditioners(self) -> None:
         self.preconditioners = self.model.construct_preconditioners(self.a)
-
-    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
-        for preconditioner in self.preconditioners:
-            if preconditioner is not None:
-                preconditioner.Update()
 
     def _load_and_apply_initial_conditions(self) -> None:
         self.gfu_0_list: List[ngs.GridFunction] = [self.model.construct_gfu()]

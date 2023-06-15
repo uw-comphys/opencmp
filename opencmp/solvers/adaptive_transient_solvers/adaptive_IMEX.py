@@ -48,21 +48,11 @@ class AdaptiveIMEX(BaseAdaptiveTransientMultiStepSolver):
     def _apply_boundary_conditions(self) -> None:
         self.model.apply_dirichlet_bcs_to(self.gfu_pred)
 
-    def _assemble(self) -> None:
-        for i in range(len(self.a)):
-            self.a[i].Assemble()
-            self.L[i].Assemble()
-
     def _create_linear_and_bilinear_forms(self) -> None:
         self.a_pred, self.L_pred = adaptive_IMEX_pred(self.model, self.gfu_0_list, self.dt_param)
 
     def _create_preconditioners(self) -> None:
         self.preconditioner_pred = self.model.construct_preconditioners(self.a_pred)
-
-    def _update_preconditioners(self, precond_lst: List[Optional[Preconditioner]] = None) -> None:
-        for preconditioner in precond_lst:
-            if preconditioner is not None:
-                preconditioner.Update()
 
     def _re_assemble(self) -> None:
         self._assemble()
