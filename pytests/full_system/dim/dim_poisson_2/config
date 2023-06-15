@@ -13,7 +13,7 @@ interpolant_order = 3
 DG = False
 
 [SOLVER]
-solver = default
+linear_solver = default
 preconditioner = default
 
 [TRANSIENT]

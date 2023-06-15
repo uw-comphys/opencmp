@@ -12,9 +12,10 @@ DG = True
 interior_penalty_coefficient = 10.0
 
 [SOLVER]
-solver = default
+linear_solver = default
 preconditioner = default
 linearization_method = Oseen
+nonlinear_solver = default
 nonlinear_tolerance = relative -> 1e-6
                       absolute -> 1e-6
 nonlinear_max_iterations = 3

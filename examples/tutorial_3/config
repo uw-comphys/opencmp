@@ -11,10 +11,10 @@ DG = True
 interior_penalty_coefficient = 10.0
 
 [SOLVER]
-solver = CG
+linear_solver = CG
 preconditioner = direct
-solver_tolerance = 1e-12
-solver_max_iterations = 100
+linear_tolerance = 1e-12
+linear_max_iterations = 100
 
 [ERROR ANALYSIS]
 check_error = True

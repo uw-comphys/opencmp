@@ -19,7 +19,7 @@ There are still two main configuration files: "config_IC" for the Stokes solve a
 "config" differs in the solver section. The linearization method is now "IMEX" and the Picard iteration parameters are no longer needed. ::
 
    [SOLVER]
-   solver = default
+   linear_solver = default
    preconditioner = default
    linearization_method = IMEX
 
