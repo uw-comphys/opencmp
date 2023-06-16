@@ -404,6 +404,7 @@ class Solver(ABC):
             self.num_rejects = 0
 
             while (not accept_this_iteration):
+
                 self._apply_boundary_conditions()
 
                 self._re_assemble()
@@ -412,30 +413,29 @@ class Solver(ABC):
                 # linearized iteration of a nonlinear
                 err, gfu_norm = self.model.linearized_solve(self.a[0], self.L[0], self.preconditioners[0], self.gfu)
 
+
                 # communicate to the model class the result of the current nonlinear iteration, this
                 self.model.update_linearization(self.gfu)
 
                 self.num_iters += 1
 
                 if self.model.nonlinear:
+
+                    logging.info("Nonlinear iteration {0} with error: {1}".format(self.num_iters, err))
+
                     # If this iteration met all all requirements for accepting the solution
                     if (err < self.model.abs_nonlinear_tolerance + self.model.rel_nonlinear_tolerance * gfu_norm) or (self.num_iters > self.model.nonlinear_max_iters):
                         # Reset counter
                         self.num_rejects = 0
-                        # Increment
-                        self.num_iters += 1
 
                         # This iteration was accepted, break out of the while loop
                         break
                     else:
                         self.num_rejects += 1
 
-                        # nasser@matthew, is there anything we can adjust if the nonlinear solver
-                        # does not converge after some max number of iterations? If so, it would go here
-                        print('Nonlinear iterations exceeded, solve attempt', self.num_rejects, "out of", self.model.nonlinear_max_iters," maximum attempts.")
-
                         # Prevent an infinite loop of rejections by ending the run.
                         if self.num_rejects > self.nonlinear_max_iters:
+
                             # Save the current solution before ending the run.
                             if self.save_to_file:
                                 self.saver.save(self.gfu, self.t_param[0].Get())
@@ -449,7 +449,7 @@ class Solver(ABC):
                                 if self.model.DIM:
                                     tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
 
-                            logging.error('Maximum number of nonlinear iterations has been exceeded. Saving current solution to file and ending the run.'.format(self.t_param[0].Get()))
+                            logging.error('Maximum number of nonlinear iterations has been exceeded. Saving current solution to file and ending the run.')
                             sys.exit(-1)
 
                 else:
