@@ -47,7 +47,11 @@ def run(config_file_path: str, config_parser: Optional[ConfigParser] = None) -> 
     msg_level = config_parser.get_item(['OTHER', 'messaging_level'], int, quiet=True)
     model_name = config_parser.get_item(['OTHER', 'model'], str)
 
+    # configure logging and status output
     logging.basicConfig(filename='opencmp.log', level=logging.INFO)
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    logging.getLogger('').addHandler(console)
 
     # Set parameters for ngsolve
     ngcore.SetNumThreads(num_threads)

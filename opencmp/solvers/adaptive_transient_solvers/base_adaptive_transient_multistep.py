@@ -124,6 +124,8 @@ class BaseAdaptiveTransientMultiStepSolver(TransientMultiStepSolver, ABC):
                 self.t_param[i].Set(self.t_param[i].Get() - self.dt_param[i].Get())
             self.dt_param[0].Set(dt_new)
 
+            logging.info("Time-step failed, re-attempting with reduced (halved) time-step.")
+
         # The largest absolute error values
         max_abs = max(local_error)
 

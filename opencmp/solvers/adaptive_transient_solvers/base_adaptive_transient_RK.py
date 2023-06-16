@@ -159,6 +159,9 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
             # Reset self.step to one.
             self.step = 1
 
+            logging.info("Time-step failed, re-attempting with reduced (halved) time-step.")
+
+
         # The largest absolute error values
         max_abs = max(local_error)
 

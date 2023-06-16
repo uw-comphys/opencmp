@@ -453,4 +453,4 @@ class MultiComponentINS(INS):
         if self.fixed_velocity:
             self.linear_solve(a_lst[0], L_lst[0], precond_lst[0], gfu)
         else:
-            super().solve_single_step(a_lst[0], L_lst[0], precond_lst[0], gfu, time_step)
+            super().solve_single_step(a_lst, L_lst, precond_lst, gfu, time_step)

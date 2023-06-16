@@ -395,8 +395,8 @@ class Solver(ABC):
                             if self.model.DIM:
                                 tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
 
-                        sys.exit('At t = {0} the maximum number of rejected time steps has been exceeded. Saving current '
-                                 'solution to file and ending the run.'.format(self.t_param[0].Get()))
+                        logging.error('At t = {0} the maximum number of rejected time steps has been exceeded.\\ Saving current solution to file and ending the run.'.format(self.t_param[0].Get()))
+                        sys.exit(-1)
         else:
             # Loop until an iteration is accepted, or until the max number of attempts is reached
             accept_this_iteration = False
@@ -449,8 +449,8 @@ class Solver(ABC):
                                 if self.model.DIM:
                                     tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
 
-                            sys.exit('Maximum number of nonlinear iterations has been exceeded. Saving current '
-                                     'solution to file and ending the run.'.format(self.t_param[0].Get()))
+                            logging.error('Maximum number of nonlinear iterations has been exceeded. Saving current solution to file and ending the run.'.format(self.t_param[0].Get()))
+                            sys.exit(-1)
 
                 else:
                     accept_this_iteration = True
