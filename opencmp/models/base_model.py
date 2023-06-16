@@ -186,7 +186,7 @@ class Model(ABC):
                     raise ValueError('Preconditioner cannot be None if using CG or MinRes solvers.')
 
         self.linear_tolerance = self.config.get_item(['SOLVER', 'linear_tolerance'], float, quiet=True)
-        self.linear_max_iters = self.config.get_item(['SOLVER', 'linear_max_iterations'], int, quiet=True)
+        self.linear_max_iterations = self.config.get_item(['SOLVER', 'linear_max_iterations'], int, quiet=True)
 
         # assume model is linear by default
         self.nonlinear = False
@@ -911,24 +911,24 @@ class Model(ABC):
 
         elif self.linear_solver == 'CG':
             ngs.solvers.CG(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
-                           tol=self.solver_tolerance, maxsteps=self.solver_max_iters, printrates=self.verbose,
+                           tol=self.linear_tolerance, maxsteps=self.linear_max_iterations, printrates=self.verbose,
                            initialize=False)
 
         elif self.linear_solver == 'MinRes':
             ngs.solvers.MinRes(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
-                               tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
+                               tol=self.linear_tolerance, maxsteps=self.linear_max_iterations,
                                printrates=self.verbose)
 
         elif self.linear_solver == 'GMRes':
             ngs.solvers.GMRes(A=a_assembled.mat, b=L_assembled.vec, pre=precond, freedofs=freedofs,
-                              x=gfu.vec, tol=self.solver_tolerance, maxsteps=self.solver_max_iters,
+                              x=gfu.vec, tol=self.linear_tolerance, maxsteps=self.linear_max_iterations,
                               printrates=self.verbose)
 
         elif self.linear_solver == 'Richardson':
             # TODO: User should be able to set a damping factor.
             ret = ngs.solvers.PreconditionedRichardson(a=a_assembled, rhs=L_assembled.vec, pre=precond,
-                                                       freedofs=freedofs, tol=self.solver_tolerance,
-                                                       maxit=self.solver_max_iters, printing=self.verbose)
+                                                       freedofs=freedofs, tol=self.linear_tolerance,
+                                                       maxit=self.linear_max_iterations, printing=self.verbose)
             gfu.vec.data = ret
         else:
             logging.error('No linear solver specified.')

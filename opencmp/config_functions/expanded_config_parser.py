@@ -168,8 +168,8 @@ class ConfigParser(configparser.ConfigParser):
                            = [{}]) \
             -> Tuple[Dict, Dict]:
         """
-        Function to load parameters from a config file into a two-level dictionary. 
-        
+        Function to load parameters from a config file into a two-level dictionary.
+
         The values in the lowest level dictionary are either parsed into Python code or kept as strings if they
         represent paths to .sol files. All other keys and values are kept as strings. ::
 
