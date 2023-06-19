@@ -84,7 +84,6 @@ class Solver(ABC):
 
         self.gfu_0_list: List[ngs.GridFunction] = []
 
-        self.nonlinear_max_iters = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
 
         if self.transient:
             self.scheme = self.config.get_item(['TRANSIENT', 'scheme'], str)
@@ -152,6 +151,14 @@ class Solver(ABC):
 
         # Initialize model
         self.model = model_class(self.config, self.t_param)
+        
+        if self.model.nonlinear:
+            self.nonlinear_solver = self.config.get_item(['SOLVER', 'nonlinear_solver'], str)
+            self.nonlinear_max_iterations = self.config.get_item(['SOLVER', 'nonlinear_max_iterations'], int)
+        
+            nonlinear_tol = self.config.get_dict(['SOLVER', 'nonlinear_tolerance'], '', None)
+            self.nonlinear_relative_tolerance = nonlinear_tol['relative']
+            self.nonlinear_absolute_tolerance = nonlinear_tol['absolute']
 
         # Set everything up for if error metrics should be calculated and saved to file after every time step.
         self.check_error = self.config.get_item(['ERROR ANALYSIS', 'check_error_every_timestep'], bool, quiet=True)
@@ -306,7 +313,74 @@ class Solver(ABC):
 
     def _solve(self) -> None:
         """
-        Function to perform a single iteration of the solve.
+        Function to perform the nonlinear solve of the model.
+
+        #########################################
+        General Description of nonlinear solvers:
+        #########################################
+
+        Note: 
+        - for all methods, the first iteration (i=0) uses the linearized solution and does not perform mixing
+        - On the second iteration (i=1) mixing may begin based on the chosen nonlinear solver
+
+        ALL nonlinear solvers implemented here follow the inexact Newton method
+        - recall the Newton method attempts to solve F(x) = 0 for a (system of) equations
+        - Using taylor series expansion and solving for x (truncating terms after first term...)
+        -   x = x0 - F(x0) / J(x0), where x0 is the initial guess. F and J represent the function to minimize and it's jacobian
+        - The inexact newton method approximates J in various ways
+        - This is an iterative method, more commonly written as: x_i+1 = x_i + dx 
+        - In general, Anderson mixing should always converge. Others may diverge.
+        
+        #################################################################
+        Simple mixing methods (LinearMixing, ExcitingMixing, DiagBroyden)
+        #################################################################
+
+        Parameters
+        - LinearMixing: alpha (scalar constant) --> related to the Jacobian approximation via J ~ -1/alpha
+        -   Note that alpha is used in all simple and advanced methods implemented here.
+        - DiagBroyden: does not have any solver specific variables
+
+        ## Iteration begins ##
+
+        Calculating dx
+        - Recall that newton method is iterative, i.e., we need updated guesses via x_i+1 = x_i + dx
+
+        LinearMixing:   dx = F_i * alpha, where alpha is merely a constant
+        DiagBroyden:    dx = F_i / beta, where beta is a vector with values 1/alpha
+
+        Updated Jacobian approximation
+
+        LinearMixing: no Jacobian update
+
+        DiagBroyden
+        - The update is quadratic in nature. Formula not shown here
+        
+        ###################################
+        Advanced mixing methods (Anderson)
+        ###################################
+        
+        Brief Overview
+        - Anderson mixing retains a number of difference vectors (dx, df) and mixes them in a unique way
+        - These difference vectors are stored in a list called dx_all and df_all. I.e., df_all[0] = F1-F0
+        - A detailed mathematical formulation can be found in V. Eyert, J. Comp. Phys., 124, 271 (1996)
+
+        Parameters
+        - alpha is the same variable as the simple methods. Related to Jacobian approximation via J ~ -1/a
+        - keep_vectors --> the number of difference vectors to retain. Default is 4 or 5 (as recommended by Anderson)
+        - w0 --> regularization parameter for numerical stability. Default is 0.01. Good values are on order of 0.01
+
+        ## Iteration begins ##
+
+        Iteration i = 1
+        - Linear mixing is used here, dx = alpha * f0. Add this to dx_all list (list of difference vectors we retain)
+        - Full anderson mixing not performed since we do not have two f values (we need both dx and df to do full mixing).
+            at this moment, we only have dx.
+
+        Iteration i = 2
+        - f1 is estimated. We now have df and dx and can perform anderson mixing
+        - Update dx via Anderson method. Uses a weighted matrix (A) and df and dx
+        - The Jacobian update for anderson involves updating the A matrix and its entries
+        
         """
 
         # currently using different nonlinear solver approaches for transient versus stationary problems
@@ -398,62 +472,205 @@ class Solver(ABC):
                         logging.error('At t = {0} the maximum number of rejected time steps has been exceeded.\\ Saving current solution to file and ending the run.'.format(self.t_param[0].Get()))
                         sys.exit(-1)
         else:
-            # Loop until an iteration is accepted, or until the max number of attempts is reached
-            accept_this_iteration = False
-            self.num_iters = 0
-            self.num_rejects = 0
+        
+            # stationary solve
 
-            while (not accept_this_iteration):
+            # LINEAR PDE
+            # if linear PDE solve linear system and return, no iteration needed
+            if not self.model.nonlinear:
+                print("Beginning linear stationary solve...")
 
+                ########################################################################################################
+                # solve linear model
                 self._apply_boundary_conditions()
-
                 self._re_assemble()
-
-                # this method solves a linear model (no iteration) or solves a single
-                # linearized iteration of a nonlinear
                 err, gfu_norm = self.model.linearized_solve(self.a[0], self.L[0], self.preconditioners[0], self.gfu)
 
+                return
 
-                # communicate to the model class the result of the current nonlinear iteration, this
-                self.model.update_linearization(self.gfu)
+            # NONLINEAR PDE
+            # iteration needed (via inexact Newton method)
 
-                self.num_iters += 1
+            # Loop until an iteration is accepted, or until the max number of attempts is reached
+            not_converged = True
+            self.num_iterations = 0
 
-                if self.model.nonlinear:
+            
+            ########################################################################################################
+            # Default optional user config parameters needed for the nonlinear solvers 
+            # TODO: eventually this is moved to the config file, but is here temporarily
+            
+            ## LinearMixing, DiagBroyden, and Anderson ##
+            alpha = 0 # related to jacobian approximation via J ~ -1/alpha
 
-                    logging.info("Nonlinear iteration {0} with error: {1}".format(self.num_iters, err))
+            ## Anderson Mixing ##
+            keep_vectors = 5 # number of difference vectors to retain. Default is 4 or 5
+            w0 = 0.01 # parameter for numerical stability. Good values on order of 0.01. Default 0.01.
+            singular_tolerance = 1e-6 # the tolerance for singular matrix
+            
 
-                    # If this iteration met all all requirements for accepting the solution
-                    if (err < self.model.abs_nonlinear_tolerance + self.model.rel_nonlinear_tolerance * gfu_norm) or (self.num_iters > self.model.nonlinear_max_iters):
-                        # Reset counter
-                        self.num_rejects = 0
+            ########################################################################################################
 
-                        # This iteration was accepted, break out of the while loop
-                        break
-                    else:
-                        self.num_rejects += 1
+            # initialize the dx and f vector. No need to populate data, this is done later
+            dx = self.gfu.vec.Copy()
+            f = self.gfu.vec.Copy()
+                        
+            ##################################################################################################################
 
-                        # Prevent an infinite loop of rejections by ending the run.
-                        if self.num_rejects > self.nonlinear_max_iters:
+            # Iteration begins here. until we have converged (and reached an acceptable solution), then
+            while not_converged:
 
-                            # Save the current solution before ending the run.
-                            if self.save_to_file:
-                                self.saver.save(self.gfu, self.t_param[0].Get())
+                ########################################################################################################
+                # solve linearized model, nasser@nasser, not sure why solver class has these first two methods...
+                self._apply_boundary_conditions()
+                self._re_assemble()
 
-                                if self.model.DIM:
-                                    self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
-                            else:
-                                tmp_saver = SolutionFileSaver(self.model, quiet=True)
-                                tmp_saver.save(self.gfu, self.t_param[0].Get())
-
-                                if self.model.DIM:
-                                    tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
-
-                            logging.error('Maximum number of nonlinear iterations has been exceeded. Saving current solution to file and ending the run.')
-                            sys.exit(-1)
+                # This function solves a single iteration of the linearized model
+                err, gfu_norm = self.model.linearized_solve(self.a[0], self.L[0], self.preconditioners[0], self.gfu)
+		
+                logging.info("Nonlinear iteration {0} with error: {1}".format(self.num_iterations, err))
+		
+		# check if solution converged
+                if (err < self.nonlinear_absolute_tolerance + self.nonlinear_relative_tolerance * gfu_norm) or (self.num_iterations > self.nonlinear_max_iterations):
+                    # This iteration was accepted, break out of the while loop
+                    not_converged = False
 
                 else:
-                    accept_this_iteration = True
+                    # Prevent an infinite loop of rejections by ending the run.
+                    if self.num_iterations > self.nonlinear_max_iterations:
+
+                        # Save the current solution before ending the run.
+                        if self.save_to_file:
+                            self.saver.save(self.gfu, self.t_param[0].Get())
+
+                            if self.model.DIM:
+                                self.saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+                        else:
+                            tmp_saver = SolutionFileSaver(self.model, quiet=True)
+                            tmp_saver.save(self.gfu, self.t_param[0].Get())
+
+                            if self.model.DIM:
+                                tmp_saver.save(self.model.DIM_solver.phi_gfu, self.t_param[0].Get(), DIM=True)
+
+                        logging.error('Maximum number of nonlinear iterations has been exceeded. Saving current solution to file and ending the run.')
+                        sys.exit(-1)
+
+
+                ########################################################################################################
+
+                # Begin nonlinear solver iteration
+
+                # i = 0
+                # for the first iteration, simply use linearized solution instead of mixing
+                if self.num_iterations == 0:
+                    
+                    # initialize x_prev and x_curr and populate with initial data
+                    x_prev = self.gfu.vec.Copy()
+                    x_prev.data = self.gfu.vec 
+                    x_curr = self.gfu.vec.Copy() 
+                    x_curr.data = self.gfu.vec 
+
+
+                # i > 0
+                # for the remaining iterations, perform a nonlinear solve
+                else:
+                    
+                    ############################################################################################
+
+                    # Populate the f vector using current guess (linearization) minus previous
+                    f.data = self.gfu.vec - x_prev
+                    fcurr = f.FV().NumPy().copy()
+
+                    # Estimate alpha
+                    alpha = 0.5 * max(1., x_prev.Norm()) / f.Norm()
+
+                    # Initialize other parameters needed for inexact newton methods
+                    if self.num_iterations == 1:
+                        fprev = fcurr.copy()
+
+                        # If DiagBroyden, initialize beta
+                        # TODO: needs to be made thread efficient; currently repeated by every thread
+                        if self.nonlinear_solver == 'DiagBroyden':
+                            beta = np.full((self.gfu.vec.size), 1/alpha)
+
+                    ############################################################################################
+                    # Perform mixing here based on the nonlinear solver chosen
+                    # Note: all solvers perform linear mixing for first (i=1) iteration
+
+                    if self.nonlinear_solver == 'LinearMixing' or self.num_iterations == 1:
+                        dx.data = alpha * f.Copy()
+                        if self.nonlinear_solver in ['default', 'Anderson']:
+                            dx_all = []
+                            df_all = []
+                            dx_all.append(dx.FV().NumPy().copy())
+
+                    elif self.nonlinear_solver == 'DiagBroyden': 
+                        # Jacobian update
+                        beta -= (fcurr-fprev + beta*dx.FV().NumPy().copy())  *  dx.FV().NumPy().copy() / dx.Norm()**2   
+                        # update dx and fprev                     
+                        dx.data = f.FV().NumPy().copy() / beta
+                        fprev = fcurr.copy()
+                    
+                    elif self.nonlinear_solver in ['default', 'Anderson']: 
+                        # first must populate df_all with difference vector, fi+1-f_i
+                        df_all.append(fcurr-fprev)
+                        fprev = fcurr.copy()
+
+                        # if we are retaining more vectors than what has been set, remove the oldest one
+                        if len(dx_all) > keep_vectors: 
+                            dx_all.pop(0)
+                            df_all.pop(0)
+                        
+                        # create the A matrix which is used to update dx during full anderson mixing
+                        A = np.zeros((len(dx_all), len(dx_all)))
+                        for i in range(len(dx_all)):
+                            for j in range(i,len(dx_all)):
+                                A[i,j] = np.vdot(df_all[i], df_all[j])
+                    
+                        np.fill_diagonal(A, A.diagonal() * (1+w0**2)) # multiply diagonal by 1+w0**2
+                        A += np.triu(A, 1).T.conj() # add to A, the transposed upper triangular (below 1st diag) matrix
+
+                        # check to see if A is singular. if so, reset jacobian approximation
+                        if abs(np.linalg.det(A)) < singular_tolerance:
+                            dx_all = []
+                            df_all = []
+                            dx.data = alpha * f.Copy()
+                            dx_all.append(dx.FV().NumPy().copy())
+                        
+                        # If A not singular, then perform full anderson mixing!
+                        else:
+                            dx.data = -alpha * f.Copy()                            
+                            dff = np.zeros(len(df_all))
+                            for k in range(len(df_all)):
+                                dff[k] = np.vdot(df_all[k], fcurr)
+
+                            gamma = np.linalg.solve(A, dff)
+                            dx_np = dx.FV().NumPy().copy()
+                            for k in range(len(df_all)):
+                                dx_np += gamma[k] * (dx_all[k] + alpha*df_all[k])
+                            
+                            # Adjust dx_np and then set it to dx for next update
+                            dx.data = -1 * dx_np.copy()
+                            dx_all.append(dx.FV().NumPy().copy())
+
+
+                    # update the current guess, the x_curr vector via the Newton method
+                    x_curr.data += dx
+
+                ############################################################################################
+                # Below is code that is executed for all iterations (i = 0 : self.nonlinear_max_iterations)
+
+                # update grid function vector (in-place) for next iteration
+                self.gfu.vec.data = x_curr
+
+                # update the previous x
+                x_prev.data = x_curr
+
+                # see if the current solution is acceptable
+                self.model.update_linearization(self.gfu)
+
+                self.num_iterations += 1
+
 
     def _update_bcs(self, bc_dict_patch: Dict[str, Dict[str, Dict[str, List[Optional[CoefficientFunction]]]]]) -> None:
         """
