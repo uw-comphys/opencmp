@@ -89,56 +89,39 @@ class Solver(ABC):
             output_dir = Path(self.config.get_item(['OTHER', 'run_dir'], str) + '/output/' + model_class.name() + '_sol/')
             if output_dir.exists():
                 # Find the last (and second last if available) saved files
-                latest        = -np.inf
-                second_latest = -np.inf
+                time_latest      = -np.inf
                 latest_file_name = None
                 prefix = len(model_class.name()) + 1  # +1 for the "_" between the name and the time
                 for sol_file in output_dir.rglob('*' + model_class.name() + '*.sol'):
                     name = sol_file.name
                     sol_time = float(name[prefix:-4])  # Strip the prefix and filetype and convert to time
-                    if sol_time > latest:
-                        second_latest = latest
-                        latest = sol_time
+                    if sol_time > time_latest:
+                        time_lates = sol_time
                         latest_file_name = name
-                    elif sol_time > second_latest:
-                        second_latest = sol_time
 
                 # Update time_range and dt to reflect those values
-                if latest_file_name != None:
+                if latest_file_name is not None:
                     # Set the new initial time
                     time_range = self.config.get('TRANSIENT', 'time_range').split(',')
-                    time_range[0] = str(latest)
+                    time_range[0] = str(time_latest)
                     self.config.set('TRANSIENT', 'time_range', ','.join(time_range))
 
-                    # Check that the initial conditions file was properly updated to point to the latest .sol file
-                    ic_not_set = True
+                    # Make sure that the latest time-step found is also the one specified by the user.
+                    # This check makes sure they did not forget to update their initial condition.
                     with open(self.config.get_item(['OTHER', 'run_dir'], str) + '/ic_dir/ic_config') as ic_config:
-                        if latest_file_name in ic_config.read():
-                            ic_not_set = False
-
-                    if ic_not_set:
-                        raise ValueError(
-                            "Tried to resume from previous solution {}, "
-                            "but it did not match up with the initial condition in ic_config. "
-                            "The initial condition must, currently, be manually changed to the latest .sol file."
-                            .format(latest_file_name)
-                        )
+                        if latest_file_name not in ic_config.read():
+                            raise ValueError(
+                                "Tried to resume from previous solution {}, "
+                                "but it did not match up with the initial condition in ic_config. "
+                                "The initial condition must, currently, be manually changed to the latest .sol file."
+                                .format(latest_file_name)
+                            )
 
                     print("Resuming from previous solution: {}".format(latest_file_name))
-
-                    # If there is more than one saved file, calculate a dt from it.
-                    if latest != second_latest:
-                        self.dt_range = self.config.get_list(['TRANSIENT', 'dt_range'], float)
-                        dt_proposed = latest - second_latest
-
-                        # Set that dt if it's within the acceptable range:
-                        if self.dt_range[0] < dt_proposed < self.dt_range[1]:
-                            self.config.set('TRANSIENT', 'dt', str(dt_proposed))
 
         self.transient = self.config.get_item(['TRANSIENT', 'transient'], bool)
 
         self.gfu_0_list: List[ngs.GridFunction] = []
-
 
         if self.transient:
             self.scheme = self.config.get_item(['TRANSIENT', 'scheme'], str)
