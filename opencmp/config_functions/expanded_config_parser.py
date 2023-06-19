@@ -104,9 +104,9 @@ class ConfigParser(configparser.ConfigParser):
 
     def get_one_level_dict(self, config_section: str, import_dir: str, mesh: Mesh,
                            t_param: Optional[List[Parameter]] = None,
-                           new_variables: List[Dict[str,
-                                                    Union[int, str, float, CoefficientFunction, GridFunction, None]]]
-                           = None,
+                           new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction,
+                                                               None]]]
+                           = [{}],
                            all_str: bool = False) -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a single-level dictionary.
@@ -136,12 +136,10 @@ class ConfigParser(configparser.ConfigParser):
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
                   future.
         """
-        if new_variables is None:
-            new_variables = [{}]
 
         dict_one: Dict[str, Union[str, float, CoefficientFunction, list]] = {}
         re_parse_dict: Dict[str, Union[str, Callable]] = {}
-        val_str_lst: Union[str, List]  # Just for type-hinting.
+        val_str_lst: Union[str, List] # Just for type-hinting.
         for key in self[config_section]:
             if all_str:
                 # If all_str option is passed none of the parameters should ever need to be re-parsed.
@@ -168,7 +166,7 @@ class ConfigParser(configparser.ConfigParser):
                            t_param: Optional[List[Parameter]] = None,
                            new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction,
                                                                None]]]
-                           = None) \
+                           = [{}]) \
             -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a two-level dictionary.
@@ -196,8 +194,6 @@ class ConfigParser(configparser.ConfigParser):
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
                   future.
         """
-        if new_variables is None:
-            new_variables = [{}]
 
         # Top level dictionaries.
         dict_one: Dict[str, Dict[str, Union[str, float, CoefficientFunction, list]]] = {}
@@ -215,9 +211,9 @@ class ConfigParser(configparser.ConfigParser):
     def get_three_level_dict(self, import_dir: str, mesh: Mesh, t_param: Optional[List[Parameter]] = None,
                              new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction,
                                                                  None]]]
-                             = None,
-                             white_list: List[str] = None,
-                             ignore: List[str] = None) -> Tuple[Dict, Dict]:
+                             = [{}],
+                             white_list: List[str] = [],
+                             ignore: List[str] = []) -> Tuple[Dict, Dict]:
         """
         Function to load parameters from a config file into a three-level dictionary.
 
@@ -250,12 +246,6 @@ class ConfigParser(configparser.ConfigParser):
                 - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the
                   future.
         """
-        if new_variables is None:
-            new_variables = [{}]
-        if white_list is None:
-            white_list = []
-        if ignore is None:
-            ignore = []
 
         # Keys for the top level dictionaries
         keys_one = [item for item in self.sections() if item not in ignore]
