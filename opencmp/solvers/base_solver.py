@@ -531,7 +531,7 @@ class Solver(ABC):
 		
                 logging.info("Nonlinear iteration {0} with error: {1}".format(self.num_iterations, err))
 		
-		        # check if solution converged
+                # check if solution converged
                 if (err < self.nonlinear_absolute_tolerance + self.nonlinear_relative_tolerance * gfu_norm) or (self.num_iterations > self.nonlinear_max_iterations):
                     # This iteration was accepted, break out of the while loop
                     break
