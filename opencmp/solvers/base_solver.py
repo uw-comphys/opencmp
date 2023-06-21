@@ -491,8 +491,7 @@ class Solver(ABC):
             # NONLINEAR PDE
             # iteration needed (via inexact Newton method)
 
-            # Loop until an iteration is accepted, or until the max number of attempts is reached
-            not_converged = True
+            # Declare iteration counter variable 
             self.num_iterations = 0
 
             
@@ -518,7 +517,7 @@ class Solver(ABC):
             ##################################################################################################################
 
             # Iteration begins here. until we have converged (and reached an acceptable solution), then
-            while not_converged:
+            while True:
 
                 ########################################################################################################
                 # solve linearized model, nasser@nasser, not sure why solver class has these first two methods...
@@ -527,17 +526,19 @@ class Solver(ABC):
 
                 # This function solves a single iteration of the linearized model
                 err, gfu_norm = self.model.linearized_solve(self.a[0], self.L[0], self.preconditioners[0], self.gfu)
+
+                self.num_iterations += 1
 		
                 logging.info("Nonlinear iteration {0} with error: {1}".format(self.num_iterations, err))
 		
-		# check if solution converged
+		        # check if solution converged
                 if (err < self.nonlinear_absolute_tolerance + self.nonlinear_relative_tolerance * gfu_norm) or (self.num_iterations > self.nonlinear_max_iterations):
                     # This iteration was accepted, break out of the while loop
-                    not_converged = False
+                    break
 
                 else:
                     # Prevent an infinite loop of rejections by ending the run.
-                    if self.num_iterations > self.nonlinear_max_iterations:
+                    if self.num_iterations == self.nonlinear_max_iterations:
 
                         # Save the current solution before ending the run.
                         if self.save_to_file:
@@ -560,9 +561,9 @@ class Solver(ABC):
 
                 # Begin nonlinear solver iteration
 
-                # i = 0
+                # i = 1
                 # for the first iteration, simply use linearized solution instead of mixing
-                if self.num_iterations == 0:
+                if self.num_iterations == 1:
                     
                     # initialize x_prev and x_curr and populate with initial data
                     x_prev = self.gfu.vec.Copy()
@@ -571,7 +572,7 @@ class Solver(ABC):
                     x_curr.data = self.gfu.vec 
 
 
-                # i > 0
+                # i > 1
                 # for the remaining iterations, perform a nonlinear solve
                 else:
                     
@@ -581,11 +582,14 @@ class Solver(ABC):
                     f.data = self.gfu.vec - x_prev
                     fcurr = f.FV().NumPy().copy()
 
-                    # Estimate alpha
-                    alpha = 0.5 * max(1., x_prev.Norm()) / f.Norm()
+                    # Initialize other parameters needed for nonlinear solvers
+                    if self.num_iterations == 2:
 
-                    # Initialize other parameters needed for inexact newton methods
-                    if self.num_iterations == 1:
+                        # Initialize alpha
+                        # TODO: must handle this after implementing alpha into config file
+                        alpha = 0.5 * max(1., x_prev.Norm()) / f.Norm()
+                        
+                        # Keep track of previous f
                         fprev = fcurr.copy()
 
                         # If DiagBroyden, initialize beta
@@ -597,7 +601,7 @@ class Solver(ABC):
                     # Perform mixing here based on the nonlinear solver chosen
                     # Note: all solvers perform linear mixing for first (i=1) iteration
 
-                    if self.nonlinear_solver == 'LinearMixing' or self.num_iterations == 1:
+                    if self.nonlinear_solver == 'LinearMixing' or self.num_iterations == 2:
                         dx.data = alpha * f.Copy()
                         if self.nonlinear_solver in ['default', 'Anderson']:
                             dx_all = []
@@ -668,8 +672,6 @@ class Solver(ABC):
 
                 # see if the current solution is acceptable
                 self.model.update_linearization(self.gfu)
-
-                self.num_iterations += 1
 
 
     def _update_bcs(self, bc_dict_patch: Dict[str, Dict[str, Dict[str, List[Optional[CoefficientFunction]]]]]) -> None:
