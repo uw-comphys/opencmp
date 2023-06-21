@@ -11,7 +11,9 @@ class ControllerFunctions(ConfigFunctions):
     """
 
     def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter],
-                 new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
+                 new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = None) -> None:
+        if new_variables is None:
+            new_variables = [{}]
         super().__init__(config_rel_path, import_dir, mesh, t_param, new_variables)
 
         tmp_vc_dict = _convert_dict_entries_to_list(self.config.get_one_level_dict('CONTROL_VARIABLES',
