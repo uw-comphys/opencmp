@@ -14,14 +14,15 @@
 # You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
+from typing import Dict, List, Tuple, Union, Optional
 
 import ngsolve as ngs
+from ngsolve.comp import FESpace, ProxyFunction
+from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
+
 from ..helpers.ngsolve_ import get_special_functions
 from ..helpers.dg import jump, grad_avg
 from . import Model
-from typing import Dict, List, Union, Optional
-from ngsolve.comp import FESpace, ProxyFunction
-from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
 
 
 class Poisson(Model):

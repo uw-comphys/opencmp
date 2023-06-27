@@ -16,7 +16,7 @@
 ########################################################################################################################
 
 import logging
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Tuple, Optional, Union
 
 import ngsolve
 from ngsolve.comp import ProxyFunction
@@ -358,7 +358,7 @@ class INS(Model):
         else:
             raise ValueError('Linearization scheme \"{}\" is not implemented.'.format(self.linearize))
 
-    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> None:
+    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> Tuple[float, float]:
         if self.linearize == 'Oseen':
             # The component index representing velocity
             component = self.fes.components[self.model_components['u']]

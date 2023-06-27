@@ -29,7 +29,7 @@ from ..config_functions import ConfigParser, BCFunctions, ICFunctions, ModelFunc
 from ..config_functions.load_config import parse_str
 from ..diffuse_interface import DIM
 from ..helpers.io import load_mesh
-
+from ..helpers.error import norm, mean
 
 """
 Module for the base model class.
@@ -910,7 +910,7 @@ class Model(ABC):
             gfu.vec.data += inv * r
 
         elif self.linear_solver == 'CG':
-            ngs.solvers.CG(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
+            solver = ngs.solvers.CG(mat=a_assembled.mat, rhs=L_assembled.vec, pre=precond, sol=gfu.vec,
                            tol=self.linear_tolerance, maxsteps=self.linear_max_iterations, printrates=self.verbose,
                            initialize=False)
 
@@ -934,7 +934,7 @@ class Model(ABC):
             logging.error('No linear solver specified.')
             raise ValueError("No linear solver specified.")
 
-    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> None:
+    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> Tuple[float, float]:
         """
         Function to prepare for and perform the linear/linearized solve of the linear/nonlinear model.
 
@@ -947,10 +947,17 @@ class Model(ABC):
             L_lst: A list of the linear forms.
             precond_lst: A list of preconditioners to use.
             gfu: The gridfunction to store the solution of the linear system.
+
+        Returns:
+            Tuple of the error residual and norm of the solution.
         """
         # assume linear model, will be overriden for nonlinear models
         self.linear_solve(a_assembled, L_assembled, precond, gfu)
 
+        # currently NGSolve's linear solver implementations do not expose the linear solver status, including residuals,
+        # number of iterations to convergence, etc.
+        # Assume that the linear solver converged and error is within numerical precision and the norm of the solution
+        # is irrelevant
         return(0., 0.)
 
     def update_linearization(self, gfu: GridFunction):

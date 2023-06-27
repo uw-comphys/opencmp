@@ -12,7 +12,7 @@ DG = True
 interior_penalty_coefficient = 10.0
 
 [SOLVER]
-linear_solver = default
+linear_solver = CG
 preconditioner = default
 
 [VISUALIZATION]

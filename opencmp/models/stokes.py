@@ -14,14 +14,15 @@
 # You should have received a copy of the GNU Lesser General Public License along with OpenCMP. If not, see             #
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 import ngsolve as ngs
+from ngsolve.comp import ProxyFunction
+from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
+
 from ..helpers.ngsolve_ import get_special_functions
 from ..helpers.dg import jump, grad_avg
 from ..models import INS
-from ngsolve.comp import ProxyFunction
-from ngsolve import Parameter, GridFunction, BilinearForm, LinearForm, Preconditioner
-from typing import Dict, List, Union, Optional
 
 
 class Stokes(INS):
@@ -136,7 +137,7 @@ class Stokes(INS):
 
         self.linearized_solve(a_lst[0], L_lst[0], precond_lst[0], gfu)
 
-    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> None:
+    def linearized_solve(self, a_assembled: BilinearForm, L_assembled: LinearForm, precond: Preconditioner, gfu: GridFunction) -> Tuple[float, float]:
         """
         Because Stokes inherits from INS, we need to override with the version of this function for linear models!
         """
