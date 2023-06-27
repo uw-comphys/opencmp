@@ -15,6 +15,8 @@ interior_penalty_coefficient = 10.0
 linear_solver = direct
 preconditioner = direct
 linearization_method = Oseen
+
+nonlinear_solver = default
 nonlinear_tolerance = relative -> 1e-6
                       absolute -> 1e-6
 nonlinear_max_iterations = 10

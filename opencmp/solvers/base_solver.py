@@ -588,7 +588,11 @@ class Solver(ABC):
                         # Initialize alpha
                         # TODO: must handle this after implementing alpha into config file and finding
                         # a citation or reference for this estimate and ITS BOUNDS
-                        # alpha = 0.5 * max(1., x_prev.Norm()) / f.Norm()
+                        # there is no citation for this from the Scipy linear_mixing solver code, but it seems to be based
+                        # on the "dominent eigenvalue method" (reference needed!)
+                        # based on Scipy implementation and information from the DEM method, alpha should not exceed 1
+                        # for stability.
+                        alpha = min(1., 0.5 * max(1., x_prev.Norm()) / f.Norm())
 
                         # Keep track of previous f
                         fprev = fcurr.copy()
