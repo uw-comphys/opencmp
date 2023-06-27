@@ -306,7 +306,7 @@ def eval_item(string: str, import_dir: str, t_param: Optional[List[Parameter]], 
         return val, variable_eval
 
 
-def eval_python(string: str, import_dir: str, mesh: Optional[Mesh] = None, new_variables: List[Dict[str, Any]] = None,
+def eval_python(string: str, import_dir: str, mesh: Optional[Mesh] = None, new_variables: List[Dict[str, Any]] = {},
                 t_param: Optional[List[Parameter]] = None, time_step: Optional[int] = None) \
         -> Tuple[Union[str, float, CoefficientFunction, bool, None], Union[str, bool, Callable]]:
     """
@@ -328,8 +328,6 @@ def eval_python(string: str, import_dir: str, mesh: Optional[Mesh] = None, new_v
               in its place. If the expression involved importing a Python function that Python function is returned in
               place of variable_eval.
     """
-    if new_variables is None:
-        new_variables = {}
 
     # Remove whitespace in case the string ends up being parsed manually.
     string = string.replace(' ', '')

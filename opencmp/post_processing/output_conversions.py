@@ -78,18 +78,18 @@ def sol_to_components(config_parser: ConfigParser, output_dir_path: str, model: 
     Path(sol_component_path).mkdir(parents=True, exist_ok=True)
 
     # Generate a list of all .sol file paths
-    sol_paths_all = [str(sol_path) for sol_path in Path(output_dir_path + model.name + '_sol/').rglob('*.sol')]
+    sol_paths_all = [str(sol_path) for sol_path in Path(output_dir_path + model.name() + '_sol/').rglob('*.sol')]
     sol_path_final = ""
-    split_str = model.name + "_"
+    split_str = model.name() + "_"
     time_max = -1.0
-    for sol_path in filter(lambda path: model.name in path, sol_paths_all):
+    for sol_path in filter(lambda path: model.name() in path, sol_paths_all):
         time_i = float(sol_path.split(split_str)[2][:-4])
         if time_i > time_max:
             time_max = time_i
             sol_path_final = sol_path
 
     if len(sol_path_final) == 0:
-        raise FileNotFoundError('A .sol file for model \"' + model.name
+        raise FileNotFoundError('A .sol file for model \"' + model.name()
                                 + '\" was not found in folder \"' + output_dir_path + 'sol/' + '\"')
 
     # Get the timestep for this .sol file from its name
@@ -164,7 +164,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
         subdivision = model.interp_ord
 
     # Generate a list of all .sol files
-    sol_path_generator  = Path(output_dir_path + model.name + '_sol/').rglob('*' + model.name + '*.sol')
+    sol_path_generator  = Path(output_dir_path + model.name() + '_sol/').rglob('*' + model.name() + '*.sol')
     sol_path_list       = [str(sol_path) for sol_path in sol_path_generator]
 
     # Number of files to convert
@@ -193,7 +193,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
         # Create the pool and start it. It will automatically take and run the next entry when it needs it
         a = [
                 pool.apply_async(_sol_to_vtu_parallel_runner, (gfus[i % n_threads], sol_path_list[i], output_dir_path,
-                                                               model.save_names, model.name, delete_sol_file,
+                                                               model.save_names, model.name(), delete_sol_file,
                                                                subdivision, model.mesh)
                                  ) for i in range(n_files)
         ]
@@ -209,7 +209,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
     output_list.append('</Collection>\n</VTKFile>')
 
     # Write each line to the file
-    with open(output_dir_path + model.name + '_transient.pvd', 'a+') as file:
+    with open(output_dir_path + model.name() + '_transient.pvd', 'a+') as file:
         for line in output_list:
             file.write(line)
 

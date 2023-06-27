@@ -27,13 +27,8 @@ class BCFunctions(ConfigFunctions):
     """
 
     def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, bc_types: List[str],
-                 t_param: List[Parameter] = None,
-                 new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = None) -> None:
-        if t_param is None:
-            t_param = [Parameter(0.0)]
-        if new_variables is None:
-            new_variables = [{}]
-
+                 t_param: List[Parameter] = [Parameter(0.0)],
+                 new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
         bc_types = [type.upper() for type in bc_types]
         super().__init__(config_rel_path, import_dir, mesh, t_param)
 
