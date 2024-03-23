@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: Please cite the following works when using this software.
+type: software
+authors:
+  - family-names: Monte
+    given-names: Elizabeth Julia
+  - family-names: Vasile
+    given-names: Alexandru Andrei
+  - family-names: Lowman
+    given-names: James
+  - family-names: Abukhdeir
+    given-names: Nasser Mohieddin
+doi: 10.21105/joss.03742
+identifiers:
+  - type: doi
+    value: 10.21105/joss.03742
+  - type: url
+    value: http://dx.doi.org/10.21105/joss.03742
+  - type: other
+    value: urn:issn:2475-9066
+title: |-
+  OpenCMP: An Open-Source Computational Multiphysics
+  Package
+url: http://dx.doi.org/10.21105/joss.03742
