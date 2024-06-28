@@ -49,16 +49,7 @@ class Model(ABC):
             config: A configparser object loaded with config file.
             t_param: List of parameters representing the current and previous timestep times.
         """
-        # The name of the model (helper variable). It is the name of the class.
-        self.name = self.__class__.__name__.lower()
-
-        logging.info('Initializing model: ' + self.name)
-
-        # Remove the trailing "dim" from the model name if the Diffuse Interface Method version is used
-        # Lets us continue using "Poisson" or "INS" in config files without adding the DIM
-        if "dim" == self.name[-3:]:
-            self.name = self.name[:-3]
-
+        logging.info('Initializing model: ' + self.name())
         # Set config file.
         self.config = config
 
@@ -223,7 +214,7 @@ class Model(ABC):
 
         # Load initial condition.
         self.IC = self.construct_gfu_ic()
-        self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components_ic)
+        self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name(), self.model_components_ic)
 
         # 2/2: Create BCs
         # Now that we have the FES, we can load in the bc gridfunctions
@@ -631,7 +622,7 @@ class Model(ABC):
             # Update the initial conditions.
             self.ic_functions.update_initial_conditions(self.t_param, self.update_variables, self.mesh)
             self.IC = self.construct_gfu_ic()
-            self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name, self.model_components)
+            self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name(), self.model_components)
 
         if ref_sol_update:
             # Update the reference solutions.
@@ -648,6 +639,23 @@ class Model(ABC):
         """
 
         gfu_0.vec.data = gfu.vec
+
+    @classmethod
+    def name(cls):
+        """
+        Helper function to generate a readable version of the class model name.
+
+        :return:
+            The formatted name of this model class.
+        """
+        name = cls.__name__.lower()
+
+        # Remove the trailing "dim" from the model name if the Diffuse Interface Method version is used
+        # Lets us continue using "Poisson" or "INS" in config files without adding the DIM
+        if "dim" == name[-3:]:
+            name = name[:-3]
+
+        return name
 
     @staticmethod
     @abstractmethod

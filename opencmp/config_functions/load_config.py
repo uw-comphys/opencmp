@@ -21,8 +21,8 @@ from . import parse_arithmetic
 
 
 def parse_str(string: str, import_dir: str, t_param: Optional[List[Parameter]],
-              new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction]]] = None,
-              filetypes: List[str] = None, mesh: Optional[Mesh] = None) \
+              new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction]]] = [{}],
+              filetypes: List[str] = ['.vol', '.sol', '.vtk'], mesh: Optional[Mesh] = None) \
         -> Tuple[Union[str, float, CoefficientFunction, list], Union[str, bool, Callable]]:
     """
     Checks if a string appears to be a path to a file and if not parses the string into Python code.
@@ -45,10 +45,6 @@ def parse_str(string: str, import_dir: str, t_param: Optional[List[Parameter]],
             - variable_eval: Whether or not the expression contains any of the new model variables (would need to be
               re-parsed if their values change).
     """
-    if new_variables is None:
-        new_variables = [{}]
-    if filetypes is None:
-        filetypes = ['.vol', '.sol', '.vtk']
 
     if not isinstance(string, str):
         # Likely got a default value from config_defaults.
@@ -82,8 +78,8 @@ def parse_str(string: str, import_dir: str, t_param: Optional[List[Parameter]],
 
 
 def convert_str_to_dict(string: str, import_dir: str, t_param: Optional[List[Parameter]], mesh: Mesh,
-                        new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction]]] = None,
-                        filetypes: List[str] = None, all_str: bool = False) -> Tuple[Dict, Dict]:
+                        new_variables: List[Dict[str, Union[int, str, float, CoefficientFunction, GridFunction]]] = [{}],
+                        filetypes: List[str] = ['.vol', '.sol', '.vtk'], all_str: bool = False) -> Tuple[Dict, Dict]:
     """
     Function to convert a string into a dict. The values of the dict may be parsed into Python
     code or left as strings.
@@ -105,10 +101,6 @@ def convert_str_to_dict(string: str, import_dir: str, t_param: Optional[List[Par
             - param_dict: Dictionary of the parameters from the string.
             - re_parse_dict: Dictionary containing only parameter values that may need to be re-parsed in the future.
     """
-    if new_variables is None:
-        new_variables = [{}]
-    if filetypes is None:
-        filetypes = ['.vol', '.sol', '.vtk']
 
     # Replace extraneous whitespace characters.
     param_tmp = string.replace('\t', '')
