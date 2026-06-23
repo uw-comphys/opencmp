@@ -15,6 +15,8 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
+import sys
+import pytest
 from pytest import CaptureFixture, fixture
 from opencmp.config_functions import ConfigParser
 import opencmp.helpers.io as io
@@ -158,6 +160,8 @@ class TestLoadMesh:
         mesh = io.load_mesh(empty_config)
         assert mesh.GetCurveOrder() == 50
 
+    @pytest.mark.skipif(sys.platform.startswith('linux'),
+                        reason='Segfaults in the NGSolve Linux pip wheel when loading a curved-element .msh')
     def test_curved_element_msh(self, empty_config: ConfigParser):
         """
         Test with a valid .msh mesh which is supposed to have curved elements.
