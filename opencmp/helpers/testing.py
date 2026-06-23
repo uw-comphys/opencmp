@@ -76,9 +76,10 @@ def automated_output_check(capsys: CaptureFixture, config: ConfigParser, expecte
     # Grab error values from console output and convert into float
     errors = [float(line.split(': ')[1]) for line in captured.out.split('\n')[-(len(expected_err)+1):-1]]
 
-    # For each error, check it against the provided value
+    # For each error, check it against the provided value.
+    # atol floor: near-zero expected errors are platform-dependent round-off; don't compare at machine precision.
     for i in range(len(expected_err)):
-        if not isclose(errors[i], expected_err[i], rtol=3, atol=0):
+        if not isclose(errors[i], expected_err[i], rtol=3, atol=1e-12):
 
             print('{}th Expected error: {}'.format(i+1, expected_err[i]))
             print('{}th Actual   error: {}'.format(i+1, errors[i]))
