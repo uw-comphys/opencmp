@@ -33,6 +33,7 @@ from ..helpers.saving import SolutionFileSaver
 from ..helpers.error import calc_error
 from ..helpers.ngsolve_ import gridfunction_rigid_body_motion
 from ..controllers.controller_group import ControllerGroup
+from .nonlinear_mixing import make_mixer
 
 """
 Module for the base solver class.
@@ -533,28 +534,12 @@ class Solver(ABC):
             self.num_iterations = 0
 
 
-            ########################################################################################################
-            # Default optional user config parameters needed for the nonlinear solvers
-            # TODO: eventually this is moved to the config file, but is here temporarily
-
-            ## LinearMixing, DiagBroyden, and Anderson ##
-            alpha = 1.0 # related to jacobian approximation via J ~ -1/alpha
-
-            ## Anderson Mixing ##
-            keep_vectors = 5 # number of difference vectors to retain. Default is 4 or 5
-            w0 = 0.01 # parameter for numerical stability. Good values on order of 0.01. Default 0.01.
-            singular_tolerance = 1e-6 # the tolerance for singular matrix
-
-
-            ########################################################################################################
-
             # initialize the dx and f vector. No need to populate data, this is done later
             dx = self.gfu.vec.Copy()
             f = self.gfu.vec.Copy()
 
-            ##################################################################################################################
+            _mixer = make_mixer(self.nonlinear_solver)
 
-            # Iteration begins here. until we have converged (and reached an acceptable solution), then
             while True:
 
                 ########################################################################################################
@@ -595,125 +580,18 @@ class Solver(ABC):
                         sys.exit(-1)
 
 
-                ########################################################################################################
-
-                # Begin nonlinear solver iteration
-
-                # i = 1
-                # for the first iteration, simply use linearized solution instead of mixing
                 if self.num_iterations == 1:
-
-                    # initialize x_prev and x_curr and populate with initial data
                     x_prev = self.gfu.vec.Copy()
                     x_prev.data = self.gfu.vec
                     x_curr = self.gfu.vec.Copy()
                     x_curr.data = self.gfu.vec
-
-
-                # i > 1
-                # for the remaining iterations, perform a nonlinear solve
                 else:
-
-                    ############################################################################################
-
-                    # Populate the f vector using current guess (linearization) minus previous
                     f.data = self.gfu.vec - x_prev
-                    fcurr = f.FV().NumPy().copy()
-
-                    # Initialize other parameters needed for nonlinear solvers
-                    if self.num_iterations == 2:
-
-                        # Initialize alpha
-                        # TODO: must handle this after implementing alpha into config file and finding
-                        # a citation or reference for this estimate and ITS BOUNDS
-                        # there is no citation for this from the Scipy linear_mixing solver code, but it seems to be based
-                        # on the "dominent eigenvalue method" (reference needed!)
-                        # based on Scipy implementation and information from the DEM method, alpha should not exceed 1
-                        # for stability.
-                        alpha = min(1., 0.5 * max(1., x_prev.Norm()) / f.Norm())
-
-                        # Keep track of previous f
-                        fprev = fcurr.copy()
-
-                        # If DiagBroyden, initialize beta
-                        # TODO: needs to be made thread efficient; currently repeated by every thread
-                        if self.nonlinear_solver == 'DiagBroyden':
-                            beta = np.full((self.gfu.vec.size), 1/alpha)
-
-                    ############################################################################################
-                    # Perform mixing here based on the nonlinear solver chosen
-                    # Note: all solvers perform linear mixing for first (i=1) iteration
-
-                    if self.nonlinear_solver == 'LinearMixing' or self.num_iterations == 2:
-                        dx.data = alpha * f.Copy()
-                        if self.nonlinear_solver in ['default', 'Anderson']:
-                            dx_all = []
-                            df_all = []
-                            dx_all.append(dx.FV().NumPy().copy())
-
-                    elif self.nonlinear_solver == 'DiagBroyden':
-                        # Jacobian update
-                        beta -= (fcurr-fprev + beta*dx.FV().NumPy().copy())  *  dx.FV().NumPy().copy() / dx.Norm()**2
-                        # update dx and fprev
-                        dx.data = f.FV().NumPy().copy() / beta
-                        fprev = fcurr.copy()
-
-                    elif self.nonlinear_solver in ['default', 'Anderson']:
-                        # first must populate df_all with difference vector, fi+1-f_i
-                        df_all.append(fcurr-fprev)
-                        fprev = fcurr.copy()
-
-                        # if we are retaining more vectors than what has been set, remove the oldest one
-                        if len(dx_all) > keep_vectors:
-                            dx_all.pop(0)
-                            df_all.pop(0)
-
-                        # create the A matrix which is used to update dx during full anderson mixing
-                        A = np.zeros((len(dx_all), len(dx_all)))
-                        for i in range(len(dx_all)):
-                            for j in range(i,len(dx_all)):
-                                A[i,j] = np.vdot(df_all[i], df_all[j])
-
-                        np.fill_diagonal(A, A.diagonal() * (1+w0**2)) # multiply diagonal by 1+w0**2
-                        A += np.triu(A, 1).T.conj() # add to A, the transposed upper triangular (below 1st diag) matrix
-
-                        # check to see if A is singular. if so, reset jacobian approximation
-                        if abs(np.linalg.det(A)) < singular_tolerance:
-                            dx_all = []
-                            df_all = []
-                            dx.data = alpha * f.Copy()
-                            dx_all.append(dx.FV().NumPy().copy())
-
-                        # If A not singular, then perform full anderson mixing!
-                        else:
-                            dx.data = -alpha * f.Copy()
-                            dff = np.zeros(len(df_all))
-                            for k in range(len(df_all)):
-                                dff[k] = np.vdot(df_all[k], fcurr)
-
-                            gamma = np.linalg.solve(A, dff)
-                            dx_np = dx.FV().NumPy().copy()
-                            for k in range(len(df_all)):
-                                dx_np += gamma[k] * (dx_all[k] + alpha*df_all[k])
-
-                            # Adjust dx_np and then set it to dx for next update
-                            dx.data = -1 * dx_np.copy()
-                            dx_all.append(dx.FV().NumPy().copy())
-
-
-                    # update the current guess, the x_curr vector via the Newton method
+                    dx.data = _mixer.step(f, x_prev, self.num_iterations)
                     x_curr.data += dx
 
-                ############################################################################################
-                # Below is code that is executed for all iterations (i = 0 : self.nonlinear_max_iterations)
-
-                # update grid function vector (in-place) for next iteration
                 self.gfu.vec.data = x_curr
-
-                # update the previous x
                 x_prev.data = x_curr
-
-                # see if the current solution is acceptable
                 self.model.update_linearization(self.gfu)
 
 
