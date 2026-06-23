@@ -109,6 +109,9 @@ class TestTransient:
                                                    sinusoidal_transient: ConfigParser) -> None:
         # Change time discretization scheme
         sinusoidal_transient['TRANSIENT']['scheme'] = 'adaptive two step'
+        # Default dt_tolerance is too loose for the adaptive stepper to reach the spatial-error
+        # floor (~1.3e-4) this test checks; tighten it so the run actually converges.
+        sinusoidal_transient['TRANSIENT']['dt_tolerance'] = 'relative -> 1e-8\n                  absolute -> 1e-6'
         # Run
         automated_output_check(capsys, sinusoidal_transient, [1e-4, 2e-3])
 
