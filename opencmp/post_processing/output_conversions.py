@@ -209,7 +209,7 @@ def sol_to_vtu_direct(config_parser: ConfigParser, output_dir_path: str, model: 
     output_list.append('</Collection>\n</VTKFile>')
 
     # Write each line to the file
-    with open(output_dir_path + model.name + '_transient.pvd', 'a+') as file:
+    with open(output_dir_path + model.name + '_transient.pvd', 'w+') as file:
         for line in output_list:
             file.write(line)
 
