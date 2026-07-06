@@ -260,6 +260,21 @@ class ConfigParser(configparser.ConfigParser):
         keys_one = [item for item in self.sections() if item not in ignore]
 
         if white_list:
+            white_list_upper = {w.upper(): w for w in white_list}
+
+            for item in self.sections():
+                if item in ignore:
+                    continue
+                if item not in white_list and item.upper() in white_list_upper:
+                    expected = white_list_upper[item.upper()]
+                    raise ValueError(
+                        f"\nConfig section '[{item}]' was not recognized, but it looks like a case mismatch for '[{expected}]'. \nSection headers are case-sensitive, please rename '[{item}]' to '[{expected}]' in your config file."
+                    )
+                elif item not in white_list:
+                    raise ValueError(
+                        f"\nInvalid config section '[{item}]'."
+                    )
+
             keys_one = [item for item in keys_one if item in white_list]
 
         # Top level dictionaries
