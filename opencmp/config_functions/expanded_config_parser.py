@@ -254,14 +254,18 @@ class ConfigParser(configparser.ConfigParser):
             white_list_upper = {w.upper(): w for w in white_list}
 
             for item in self.sections():
-                if item in ignore:
+                if item in ignore or item in white_list:
                     continue
-                if item not in white_list and item.upper() in white_list_upper:
+                # Empty sections are harmless boilerplate (e.g. unused BC types left over in a
+                # DIM config template) -- only mistyped/unrecognized sections with actual data are an error.
+                if not list(self[item]):
+                    continue
+                if item.upper() in white_list_upper:
                     expected = white_list_upper[item.upper()]
                     raise ValueError(
                         f"\nConfig section '[{item}]' was not recognized, but it looks like a case mismatch for '[{expected}]'. \nSection headers are case-sensitive, please rename '[{item}]' to '[{expected}]' in your config file."
                     )
-                elif item not in white_list:
+                else:
                     raise ValueError(
                         f"\nInvalid config section '[{item}]'."
                     )
