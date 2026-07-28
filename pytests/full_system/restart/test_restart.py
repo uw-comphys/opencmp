@@ -22,7 +22,16 @@ from typing import List
 import ngsolve as ngs
 import pytest
 
+from opencmp.config_functions import ConfigParser
+from opencmp.models.misc import get_model_class
 from opencmp.run import run
+from opencmp.solvers.base_solver import scheme_history_order, scheme_order
+from opencmp.solvers.misc import get_solver_class
+
+# Keep these expectations independent of the production mapping so the test catches accidental confusion between
+# previous-step history and Runge-Kutta stage count.
+MULTISTEP_SCHEMES = ['CNLF', 'SBDF', 'adaptive IMEX']
+RESTARTABLE_MULTISTAGE_SCHEMES = ['implicit euler', 'adaptive three step', 'RK 222', 'RK 232']
 
 TEMPLATE = Path('pytests/full_system/restart/transient_poisson')
 MESH = 'pytests/mesh_files/unit_square_coarse.vol'
@@ -112,3 +121,40 @@ def test_resume_matches_uninterrupted_solve(tmp_path: Path) -> None:
 
     assert norm > 0.0, 'Reference solution is identically zero, the test problem is not exercising anything.'
     assert err / norm < 1e-10
+
+
+@pytest.mark.parametrize('scheme', MULTISTEP_SCHEMES)
+def test_resume_rejects_multistep_schemes(tmp_path: Path, scheme: str) -> None:
+    """
+    Test that resuming is refused for schemes needing more than one previous time step. Only one saved solution is
+    restored, and saved .sol files are not necessarily consecutive iterations, so the history a multi-step scheme
+    needs cannot be reconstructed. Resuming anyway would silently re-run the scheme's startup and change the results.
+    """
+    case = _make_case(tmp_path)
+
+    config = case / 'config'
+    config.write_text(config.read_text()
+                      .replace('scheme = implicit euler', 'scheme = ' + scheme)
+                      .replace('resume_from_previous = False', 'resume_from_previous = True'))
+
+    with pytest.raises(NotImplementedError, match='single-step'):
+        run(str(config))
+
+
+@pytest.mark.parametrize('scheme', RESTARTABLE_MULTISTAGE_SCHEMES)
+def test_resume_allowed_for_single_step_schemes(tmp_path: Path, scheme: str) -> None:
+    """ Test that restartable schemes pass the history guard, including multi-stage Runge-Kutta schemes. """
+    case = _make_case(tmp_path)
+    assert set(scheme_history_order) == set(scheme_order)
+    assert scheme_history_order[scheme] == 1
+
+    config = case / 'config'
+    config.write_text(config.read_text()
+                      .replace('scheme = implicit euler', 'scheme = ' + scheme)
+                      .replace('resume_from_previous = False', 'resume_from_previous = True'))
+
+    # Nothing has been solved yet so there is no .sol file to resume from. Constructing the solver exercises the resume
+    # guard without requiring this Poisson fixture to implement the explicit IMEX terms used by the RK schemes.
+    config_parser = ConfigParser(str(config))
+    model_class = get_model_class(config_parser.get_item(['OTHER', 'model'], str), False)
+    get_solver_class(config_parser)(model_class, config_parser)

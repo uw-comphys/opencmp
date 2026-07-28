@@ -52,6 +52,21 @@ scheme_order = {'explicit euler': 1,
                 'RK 222': 2,
                 'RK 232': 3}
 
+# Number of consecutive previous time-step solutions needed to restart each scheme. Unlike scheme_order, this does not
+# count Runge-Kutta intermediate stages: RK schemes are single-step methods and only need the solution at the restart
+# time.
+scheme_history_order = {'explicit euler': 1,
+                        'implicit euler': 1,
+                        'crank nicolson': 1,
+                        'adaptive two step': 1,
+                        'adaptive three step': 1,
+                        'euler IMEX': 1,
+                        'CNLF': 2,
+                        'SBDF': 3,
+                        'adaptive IMEX': 3,
+                        'RK 222': 1,
+                        'RK 232': 1}
+
 # Dictionary holding the time step coefficients. This is only relevant for Runge Kutta schemes where the intermediate
 # steps use modified dt values.
 scheme_dt_coef = {'explicit euler': [1.0],
@@ -85,6 +100,18 @@ class Solver(ABC):
         #       That was not done here since it would involve deep changes with ICFunctions.
         # TODO: Have LATEST be a special keyword to read in
         if self.config.get_item(['OTHER', 'resume_from_previous'], bool):
+            # Only a single saved solution is restored, as the initial condition. Multi-step schemes need several
+            # consecutive previous time steps, and those cannot be recovered from the saved .sol files: save_frequency
+            # may skip time steps, so consecutive .sol files are not necessarily consecutive iterations. Reject those
+            # schemes rather than silently restarting them with a startup sequence, which would change the results.
+            resume_scheme = self.config.get_item(['TRANSIENT', 'scheme'], str)
+            if scheme_history_order[resume_scheme] > 1:
+                raise NotImplementedError(
+                    'resume_from_previous only supports single-step time discretization schemes. The "{}" scheme '
+                    'needs {} previous time steps, which cannot be recovered from the saved .sol files since '
+                    'save_frequency may skip time steps.'.format(resume_scheme, scheme_history_order[resume_scheme])
+                )
+
             # Find the .sol files
             output_dir = Path(self.config.get_item(['OTHER', 'run_dir'], str) + '/output/' + model_class.name() + '_sol/')
             if output_dir.exists():
