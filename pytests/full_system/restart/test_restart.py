@@ -155,6 +155,53 @@ def test_resume_allowed_for_single_step_schemes(tmp_path: Path, scheme: str) -> 
 
     # Nothing has been solved yet so there is no .sol file to resume from. Constructing the solver exercises the resume
     # guard without requiring this Poisson fixture to implement the explicit IMEX terms used by the RK schemes.
+    # Reaching the missing-checkpoint error means the scheme was accepted: a rejected scheme raises
+    # NotImplementedError earlier, before any .sol file is looked for.
     config_parser = ConfigParser(str(config))
     model_class = get_model_class(config_parser.get_item(['OTHER', 'model'], str), False)
-    get_solver_class(config_parser)(model_class, config_parser)
+
+    with pytest.raises(FileNotFoundError, match='no .sol file to resume from'):
+        get_solver_class(config_parser)(model_class, config_parser)
+
+
+def test_resume_without_any_checkpoint_fails(tmp_path: Path) -> None:
+    """
+    Test that asking to resume when there is nothing to resume from is an error rather than a silent fresh start.
+    A fresh start looks identical to a successful resume in the log, so it must not happen quietly.
+    """
+    case = _make_case(tmp_path)
+
+    config = case / 'config'
+    config.write_text(config.read_text().replace('resume_from_previous = False', 'resume_from_previous = True'))
+
+    assert not (case / 'output').exists()
+
+    with pytest.raises(FileNotFoundError, match='no .sol file to resume from'):
+        run(str(config))
+
+
+def test_resume_of_completed_simulation_exits_cleanly(tmp_path: Path) -> None:
+    """
+    Test that resuming a simulation which already reached the end of time_range exits with a success code instead of
+    taking a meaningless final step. The saved final time is short of the range end by floating point error, so this
+    also covers the tolerance in the comparison.
+    """
+    case = _make_case(tmp_path)
+    sol_dir = case / 'output' / 'poisson_sol'
+
+    run(str(case / 'config'))
+
+    final = _sol_files(sol_dir)[-1]
+    assert _sol_time(final) != T_FINAL, 'Expected float drift in the saved time, the tolerance is untested without it.'
+    assert _sol_time(final) == pytest.approx(T_FINAL)
+
+    (case / 'ic_dir' / 'ic_config').write_text(
+        '[POISSON]\nu = all -> output/poisson_sol/' + final.name + '\n'
+    )
+    config = case / 'config'
+    config.write_text(config.read_text().replace('resume_from_previous = False', 'resume_from_previous = True'))
+
+    with pytest.raises(SystemExit) as exit_info:
+        run(str(config))
+
+    assert exit_info.value.code == 0

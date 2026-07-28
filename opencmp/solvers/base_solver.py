@@ -114,10 +114,9 @@ class Solver(ABC):
 
             # Find the .sol files
             output_dir = Path(self.config.get_item(['OTHER', 'run_dir'], str) + '/output/' + model_class.name() + '_sol/')
+            time_latest      = -np.inf
+            latest_file_name = None
             if output_dir.exists():
-                # Find the last (and second last if available) saved files
-                time_latest      = -np.inf
-                latest_file_name = None
                 prefix = len(model_class.name()) + 1  # +1 for the "_" between the name and the time
                 for sol_file in output_dir.rglob('*' + model_class.name() + '*.sol'):
                     name = sol_file.name
@@ -126,25 +125,41 @@ class Solver(ABC):
                         time_latest = sol_time
                         latest_file_name = name
 
-                # Update time_range and dt to reflect those values
-                if latest_file_name is not None:
-                    # Set the new initial time
-                    time_range = self.config.get('TRANSIENT', 'time_range').split(',')
-                    time_range[0] = str(time_latest)
-                    self.config.set('TRANSIENT', 'time_range', ','.join(time_range))
+            # A resume was explicitly asked for, so having nothing to resume from is an error. Quietly starting over
+            # from the beginning is indistinguishable from a successful resume in the log.
+            if latest_file_name is None:
+                raise FileNotFoundError(
+                    'resume_from_previous is True but no .sol file to resume from was found in "{}". Set '
+                    'resume_from_previous to False to start a new simulation.'.format(output_dir)
+                )
 
-                    # Make sure that the latest time-step found is also the one specified by the user.
-                    # This check makes sure they did not forget to update their initial condition.
-                    with open(self.config.get_item(['OTHER', 'run_dir'], str) + '/ic_dir/ic_config') as ic_config:
-                        if latest_file_name not in ic_config.read():
-                            raise ValueError(
-                                "Tried to resume from previous solution {}, "
-                                "but it did not match up with the initial condition in ic_config. "
-                                "The initial condition must, currently, be manually changed to the latest .sol file."
-                                .format(latest_file_name)
-                            )
+            time_range = self.config.get('TRANSIENT', 'time_range').split(',')
+            t_end = float(time_range[-1])
 
-                    print("Resuming from previous solution: {}".format(latest_file_name))
+            # Stop instead of taking a meaningless final step if the saved solution already covers time_range. The
+            # comparison needs a tolerance because accumulated floating point error leaves the last saved time step
+            # just short of the end of the range, e.g. 0.09999999999999999 for a range ending at 0.1.
+            if time_latest >= t_end or math.isclose(time_latest, t_end, rel_tol=1e-09):
+                print('Simulation is already complete at t = {}, the end of time_range. Nothing to resume.'
+                      .format(time_latest))
+                sys.exit(0)
+
+            # Set the new initial time
+            time_range[0] = str(time_latest)
+            self.config.set('TRANSIENT', 'time_range', ','.join(time_range))
+
+            # Make sure that the latest time-step found is also the one specified by the user.
+            # This check makes sure they did not forget to update their initial condition.
+            with open(self.config.get_item(['OTHER', 'run_dir'], str) + '/ic_dir/ic_config') as ic_config:
+                if latest_file_name not in ic_config.read():
+                    raise ValueError(
+                        "Tried to resume from previous solution {}, "
+                        "but it did not match up with the initial condition in ic_config. "
+                        "The initial condition must, currently, be manually changed to the latest .sol file."
+                        .format(latest_file_name)
+                    )
+
+            print("Resuming from previous solution: {}".format(latest_file_name))
 
         self.transient = self.config.get_item(['TRANSIENT', 'transient'], bool)
 
