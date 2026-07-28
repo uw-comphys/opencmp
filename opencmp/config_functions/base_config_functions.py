@@ -28,7 +28,7 @@ class ConfigFunctions:
     """
 
     def __init__(self, config_rel_path: str, import_dir: str, mesh: Mesh, t_param: List[Parameter],
-                 new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = None) -> None:
+                 new_variables: List[Dict[str, Union[float, CoefficientFunction, GridFunction]]] = [{}]) -> None:
         """
         Initializer
 
@@ -43,9 +43,6 @@ class ConfigFunctions:
         # Set the run directory for the config functions.
         # Files could get accessed at run_dir + '/' + <path>. Make sure that if the config file is in the current
         # directory run_dir is specified such that this will still work.
-        if new_variables is None:
-            new_variables = [{}]
-
         if '/' in config_rel_path:
             idx = config_rel_path[::-1].index('/')
             self.run_dir = config_rel_path[:len(config_rel_path) - idx - 1]

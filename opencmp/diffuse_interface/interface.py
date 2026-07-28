@@ -268,7 +268,7 @@ def nonconformal_subdomain_2d(boundary_lst: List, vertices: List, N: List[int], 
 
 def split_nonconformal_subdomains_2d(boundary_lst: List, vertices: Dict, N: List[int], scale: List[float],
                                      offset: List[float], lmbda_overlap: Union[float, bool] = False,
-                                     remainder: bool = False, centroid: Dict = None) -> Dict[str, ndarray]:
+                                     remainder: bool = False, centroid: Dict = {}) -> Dict[str, ndarray]:
     """
     Function to generate all BC masks for a 2D diffuse interface simulation.
 
@@ -293,8 +293,6 @@ def split_nonconformal_subdomains_2d(boundary_lst: List, vertices: Dict, N: List
     Returns:
         Dictionary of numpy array masks.
     """
-    if centroid is None:
-        centroid = {}
 
     shape = (int(N[0] + 1), int(N[1] + 1))
 
@@ -416,7 +414,7 @@ def nonconformal_subdomain_3d(face_lst: ndarray, vertices: str, N: List[int], sc
 
 def split_nonconformal_subdomains_3d(face_lst: List, vertices: Dict[str, str], N: List[int], scale: List[float],
                                      offset: List[float], lmbda_overlap: Union[float, bool] = False,
-                                     remainder: bool = False, centroid: Dict = None) -> Dict[str, ndarray]:
+                                     remainder: bool = False, centroid: Dict = {}) -> Dict[str, ndarray]:
     """
     Function to generate all BC masks for a 3D diffuse interface simulation.
 
@@ -440,8 +438,6 @@ def split_nonconformal_subdomains_3d(face_lst: List, vertices: Dict[str, str], N
     Returns:
         Dictionary of numpy array masks.
     """
-    if centroid is None:
-        centroid = {}
 
     shape = (int(N[0] + 1), int(N[1] + 1), int(N[2] + 1))
 

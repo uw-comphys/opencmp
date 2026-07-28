@@ -1,6 +1,10 @@
 OpenCMP Changelog
 =================
 
+June 2, 2023 (v1.0.3)
+
+* Added ability for a simulation to resume from the last saved .sol file.
+
 August 11, 2022 (v1.0.2)
 
 * Implemented the DG version fo the multi-component INS code.
