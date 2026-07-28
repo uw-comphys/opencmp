@@ -215,6 +215,10 @@ class Model(ABC):
         # Load initial condition.
         self.IC = self.construct_gfu_ic()
         self.ic_functions.set_initial_conditions(self.IC, self.mesh, self.name(), self.model_components_ic)
+        if self.config.get_item(['OTHER', 'resume_from_previous'], bool):
+            restart_from = self.config.get_item(['OTHER', 'restart_from'], str, quiet=True)
+            if restart_from:
+                self.IC.Load(restart_from)
 
         # 2/2: Create BCs
         # Now that we have the FES, we can load in the bc gridfunctions

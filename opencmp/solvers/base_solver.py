@@ -86,6 +86,66 @@ class Solver(ABC):
     """
     Base class for the different stationary/transient solvers.
     """
+
+    @staticmethod
+    def _checkpoint_time(checkpoint: Path, model_name: str) -> float:
+        """Return the time encoded in a model checkpoint filename."""
+        prefix = model_name + '_'
+        if not checkpoint.name.startswith(prefix) or checkpoint.suffix != '.sol':
+            raise ValueError(
+                'Restart checkpoint "{}" must be named "{}<time>.sol" for the active model.'
+                .format(checkpoint, prefix)
+            )
+
+        time_text = checkpoint.name[len(prefix):-len(checkpoint.suffix)]
+        try:
+            checkpoint_time = float(time_text)
+        except ValueError:
+            raise ValueError(
+                'Could not determine the restart time from checkpoint "{}". Expected the filename format '
+                '"{}<time>.sol".'.format(checkpoint, prefix)
+            )
+
+        if not math.isfinite(checkpoint_time):
+            raise ValueError('Restart checkpoint "{}" does not contain a finite time.'.format(checkpoint))
+
+        return checkpoint_time
+
+    @classmethod
+    def _select_restart_checkpoint(cls, restart_from: str, run_dir: Path,
+                                   model_name: str) -> Tuple[Path, float]:
+        """Resolve an explicit checkpoint path or select the latest valid model checkpoint."""
+        if restart_from.upper() == 'LATEST':
+            output_dir = run_dir / 'output' / (model_name + '_sol')
+            checkpoints: List[Tuple[float, Path]] = []
+
+            if output_dir.exists():
+                for checkpoint in output_dir.rglob(model_name + '_*.sol'):
+                    try:
+                        checkpoint_time = cls._checkpoint_time(checkpoint, model_name)
+                    except ValueError:
+                        continue
+                    checkpoints.append((checkpoint_time, checkpoint.resolve()))
+
+            if not checkpoints:
+                raise FileNotFoundError(
+                    'No valid .sol checkpoint for model "{}" was found in "{}". Set resume_from_previous to False '
+                    'to start a new simulation.'.format(model_name, output_dir)
+                )
+
+            latest_time, latest_checkpoint = max(checkpoints, key=lambda item: item[0])
+            return latest_checkpoint, latest_time
+
+        checkpoint = Path(restart_from).expanduser()
+        if not checkpoint.is_absolute():
+            checkpoint = run_dir / checkpoint
+        checkpoint = checkpoint.resolve()
+
+        if not checkpoint.is_file():
+            raise FileNotFoundError('The restart checkpoint "{}" does not exist.'.format(checkpoint))
+
+        return checkpoint, cls._checkpoint_time(checkpoint, model_name)
+
     def __init__(self, model_class: Type[Model], config: ConfigParser) -> None:
         """
         This function initializes the TimeSolver class.
@@ -95,11 +155,18 @@ class Solver(ABC):
         """
         self.config = config
 
-        # If the simulation is allowed to resume from a previous simulation
-        # TODO: Come back and add one where the IC is chosen and loaded automatically from the .sol
-        #       That was not done here since it would involve deep changes with ICFunctions.
-        # TODO: Have LATEST be a special keyword to read in
-        if self.config.get_item(['OTHER', 'resume_from_previous'], bool):
+        self.restart_file: Optional[Path] = None
+        resume_requested = self.config.get_item(['OTHER', 'resume_from_previous'], bool)
+        restart_from = self.config.get_item(['OTHER', 'restart_from'], str, quiet=True).strip()
+
+        if restart_from and not resume_requested:
+            raise ValueError(
+                'restart_from is set to "{}", but resume_from_previous is False. Enable resume_from_previous or '
+                'remove restart_from.'.format(restart_from)
+            )
+
+        # If the simulation is allowed to resume from a previous simulation.
+        if resume_requested:
             # Only a single saved solution is restored, as the initial condition. Multi-step schemes need several
             # consecutive previous time steps, and those cannot be recovered from the saved .sol files: save_frequency
             # may skip time steps, so consecutive .sol files are not necessarily consecutive iterations. Reject those
@@ -112,26 +179,20 @@ class Solver(ABC):
                     'save_frequency may skip time steps.'.format(resume_scheme, scheme_history_order[resume_scheme])
                 )
 
-            # Find the .sol files
-            output_dir = Path(self.config.get_item(['OTHER', 'run_dir'], str) + '/output/' + model_class.name() + '_sol/')
-            time_latest      = -np.inf
-            latest_file_name = None
-            if output_dir.exists():
-                prefix = len(model_class.name()) + 1  # +1 for the "_" between the name and the time
-                for sol_file in output_dir.rglob('*' + model_class.name() + '*.sol'):
-                    name = sol_file.name
-                    sol_time = float(name[prefix:-4])  # Strip the prefix and filetype and convert to time
-                    if sol_time > time_latest:
-                        time_latest = sol_time
-                        latest_file_name = name
-
-            # A resume was explicitly asked for, so having nothing to resume from is an error. Quietly starting over
-            # from the beginning is indistinguishable from a successful resume in the log.
-            if latest_file_name is None:
-                raise FileNotFoundError(
-                    'resume_from_previous is True but no .sol file to resume from was found in "{}". Set '
-                    'resume_from_previous to False to start a new simulation.'.format(output_dir)
+            if not restart_from:
+                restart_from = 'LATEST'
+                logging.warning(
+                    'resume_from_previous without restart_from is deprecated and currently means restart_from = '
+                    'LATEST. Set restart_from explicitly in the [OTHER] section.'
                 )
+
+            run_dir = Path(self.config.get_item(['OTHER', 'run_dir'], str)).resolve()
+            self.restart_file, restart_time = self._select_restart_checkpoint(
+                restart_from, run_dir, model_class.name()
+            )
+            # Pass the resolved checkpoint to Model so it replaces the configured IC before model-specific
+            # initialization runs.
+            self.config.set('OTHER', 'restart_from', str(self.restart_file))
 
             time_range = self.config.get('TRANSIENT', 'time_range').split(',')
             t_end = float(time_range[-1])
@@ -139,27 +200,16 @@ class Solver(ABC):
             # Stop instead of taking a meaningless final step if the saved solution already covers time_range. The
             # comparison needs a tolerance because accumulated floating point error leaves the last saved time step
             # just short of the end of the range, e.g. 0.09999999999999999 for a range ending at 0.1.
-            if time_latest >= t_end or math.isclose(time_latest, t_end, rel_tol=1e-09):
+            if restart_time >= t_end or math.isclose(restart_time, t_end, rel_tol=1e-09):
                 print('Simulation is already complete at t = {}, the end of time_range. Nothing to resume.'
-                      .format(time_latest))
+                      .format(restart_time))
                 sys.exit(0)
 
             # Set the new initial time
-            time_range[0] = str(time_latest)
+            time_range[0] = str(restart_time)
             self.config.set('TRANSIENT', 'time_range', ','.join(time_range))
 
-            # Make sure that the latest time-step found is also the one specified by the user.
-            # This check makes sure they did not forget to update their initial condition.
-            with open(self.config.get_item(['OTHER', 'run_dir'], str) + '/ic_dir/ic_config') as ic_config:
-                if latest_file_name not in ic_config.read():
-                    raise ValueError(
-                        "Tried to resume from previous solution {}, "
-                        "but it did not match up with the initial condition in ic_config. "
-                        "The initial condition must, currently, be manually changed to the latest .sol file."
-                        .format(latest_file_name)
-                    )
-
-            print("Resuming from previous solution: {}".format(latest_file_name))
+            print("Resuming from checkpoint: {}".format(self.restart_file))
 
         self.transient = self.config.get_item(['TRANSIENT', 'transient'], bool)
 

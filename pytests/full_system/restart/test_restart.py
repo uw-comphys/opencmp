@@ -73,7 +73,8 @@ def _load(sol_path: Path, mesh: ngs.Mesh) -> ngs.GridFunction:
     return gfu
 
 
-def test_resume_matches_uninterrupted_solve(tmp_path: Path) -> None:
+@pytest.mark.parametrize('restart_selector', ['relative', 'absolute', 'LATEST', 'legacy'])
+def test_resume_matches_uninterrupted_solve(tmp_path: Path, restart_selector: str, caplog) -> None:
     """
     Test that resuming a transient solve from a saved .sol file gives the same final solution as solving straight
     through. Fixed time-stepping (implicit euler) is used so that both solves take identical time steps and the
@@ -98,15 +99,24 @@ def test_resume_matches_uninterrupted_solve(tmp_path: Path) -> None:
     restart_from = _sol_files(sol_dir)[-1]
     assert _sol_time(restart_from) == pytest.approx(T_RESTART)
 
-    # Resume. The initial condition has to be pointed at the last .sol by hand, resume_from_previous only picks up
-    # the new start time and checks that the initial condition agrees with the .sol file it found.
-    (case / 'ic_dir' / 'ic_config').write_text(
-        '[POISSON]\nu = all -> output/poisson_sol/' + restart_from.name + '\n'
-    )
+    # A similarly named checkpoint for another model must never be selected by LATEST.
+    if restart_selector == 'LATEST':
+        shutil.copy(restart_from, sol_dir / 'mcpoisson_999.0.sol')
+
     config = case / 'config'
-    config.write_text(config.read_text().replace('resume_from_previous = False', 'resume_from_previous = True'))
+    config_text = config.read_text().replace('resume_from_previous = False', 'resume_from_previous = True')
+    if restart_selector == 'relative':
+        config_text += '\nrestart_from = output/poisson_sol/' + restart_from.name + '\n'
+    elif restart_selector == 'absolute':
+        config_text += '\nrestart_from = ' + str(restart_from.resolve()) + '\n'
+    elif restart_selector == 'LATEST':
+        config_text += '\nrestart_from = LATEST\n'
+    config.write_text(config_text)
 
     run(str(config))
+
+    if restart_selector == 'legacy':
+        assert 'without restart_from is deprecated' in caplog.text
 
     # Both solves should have ended up at the same place.
     resumed_final = _sol_files(sol_dir)[-1]
@@ -160,7 +170,7 @@ def test_resume_allowed_for_single_step_schemes(tmp_path: Path, scheme: str) -> 
     config_parser = ConfigParser(str(config))
     model_class = get_model_class(config_parser.get_item(['OTHER', 'model'], str), False)
 
-    with pytest.raises(FileNotFoundError, match='no .sol file to resume from'):
+    with pytest.raises(FileNotFoundError, match='No valid .sol checkpoint'):
         get_solver_class(config_parser)(model_class, config_parser)
 
 
@@ -176,7 +186,51 @@ def test_resume_without_any_checkpoint_fails(tmp_path: Path) -> None:
 
     assert not (case / 'output').exists()
 
-    with pytest.raises(FileNotFoundError, match='no .sol file to resume from'):
+    with pytest.raises(FileNotFoundError, match='No valid .sol checkpoint'):
+        run(str(config))
+
+
+def test_explicit_restart_checkpoint_must_exist(tmp_path: Path) -> None:
+    """ An explicit restart_from path must identify an existing file. """
+    case = _make_case(tmp_path)
+    config = case / 'config'
+    config.write_text(
+        config.read_text()
+        .replace('resume_from_previous = False', 'resume_from_previous = True')
+        + '\nrestart_from = output/poisson_sol/poisson_0.05.sol\n'
+    )
+
+    with pytest.raises(FileNotFoundError, match='does not exist'):
+        run(str(config))
+
+
+def test_restart_checkpoint_must_match_active_model(tmp_path: Path) -> None:
+    """ An explicit checkpoint belonging to another model must be rejected before NGSolve loads it. """
+    case = _make_case(tmp_path)
+    sol_dir = case / 'output' / 'poisson_sol'
+    run(str(case / 'config'))
+    source = min(_sol_files(sol_dir), key=lambda path: abs(_sol_time(path) - T_RESTART))
+    wrong_model = sol_dir / 'ins_0.05.sol'
+    shutil.copy(source, wrong_model)
+
+    config = case / 'config'
+    config.write_text(
+        config.read_text()
+        .replace('resume_from_previous = False', 'resume_from_previous = True')
+        + '\nrestart_from = ' + str(wrong_model) + '\n'
+    )
+
+    with pytest.raises(ValueError, match='active model'):
+        run(str(config))
+
+
+def test_restart_from_requires_resume_mode(tmp_path: Path) -> None:
+    """ restart_from must not be silently ignored when resume_from_previous is disabled. """
+    case = _make_case(tmp_path)
+    config = case / 'config'
+    config.write_text(config.read_text() + '\nrestart_from = LATEST\n')
+
+    with pytest.raises(ValueError, match='resume_from_previous is False'):
         run(str(config))
 
 
@@ -195,11 +249,11 @@ def test_resume_of_completed_simulation_exits_cleanly(tmp_path: Path) -> None:
     assert _sol_time(final) != T_FINAL, 'Expected float drift in the saved time, the tolerance is untested without it.'
     assert _sol_time(final) == pytest.approx(T_FINAL)
 
-    (case / 'ic_dir' / 'ic_config').write_text(
-        '[POISSON]\nu = all -> output/poisson_sol/' + final.name + '\n'
-    )
     config = case / 'config'
-    config.write_text(config.read_text().replace('resume_from_previous = False', 'resume_from_previous = True'))
+    config.write_text(
+        config.read_text().replace('resume_from_previous = False', 'resume_from_previous = True')
+        + '\nrestart_from = LATEST\n'
+    )
 
     with pytest.raises(SystemExit) as exit_info:
         run(str(config))
