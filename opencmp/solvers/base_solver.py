@@ -96,7 +96,7 @@ class Solver(ABC):
                     name = sol_file.name
                     sol_time = float(name[prefix:-4])  # Strip the prefix and filetype and convert to time
                     if sol_time > time_latest:
-                        time_lates = sol_time
+                        time_latest = sol_time
                         latest_file_name = name
 
                 # Update time_range and dt to reflect those values

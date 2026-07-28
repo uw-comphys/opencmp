@@ -1,0 +1,9 @@
+[DIRICHLET]
+u = left   ->  0.0
+    right  ->  0.0
+
+[NEUMANN]
+u = top    ->  0.0
+    bottom ->  0.0
+
+[ROBIN]
