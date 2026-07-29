@@ -144,9 +144,26 @@ The simulation can be run from the command line; within the directory "examples/
 1) Run the Stokes solve by calling :code:`python3 -m opencmp config_IC`
 2) Run the incompressible Navier-Stokes solve by calling :code:`python3 -m opencmp config`.
 
+Restarting an Interrupted Simulation
+------------------------------------
+
+The implicit Euler scheme used in this tutorial can be restarted from a saved ``.sol``
+checkpoint. Under ``[OTHER]`` in ``config``, enable restart and select a checkpoint explicitly::
+
+   resume_from_previous = True
+   restart_from = output/ins_sol/ins_0.1.sol
+
+The path may be relative to ``run_dir`` or absolute. OpenCMP loads this checkpoint
+automatically, so ``ic_dir/ic_config`` does not need to be changed. To select the newest
+valid INS checkpoint instead, use::
+
+   restart_from = LATEST
+
+Restart currently supports single-step schemes, including the implicit Euler scheme used
+here. Set ``resume_from_previous = False`` when starting a new simulation.
 
 As usual, the progress of the transient simulation can be tracked from the print outs at each time step. Once the simulation has finished the results can be visualized by opening "output/transient.pvd" in ParaView.
 
 .. raw:: html
 
-   <video controls src=../_static/tutorial_7.mp4 width="700" class="center"> </video>
+   <video controls src=../_static/tutorial_6.mp4 width="700" class="center"> </video>
