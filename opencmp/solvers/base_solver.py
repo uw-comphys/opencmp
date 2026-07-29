@@ -253,6 +253,9 @@ class Solver(ABC):
 
         self.save_to_file = self.config.get_item(['VISUALIZATION', 'save_to_file'], bool)
 
+        if not self.save_to_file:
+            logging.warning('save_to_file is set to False — no solution files will be written for this run.')
+
         if self.save_to_file:
             self.saver = SolutionFileSaver(self.model, quiet=True)
             save_freq = self.config.get_list(['VISUALIZATION', 'save_frequency'], str, quiet=True)

@@ -43,7 +43,11 @@ def run_opencmp():
         exit(0)
 
     # call the function in run.py
-    run(config_file_path)
+    try:
+        run(config_file_path)
+    except KeyboardInterrupt:
+        print()
+        sys.exit(0)
 
     return
 
