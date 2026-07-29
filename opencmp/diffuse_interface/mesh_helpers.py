@@ -15,6 +15,7 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
+import math
 import numpy as np
 from numpy import ndarray
 import netgen.meshing as ngmsh
@@ -61,7 +62,7 @@ def angle_between(p1_tmp: List[float], p2_tmp: List[float], p3_tmp: List[float])
 
     v1 = p1 - p2
     v2 = p3 - p2
-    angle = np.math.atan2(np.linalg.det([v1, v2]), np.dot(v1, v2))
+    angle = math.atan2(np.linalg.det([v1, v2]), np.dot(v1, v2))
 
     if angle < 0.0:
         angle += 2 * np.pi
