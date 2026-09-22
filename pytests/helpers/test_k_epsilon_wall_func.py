@@ -53,6 +53,17 @@ def elements_owning_a_facet_on(mesh, wall):
             if sum(1 for v in el.vertices if v.nr in wall_vertices) >= mesh.dim}
 
 
+def elements_touching_wall_vertices(mesh, wall):
+    wall_vertices = {
+        vertex.nr
+        for boundary_element in mesh.Elements(ngs.BND)
+        if boundary_element.mat == wall
+        for vertex in boundary_element.vertices
+    }
+    return {element.nr for element in mesh.Elements(ngs.VOL)
+            if any(vertex.nr in wall_vertices for vertex in element.vertices)}
+
+
 def add_one_face_connected_layer(mesh, element_numbers):
     """Ground truth for one topological dilation through volume-cell facets."""
     elements = list(mesh.Elements(ngs.VOL))
@@ -74,20 +85,20 @@ def add_one_face_connected_layer(mesh, element_numbers):
 # ----------------------------------------------------------------------
 
 @pytest.mark.parametrize('meshfile, wall', [(SQUARE, 'bottom'), (CHANNEL, 'wall')])
-def test_mask_contains_only_wall_facet_owners(meshfile, wall):
+def test_mask_contains_every_cell_touching_a_wall_vertex(meshfile, wall):
     mesh = ngs.Mesh(meshfile)
     wf = build(mesh, wall)
-    wall_cells = elements_owning_a_facet_on(mesh, wall)
+    wall_cells = elements_touching_wall_vertices(mesh, wall)
     assert marked_element_numbers(wf) == wall_cells
 
 
-def test_near_wall_mask_matches_wall_facet_owners():
+def test_near_wall_mask_matches_wall_vertex_cells():
     mesh = ngs.Mesh(CHANNEL)
     wf = build(mesh, 'wall')
     values = wf.near_wall_mask().vec.FV().NumPy()
     actual = {element.nr for element in wf._fes0.Elements(ngs.VOL)
               if any(values[dof] > 0.5 for dof in element.dofs)}
-    wall_cells = elements_owning_a_facet_on(mesh, 'wall')
+    wall_cells = elements_touching_wall_vertices(mesh, 'wall')
     assert actual == wall_cells
 
 
@@ -117,8 +128,7 @@ def test_wall_measure_sums_to_the_exact_boundary_measure():
     assert wf._wall_measure.sum() == pytest.approx(exact, rel=1e-12)
 
 
-def test_cell_touching_the_wall_only_at_a_vertex_is_not_marked():
-    """A vertex-only touch is not a wall-function cell."""
+def test_cell_touching_the_wall_only_at_a_vertex_is_marked():
     mesh = ngs.Mesh(SQUARE)
     wf = build(mesh, 'bottom')
     marked = marked_element_numbers(wf)
@@ -131,7 +141,7 @@ def test_cell_touching_the_wall_only_at_a_vertex_is_not_marked():
     vertex_only = {el.nr for el in mesh.Elements(ngs.VOL)
                    if sum(1 for v in el.vertices if v.nr in bottom_vertices) == 1}
     assert vertex_only, 'mesh exercises no vertex-only touch; test is vacuous'
-    assert not vertex_only & marked
+    assert vertex_only <= marked
 
 
 def test_missing_wall_marker_raises_a_clear_error():
@@ -360,11 +370,12 @@ def test_bulk_viscosity_matches_the_plain_k_epsilon_formula(channel_wf):
     assert nu_t[~marked] == pytest.approx(0.09 * k ** 2 / eps, rel=1e-6)
 
 
-def test_wall_owner_neighbours_are_not_in_the_wall_function_mask(channel_wf):
+def test_only_vertex_connected_owner_neighbours_join_the_wall_mask(channel_wf):
     mesh, wf = channel_wf
     owners = elements_owning_a_facet_on(mesh, 'wall')
     expanded = add_one_face_connected_layer(mesh, owners)
     neighbours = expanded - owners
+    vertex_cells = elements_touching_wall_vertices(mesh, 'wall') - owners
     assert neighbours
 
     k = ngs.GridFunction(wf._fes0)
@@ -374,8 +385,11 @@ def test_wall_owner_neighbours_are_not_in_the_wall_function_mask(channel_wf):
     u_tau = wf.u_tau_cell.vec.FV().NumPy()
     for element in wf._fes0.Elements(ngs.VOL):
         if element.nr in neighbours:
-            assert mask[list(element.dofs)] == pytest.approx(0.0, abs=1e-14)
-            assert u_tau[list(element.dofs)] == pytest.approx(0.0, abs=1e-14)
+            expected = 1.0 if element.nr in vertex_cells else 0.0
+            assert mask[list(element.dofs)] == pytest.approx(expected, abs=1e-14)
+            expected_utau = 0.09 ** 0.25 if expected else 0.0
+            assert u_tau[list(element.dofs)] == pytest.approx(
+                expected_utau, abs=1e-14)
 
 
 def test_velocity_method_uses_molecular_tangential_not_normal_stress():
@@ -455,9 +469,9 @@ def test_tet_mesh_attributes_every_wall_face_to_exactly_one_cell(cube_wf):
     assert wf._wall_measure.sum() == pytest.approx(exact, rel=1e-12)
 
 
-def test_tet_mask_contains_only_wall_face_owners(cube_wf):
+def test_tet_mask_contains_every_wall_vertex_cell(cube_wf):
     mesh, wf = cube_wf
-    wall_cells = elements_owning_a_facet_on(mesh, 'bottom')
+    wall_cells = elements_touching_wall_vertices(mesh, 'bottom')
     assert wall_cells, 'no cell owns a wall face; test is vacuous'
     assert marked_element_numbers(wf) == wall_cells
 

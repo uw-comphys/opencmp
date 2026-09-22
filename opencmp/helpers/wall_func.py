@@ -133,8 +133,8 @@ class KEpsilonWallFunction:
     def _mark_wall_cells(self) -> None:
         """Find the wall layer from mesh topology.
 
-        Sets ``_wall_measure``, ``_marked`` / ``wall_facet_cell_mask`` and
-        ``mask`` to the cells that own a physical wall facet.
+        ``_marked`` / ``wall_facet_cell_mask`` identify physical facet owners.
+        ``mask`` additionally includes cells touching the wall at a vertex.
         """
         # Assumes a simplicial mesh (one L2(0) DOF per cell). Quads/hexes parse
         # but the resulting layer is untested, so refuse rather than go silently wrong.
@@ -163,16 +163,48 @@ class KEpsilonWallFunction:
         self.wall_facet_cell_mask = ngs.GridFunction(self._fes0)
         self.wall_facet_cell_mask.vec.FV().NumPy()[:] = self._marked.astype(float)
 
-        # A wall function is a first-cell treatment. Cells that do not own a
-        # physical wall facet use the bulk closure, even when facet-adjacent to
-        # a wall owner.
+        volume_elements = list(self._fes0.Elements(ngs.VOL))
+        wall_vertices = {
+            vertex.nr
+            for boundary_element in self.mesh.Elements(ngs.BND)
+            if boundary_element.mat == self.wall_boundary
+            for vertex in boundary_element.vertices
+        }
+        vertex_marked = np.zeros_like(self._marked)
+        for element in volume_elements:
+            if any(vertex.nr in wall_vertices for vertex in element.vertices):
+                vertex_marked[list(element.dofs)] = True
+
         self.mask = ngs.GridFunction(self._fes0)
-        self.mask.vec.FV().NumPy()[:] = self._marked.astype(float)
-        self._wall_layer_sources = {}
+        self.mask.vec.FV().NumPy()[:] = vertex_marked.astype(float)
         self._element_dofs = {
             element.nr: tuple(element.dofs)
-            for element in self._fes0.Elements(ngs.VOL)
+            for element in volume_elements
         }
+        owner_numbers = {
+            element.nr for element in volume_elements
+            if any(self._marked[dof] for dof in element.dofs)
+        }
+        vertex_to_owners = {}
+        for element in volume_elements:
+            if element.nr not in owner_numbers:
+                continue
+            for vertex in element.vertices:
+                if vertex.nr in wall_vertices:
+                    vertex_to_owners.setdefault(vertex.nr, set()).add(element.nr)
+
+        self._wall_layer_sources = {}
+        for element in volume_elements:
+            if element.nr in owner_numbers or not any(
+                    vertex_marked[dof] for dof in element.dofs):
+                continue
+            sources = set()
+            for vertex in element.vertices:
+                sources.update(vertex_to_owners.get(vertex.nr, ()))
+            if not sources:
+                raise ValueError(
+                    f'Wall-vertex cell {element.nr} has no wall-facet owner source.')
+            self._wall_layer_sources[element.nr] = tuple(sorted(sources))
         self._wall_facets = self._find_physical_wall_facets()
 
     def _find_physical_wall_facets(self):
@@ -276,19 +308,23 @@ class KEpsilonWallFunction:
         wall_nu_t = np.zeros(self._fes0.ndof)
         wall_shear = np.zeros(self._fes0.ndof)
         y_plus_cell = np.zeros(self._fes0.ndof)
+        active = self.mask.vec.FV().NumPy() > 0.5
         if self.u_tau_method == 0:
             projected = ngs.GridFunction(self._fes0)
             projected.Set(K)
             k_values = np.maximum(projected.vec.FV().NumPy(), 0.0)
-            u_tau[self._marked] = self.C_mu ** 0.25 * np.sqrt(
-                k_values[self._marked])
+            u_tau[active] = self.C_mu ** 0.25 * np.sqrt(k_values[active])
             y_plus_cell = (self._dist_cell.vec.FV().NumPy()
                            * u_tau / self.nu)
         else:
             if U is None:
                 raise ValueError('Velocity-based u_tau requires the velocity iterate.')
             wall_shear = self._resolved_wall_shear(U)
-            u_tau[self._marked] = np.sqrt(wall_shear[self._marked])
+            for element_number, sources in self._wall_layer_sources.items():
+                target_dof = self._element_dofs[element_number][0]
+                source_dofs = [self._element_dofs[source][0] for source in sources]
+                wall_shear[target_dof] = float(np.mean(wall_shear[source_dofs]))
+            u_tau[active] = np.sqrt(wall_shear[active])
             y_plus_cell = (self._dist_cell.vec.FV().NumPy()
                            * u_tau / self.nu)
             wall_nu_t = self._wall_viscosity_from_yplus(y_plus_cell)
@@ -303,7 +339,7 @@ class KEpsilonWallFunction:
 
     def _warn_if_yplus_outside_recommended_range(self, y_plus: np.ndarray) -> None:
         """Warn once for each side of the recommended wall-function band."""
-        wall_values = y_plus[self._marked]
+        wall_values = y_plus[self.mask.vec.FV().NumPy() > 0.5]
         total = wall_values.size
         observed_min = float(np.min(wall_values))
         observed_max = float(np.max(wall_values))
@@ -337,7 +373,7 @@ class KEpsilonWallFunction:
     # ------------------------------------------------------------------
 
     def near_wall_mask(self) -> ngs.GridFunction:
-        """1 only on cells that own a physical wall facet."""
+        """1 on cells owning a wall facet or touching the wall at a vertex."""
         return self.mask
 
     def wall_facet_mask(self) -> ngs.GridFunction:
