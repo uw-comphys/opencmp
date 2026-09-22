@@ -63,6 +63,7 @@ config_defaults: Dict = {
               'restart_from': ''},
     'VISUALIZATION': {'save_to_file': False,
                       'save_type': '.sol',
+                      'save_vtu_each_timestep': False,
                       'save_frequency': ['1', 'numit'],
                       'subdivision': -1,
                       'split_components': False},

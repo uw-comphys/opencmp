@@ -15,8 +15,9 @@
 # <https://www.gnu.org/licenses/>.                                                                                     #
 ########################################################################################################################
 
+import re
 from typing import Union
-from ngsolve import GridFunction, CoefficientFunction
+from ngsolve import GridFunction, CoefficientFunction, VTKOutput
 from ..models import Model
 from pathlib import Path
 
@@ -52,6 +53,15 @@ class SolutionFileSaver:
         self.base_filename_sol = self.save_dir_sol + model.name() + '_'
         self.base_filename_phi_sol = self.save_dir_phi_sol + 'phi' + '_'
         self.base_subdivision = model.config.get_item(['VISUALIZATION', 'subdivision'], int, quiet)
+        self.save_vtu_each_timestep = (
+            base_type == '.vtu'
+            and model.config.get_item(
+                ['VISUALIZATION', 'save_vtu_each_timestep'], bool, quiet)
+        )
+        self.model_name = model.name()
+        self.mesh = model.mesh
+        self.save_names = model.save_names
+        self.pvd_entries = {False: {}, True: {}}
 
         # Create the save dir if it doesn't exist
         Path(self.save_dir).mkdir(parents=True, exist_ok=True)
@@ -91,3 +101,43 @@ class SolutionFileSaver:
 
         # Save to file
         gfu.Save(filename)
+
+        if self.save_vtu_each_timestep:
+            self._save_vtu(gfu, timestep, DIM)
+
+    def _save_vtu(self, gfu: Union[GridFunction, CoefficientFunction], timestep: float, DIM: bool) -> None:
+        """Write the just-saved checkpoint to VTU and refresh its PVD collection."""
+        if DIM:
+            vtu_dir = self.save_dir_phi_vtu
+            basename = 'phi_' + str(timestep)
+            names = ['phi']
+            pvd_filename = self.save_dir_phi + 'phi_transient.pvd'
+            relative_filename = self.model_name + '_vtu/' + basename + '.vtu'
+        else:
+            vtu_dir = self.save_dir_vtu
+            basename = self.model_name + '_' + str(timestep)
+            names = self.save_names
+            pvd_filename = self.save_dir + self.model_name + '_transient.pvd'
+            relative_filename = self.model_name + '_vtu/' + basename + '.vtu'
+
+        # On the first write of a run, keep any entries already in the .pvd so a
+        # resumed run doesn't truncate the collection to just the new timesteps.
+        if not self.pvd_entries[DIM] and Path(pvd_filename).is_file():
+            self.pvd_entries[DIM] = {float(t): f for t, f in
+                                     re.findall(r'timestep="([^"]+)".*?file="([^"]+)"',
+                                                Path(pvd_filename).read_text())}
+
+        coefs = list(gfu.components) if isinstance(gfu, GridFunction) and len(gfu.components) > 0 else [gfu]
+        VTKOutput(ma=self.mesh, coefs=coefs, names=names,
+                  filename=vtu_dir + basename, subdivision=self.base_subdivision).Do()
+
+        self.pvd_entries[DIM][float(timestep)] = relative_filename
+        with open(pvd_filename, 'w') as pvd:
+            pvd.write('<?xml version="1.0"?>\n'
+                      '<VTKFile type="Collection" version="0.1"\n'
+                      'byte_order="LittleEndian" compressor="vtkZLibDataCompressor">\n'
+                      '<Collection>\n')
+            for time, path in sorted(self.pvd_entries[DIM].items()):
+                pvd.write('<DataSet timestep="%e" group="" part="0" file="%s"/>\n'
+                          % (time, path))
+            pvd.write('</Collection>\n</VTKFile>')
