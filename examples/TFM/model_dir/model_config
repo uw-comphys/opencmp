@@ -1,0 +1,24 @@
+[PARAMETERS]
+# Phase densities (kg/m^3)
+rho_c        = all -> 998.2
+rho_d        = all -> 1.204
+
+# Kinematic viscosities (m^2/s)
+nu_c         = all -> 1.0038e-6
+nu_d         = all -> 1.5158e-5
+
+# Surface tension (N/m)
+sigma_c      = all -> 0.072
+
+# Bubble diameter (m)
+dp           = all -> 3e-3
+
+# Interphase force constants
+c_vm         = all -> 0.5
+cdis         = all -> 4.545
+d_artificial = all -> 1e-5
+
+[INJECTION]
+region         = injection
+mass_flow_rate = 0.3
+velocity       = 0.2

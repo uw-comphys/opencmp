@@ -1,0 +1,16 @@
+[PARAMETERS]
+rho_c = all -> 1.0
+rho_d = all -> 1.0
+nu_c = all -> 0.01
+nu_d = all -> 0.01
+sigma_c = all -> 0.072
+dp = all -> 1.0
+c_vm = all -> 0.2
+cdis = all -> 0.1
+d_artificial = all -> 0.0
+
+[FUNCTIONS]
+source = u_c -> IMPORT(source_uc)
+         u_d -> IMPORT(source_ud)
+         p -> IMPORT(source_mixture_mass)
+         alpha_c -> IMPORT(source_alpha_c)

@@ -45,6 +45,21 @@ def construct_identity_mat(dim: int) -> CoefficientFunction:
     return ngs.CoefficientFunction(tuple(lst), dims=(dim, dim))
 
 
+def curl_3d(gfu: GridFunction) -> CoefficientFunction:
+    """
+    Returns the curl of a 3D vector field computed from its gradient.
+
+    Args:
+        gfu: The 3D vector field.
+
+    Returns:
+        The curl of gfu.
+    """
+
+    g = ngs.grad(gfu)
+    return ngs.CoefficientFunction((g[5] - g[7], -(g[2] - g[6]), g[1] - g[3]))
+
+
 def get_special_functions(mesh: Mesh, nu: float) \
         -> Tuple[CoefficientFunction, CoefficientFunction, CoefficientFunction, CoefficientFunction]:
     """

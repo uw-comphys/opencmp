@@ -1,0 +1,13 @@
+[DIRICHLET]
+u_c = wall   -> [0.0, 0.0]
+      bottom -> [0.0, 0.0]
+
+[SLIP]
+u_d = wall|bottom
+
+[ZERO_STRESS]
+u_c = outlet
+u_d = outlet
+
+[ZERO_BACKFLOW]
+alpha_c = outlet|wall|bottom

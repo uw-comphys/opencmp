@@ -1,0 +1,8 @@
+[REFERENCE SOLUTIONS]
+u_c = [-cos(2*pi*x)*sin(2*pi*y), sin(2*pi*x)*cos(2*pi*y)]
+u_d = [sin(2*pi*x)*sin(2*pi*y), cos(2*pi*x)*cos(2*pi*y)]
+p = -0.25*(cos(4*pi*x)+cos(4*pi*y))
+alpha_c = 0.9+0.02*sin(2*pi*x+pi/4)*cos(2*pi*y)
+
+[METRICS]
+l2_norm = u_c, u_d, p, alpha_c

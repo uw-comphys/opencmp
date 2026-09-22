@@ -1,0 +1,7 @@
+[TwoFluidModel]
+# Initially quiescent liquid column.
+u_c = all -> [0.0, 0.0]
+u_d = all -> [0.0, 0.0]
+
+# Column initially contains only the continuous phase.
+alpha_c = all -> 1.0

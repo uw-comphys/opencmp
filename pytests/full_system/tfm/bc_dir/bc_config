@@ -1,0 +1,15 @@
+[DIRICHLET]
+u_c = bottom -> [1-0.01*cos(pi*x)*sin(pi*y), 0.01*sin(pi*x)*cos(pi*y)]
+      right -> [1-0.01*cos(pi*x)*sin(pi*y), 0.01*sin(pi*x)*cos(pi*y)]
+      top -> [1-0.01*cos(pi*x)*sin(pi*y), 0.01*sin(pi*x)*cos(pi*y)]
+      left -> [1-0.01*cos(pi*x)*sin(pi*y), 0.01*sin(pi*x)*cos(pi*y)]
+u_d = bottom -> [1+0.01*sin(pi*x)*sin(pi*y), 0.01*cos(pi*x)*cos(pi*y)]
+      right -> [1+0.01*sin(pi*x)*sin(pi*y), 0.01*cos(pi*x)*cos(pi*y)]
+      top -> [1+0.01*sin(pi*x)*sin(pi*y), 0.01*cos(pi*x)*cos(pi*y)]
+      left -> [1+0.01*sin(pi*x)*sin(pi*y), 0.01*cos(pi*x)*cos(pi*y)]
+alpha_c = bottom -> 0.9+0.002*sin(pi*x+pi/4)*cos(pi*y)
+          right -> 0.9+0.002*sin(pi*x+pi/4)*cos(pi*y)
+          top -> 0.9+0.002*sin(pi*x+pi/4)*cos(pi*y)
+          left -> 0.9+0.002*sin(pi*x+pi/4)*cos(pi*y)
+
+[SLIP]

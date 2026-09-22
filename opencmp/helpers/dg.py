@@ -102,6 +102,28 @@ def weighted_grad_avg(q: CoefficientFunction, c: CoefficientFunction) -> Coeffic
         return 0.5 * (c * Grad(q) + c.Other() * Grad(q).Other())
 
 
+def weighted_trans_grad_avg(q: CoefficientFunction, c: CoefficientFunction) -> CoefficientFunction:
+    """
+    Returns the average of the transposed gradient of a field weighted by a (possibly discontinuous) coefficient.
+
+    Note this is NOT weighted_grad_avg(q, c).trans in general: this weights on the right,
+    (Grad(q) * c)^T, and the two only coincide for scalar c.
+
+    Args:
+        q: The field.
+        c: The coefficient weighting the gradient on each side of the facet.
+
+    Returns:
+        The average of (Grad(q) * c)^T at every facet of the mesh.
+    """
+
+    # Grad must be called differently if q is a trial or testfunction instead of a coefficientfunction/gridfunction.
+    if isinstance(q, ProxyFunction):
+        return 0.5 * ((Grad(q) * c).trans + (Grad(q.Other()) * c.Other()).trans)
+    else:
+        return 0.5 * ((Grad(q) * c).trans + (Grad(q).Other() * c.Other()).trans)
+
+
 def weighted_div_avg(q: CoefficientFunction, c: CoefficientFunction) -> CoefficientFunction:
     """
     Returns the average of the divergence of a field weighted by a (possibly discontinuous) coefficient.

@@ -1,0 +1,5 @@
+[TwoFluidModel]
+u_c = all -> [1.0, 0.0]
+u_d = all -> [1.0, 0.0]
+p = all -> 0.0
+alpha_c = all -> 0.9

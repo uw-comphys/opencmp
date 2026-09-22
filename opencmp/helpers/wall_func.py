@@ -22,6 +22,48 @@ import numpy as np
 import ngsolve as ngs
 
 
+def wall_distance(mesh: ngs.comp.Mesh, wall_boundary: str = 'wall',
+                  order: int = 2, relax: float = 0.1) -> ngs.GridFunction:
+    """
+    Distance to ``wall_boundary`` from a regularized Eikonal solve.
+
+    Free of any turbulence modelling, so models that need only a wall distance
+    (e.g. the two-fluid lift wall-deactivation taper) can use it without
+    constructing a :class:`KEpsilonWallFunction`.
+
+    Args:
+        mesh: The mesh used for the simulation.
+        wall_boundary: Boundary marker(s) to measure the distance from.
+        order: Order of the H1 space the distance field lives in.
+        relax: Regularization, as a multiple of the local mesh size.
+
+    Returns:
+        The wall-distance field.
+    """
+
+    eps = relax * ngs.specialcf.mesh_size
+    fes = ngs.H1(mesh, order=order, dirichlet=wall_boundary)
+    u, v = fes.TnT()
+    y = ngs.GridFunction(fes)
+
+    a = ngs.BilinearForm(fes)
+    a += ngs.grad(u) * ngs.grad(v) * ngs.dx
+    f = ngs.LinearForm(fes)
+    f += 1.0 * v * ngs.dx
+    a.Assemble()
+    f.Assemble()
+    y.vec.data = a.mat.Inverse(fes.FreeDofs()) * f.vec
+
+    gu = ngs.grad(u)
+    residual = ngs.BilinearForm(fes)
+    residual += (
+        ngs.sqrt(gu * gu + 1e-12) * v - v
+        + eps * gu * ngs.grad(v)
+    ) * ngs.dx
+    ngs.solvers.Newton(residual, y, printing=False)
+    return y
+
+
 class KEpsilonWallFunction:
     """Wall-layer eddy viscosity and dissipation for high-Re k-epsilon.
 
@@ -180,27 +222,7 @@ class KEpsilonWallFunction:
 
     def _compute_distance_field(self, order: int, relax: float) -> ngs.GridFunction:
         """Distance to ``wall_boundary`` from a regularized Eikonal solve."""
-        eps = relax * self.h
-        fes = ngs.H1(self.mesh, order=order, dirichlet=self.wall_boundary)
-        u, v = fes.TnT()
-        y = ngs.GridFunction(fes)
-
-        a = ngs.BilinearForm(fes)
-        a += ngs.grad(u) * ngs.grad(v) * ngs.dx
-        f = ngs.LinearForm(fes)
-        f += 1.0 * v * ngs.dx
-        a.Assemble()
-        f.Assemble()
-        y.vec.data = a.mat.Inverse(fes.FreeDofs()) * f.vec
-
-        gu = ngs.grad(u)
-        residual = ngs.BilinearForm(fes)
-        residual += (
-            ngs.sqrt(gu * gu + 1e-12) * v - v
-            + eps * gu * ngs.grad(v)
-        ) * ngs.dx
-        ngs.solvers.Newton(residual, y, printing=False)
-        return y
+        return wall_distance(self.mesh, self.wall_boundary, order, relax)
 
     # ------------------------------------------------------------------
     # Per-iteration update

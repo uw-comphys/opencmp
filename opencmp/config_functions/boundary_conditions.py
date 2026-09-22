@@ -33,10 +33,34 @@ class BCFunctions(ConfigFunctions):
         super().__init__(config_rel_path, import_dir, mesh, t_param)
 
         # Load the BC dict from the BC configfile.
+        # These types are fully determined by their name, so they are marker-only
+        # (``u_d = wall|bottom``) instead of the parser's ``marker -> value``.
+        marker_only_types = ({'SLIP', 'ZERO_STRESS', 'ZERO_GRADIENT', 'ZERO_BACKFLOW'}
+                             & set(bc_types))
         self.bc_dict, self.bc_re_parse_dict = self.config.get_three_level_dict(self.import_dir, None, self.t_param,
                                                                                new_variables,
-                                                                               white_list=bc_types,
-                                                                               ignore=['VERTICES', 'CENTROIDS'])
+                                                                               white_list=[bc_type for bc_type in bc_types
+                                                                                           if bc_type not in marker_only_types],
+                                                                               ignore=['VERTICES', 'CENTROIDS']
+                                                                                      + list(marker_only_types))
+        for bc_type in marker_only_types:
+            marker_dict = {}
+            section = self.config[bc_type] if self.config.has_section(bc_type) else {}
+            for var, marker_expression in section.items():
+                markers = [marker.strip() for marker in marker_expression.split('|') if marker.strip()]
+                if not markers:
+                    raise ValueError(
+                        "Boundary condition '[{}] {}' must specify at least one mesh marker."
+                        .format(bc_type, var)
+                    )
+                if len(markers) != len(set(markers)):
+                    raise ValueError(
+                        "Boundary condition '[{}] {}' contains duplicate mesh markers."
+                        .format(bc_type, var)
+                    )
+                marker_dict[var] = {marker: [] for marker in markers}
+            self.bc_dict[bc_type.lower()] = marker_dict
+            self.bc_re_parse_dict[bc_type.lower()] = {var: {} for var in marker_dict}
 
         # Used to keep track of which unknown variables the user has already been warned about
         # A variable present in the config file that is not in the current model is not necessarily a bug.

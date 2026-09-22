@@ -27,6 +27,7 @@ from .stokes                import Stokes
 from .stokes_dim            import StokesDIM
 from .multi_component_ins   import MultiComponentINS
 from .k_epsilon             import KEpsilonINS
+from .tfm                   import TwoFluidModel
 
 
 models_dict = {"INS": INS,
@@ -36,7 +37,8 @@ models_dict = {"INS": INS,
                "Stokes": Stokes,
                "Stokes-DIM": StokesDIM,
                "MultiComponentINS": MultiComponentINS,
-               "KEpsilonINS": KEpsilonINS}
+               "KEpsilonINS": KEpsilonINS,
+               "TwoFluidModel": TwoFluidModel}
 
 # Helper functions
 from .misc import get_model_class
