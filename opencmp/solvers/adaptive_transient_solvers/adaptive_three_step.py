@@ -73,9 +73,11 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
         self._assemble()
         self._update_preconditioners(self.preconditioner_long)
 
-    def _single_solve(self) -> None:
+    def _single_solve(self) -> bool:
         # Single solve for the full time step.
-        self.model.solve_single_step(self.a_long, self.L_long, self.preconditioner_long, self.gfu_long, 0)
+        if self.model.solve_single_step(self.a_long, self.L_long, self.preconditioner_long,
+                                        self.gfu_long, 0) is False:
+            return self._discard_diverged_solve()
 
         # Update the linearization terms back to their t^n values.
         # gfu_short needs to be solved with the same values for W as gfu_long since they have the same initial time
@@ -87,7 +89,9 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
             self.L_short[i].Assemble()
 
         self._update_preconditioners(self.preconditioner_short)
-        self.model.solve_single_step(self.a_short, self.L_short, self.preconditioner_short, self.gfu_short, 1)
+        if self.model.solve_single_step(self.a_short, self.L_short, self.preconditioner_short,
+                                        self.gfu_short, 1) is False:
+            return self._discard_diverged_solve()
 
         # Update the model component values at t^n+1/2 now that they have been solved for.
         # The linearization terms do not need to be updated since they are now for t^n+1/2 as expected.
@@ -99,7 +103,18 @@ class AdaptiveThreeStep(BaseAdaptiveTransientRKSolver):
             self.L[i].Assemble()
 
         self._update_preconditioners(self.preconditioner)
-        self.model.solve_single_step(self.a, self.L, self.preconditioner, self.gfu, 0)
+        if self.model.solve_single_step(self.a, self.L, self.preconditioner,
+                                        self.gfu, 0) is False:
+            return self._discard_diverged_solve()
+
+        return True
+
+    def _discard_diverged_solve(self) -> bool:
+        # Drop the diverged iterate so the retry doesn't linearize about garbage.
+        for candidate in (self.gfu_long, self.gfu_short, self.gfu):
+            candidate.vec.data = self.gfu_0_list[-1].vec
+        self.model.update_linearization(self.gfu_0_list[-1])
+        return False
 
     def _calculate_local_error(self) -> Tuple[List[float], List[float], List[str]]:
         # Include any variables specified by the model as included in local error.

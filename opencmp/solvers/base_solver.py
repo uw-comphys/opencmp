@@ -544,10 +544,13 @@ class Solver(ABC):
 
                 self._re_assemble()
 
-                self._single_solve()
-
-                # Calculate local error, accept/reject current result, and update timestep
-                accept_this_iteration, local_error_abs, local_error_rel, component = self._update_time_step()
+                # A model may explicitly report that its nonlinear solve diverged.
+                if self._single_solve() is False and self.adaptive:
+                    accept_this_iteration, local_error_abs, local_error_rel, component = \
+                        self._update_time_step(nonlinear_failed=True)
+                else:
+                    # Calculate local error, accept/reject current result, and update timestep
+                    accept_this_iteration, local_error_abs, local_error_rel, component = self._update_time_step()
 
                 # Log information about the current timestep
                 self._log_timestep(accept_this_iteration, local_error_abs, local_error_rel, component)

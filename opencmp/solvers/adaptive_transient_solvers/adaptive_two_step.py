@@ -69,9 +69,23 @@ class AdaptiveTwoStep(BaseAdaptiveTransientMultiStepSolver):
     def _re_assemble(self) -> None:
         self._assemble()
 
-    def _single_solve(self) -> None:
-        self.model.solve_single_step(self.a_pred, self.L_pred, self.preconditioner_pred, self.gfu_pred)
-        self.model.solve_single_step(self.a_corr, self.L_corr, self.preconditioner_corr, self.gfu)
+    def _single_solve(self) -> bool:
+        if self.model.solve_single_step(self.a_pred, self.L_pred, self.preconditioner_pred,
+                                        self.gfu_pred) is False:
+            return self._discard_diverged_solve()
+
+        if self.model.solve_single_step(self.a_corr, self.L_corr, self.preconditioner_corr,
+                                        self.gfu) is False:
+            return self._discard_diverged_solve()
+
+        return True
+
+    def _discard_diverged_solve(self) -> bool:
+        # Drop the diverged iterate so the retry doesn't linearize about garbage.
+        self.gfu_pred.vec.data = self.gfu_0_list[0].vec
+        self.gfu.vec.data = self.gfu_0_list[0].vec
+        self.model.update_linearization(self.gfu_0_list[0])
+        return False
 
     def _calculate_local_error(self) -> Tuple[List[float], List[float], List[str]]:
         # Include any variables specified by the model as included in local error.

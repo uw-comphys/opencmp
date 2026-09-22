@@ -39,12 +39,17 @@ class BaseAdaptiveTransientRKSolver(TransientRKSolver, ABC):
     def __init__(self, model_class: Type[Model], config: ConfigParser) -> None:
         super().__init__(model_class, config)
 
-    def _update_time_step(self) -> Tuple[bool, float, float, str]:
+    def _update_time_step(self, nonlinear_failed: bool = False) -> Tuple[bool, float, float, str]:
         dt_min_allowed = self.dt_range[0]
         dt_max_allowed = self.dt_range[1]
 
-        # Get the local error and the norm of the solution gridfunction.
-        local_error, gfu_norm, comp_names = self._calculate_local_error()
+        if nonlinear_failed:
+            # A diverged solve has no meaningful error estimate (and may be NaN, which compares
+            # as acceptable). Force a rejection through the normal path.
+            local_error, gfu_norm, comp_names = [1e30], [1.0], ['nonlinear solve']
+        else:
+            # Get the local error and the norm of the solution gridfunction.
+            local_error, gfu_norm, comp_names = self._calculate_local_error()
 
         # Create a list of all of the relative errors
         local_error_relative = local_error.copy()
