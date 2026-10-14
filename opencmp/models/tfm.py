@@ -16,6 +16,7 @@
 ########################################################################################################################
 
 import logging
+import math
 from typing import Dict, List, Optional, Union
 
 import ngsolve as ngs
@@ -504,6 +505,8 @@ class TwoFluidModel(Model):
         a += (ngs.div(ud) * q) * ngs.dx
         a += (-Ac * ngs.div(ud) * q) * ngs.dx
         a += (-ngs.grad(Ac) * ud * q) * ngs.dx
+        # the following term ccount for discontinuous alpha_c in the conservative mixture flux.
+        a += (-avg(q) * jump(Ac) * ((uc - ud) * n)) * ngs.dx(skeleton=True)
         if self.mean_zero_pressure:
             pressure_mean, pressure_mean_test = U[-1], V[-1]
             a += (pressure_mean * q + p * pressure_mean_test) * ngs.dx
@@ -608,6 +611,20 @@ class TwoFluidModel(Model):
             a += (dt * drag_factor_d * (ud - uc) * vd) * ngs.dx
             a += (dt * drag_factor_c * (ud - uc) * vc) * ngs.dx
 
+        if self.Disp_switch and self.drag_switch:
+            Cd = self._get_drag_coeff(wd, wc, Ad, ts)
+            H = 1 - 1.166*Ad + 0.5*Ad**2
+            Cdis = self.Cdis[ts]
+            relative_wind = wd - wc
+            relative_trial = ud - uc
+            slip_product = ngs.InnerProduct(relative_wind, relative_trial)
+            disp_factor_d = 0.75 * Cd * Cdis * rho_c/rho_d * H
+            disp_factor_c = -0.75 * Cd * Cdis * Ad/(Ac + 1e-30) * H
+            # The physical forces were formerly RHS terms, so their
+            # velocity-dependent linearizations enter the left with minus signs.
+            a += (-dt * disp_factor_d * slip_product * ngs.grad(Ac) * vd) * ngs.dx
+            a += (-dt * disp_factor_c * slip_product * ngs.grad(Ac) * vc) * ngs.dx
+
         # — Virtual mass: a_dt (NOT dt-scaled) + a (dt-scaled)
         if self.VM_switch:
             C_VM = self.C_VM[ts]
@@ -682,6 +699,11 @@ class TwoFluidModel(Model):
                 lift_mom_c = Cl * (-Ad)/(Ac + 1e-30) * (ngs.Cross(ud - uc, curl_3d(wc)) * vc)
             a += (dt * lift_mom_d) * ngs.dx
             a += (dt * lift_mom_c) * ngs.dx
+
+        if self.injection_switch and self.inj_mass_flowrate:
+            dx_inj = ngs.dx(definedon=self.mesh.Materials(self.injection_region))
+            Ad_safe = Max(Ad, ngs.CoefficientFunction(1e-5))
+            a += (dt * self.inj_mass_flowrate / Ad_safe * ud * vd) * dx_inj
 
         return [a]
 
@@ -825,30 +847,19 @@ class TwoFluidModel(Model):
                      * self._ds(marker)
 
         # ============================================================
-        # 5. Laminar dispersion (linear source term)
-        # ============================================================
-        if self.Disp_switch and self.drag_switch:
-            Cd   = self._get_drag_coeff(wd, wc, Ad, ts)
-            H    = 1 - 1.166*(1 - Ac) + 0.5*(1 - Ac)**2
-            Cdis = self.Cdis[ts]
-            disp_d = 0.75*Cd*Cdis*rho_c/rho_d * H * ngs.Norm(wd - wc)**2
-            disp_c = -0.75*Cd*Cdis*Ad/(Ac + 1e-30) * H * ngs.Norm(wd - wc)**2
-            L += (dt * disp_d * ngs.grad(Ac) * vd) * ngs.dx
-            L += (dt * disp_c * ngs.grad(Ac) * vc) * ngs.dx
-
-        # ============================================================
-        # 6. Interior injection source (on the 'injection' material region)
+        # 5. Interior injection source (on the 'injection' material region)
         # ============================================================
         if self.injection_switch and self.inj_mass_flowrate:
             mdot = self.inj_mass_flowrate
             dx_inj = ngs.dx(definedon=self.mesh.Materials(self.injection_region))
             L += (dt * -mdot * r) * dx_inj          # dispersed-phase mass
-            L += (dt *  mdot * q) * dx_inj          # mixture mass
+            L += (mdot * q) * dx_inj                 # mixture mass (not dt-scaled)
             if self.mesh.dim == 2:
                 inj_vec = ngs.CoefficientFunction((0, self.inj_velocity))
             else:
                 inj_vec = ngs.CoefficientFunction((0, self.inj_velocity, 0))
-            L += (dt * mdot * inj_vec * vc) * dx_inj  # continuous-phase momentum
+            Ad_safe = Max(Ad, ngs.CoefficientFunction(1e-5))
+            L += (dt * mdot / Ad_safe * inj_vec * vd) * dx_inj
 
         return [L]
 
@@ -911,6 +922,10 @@ class TwoFluidModel(Model):
                 ac = gfu.components[comp['alpha_c']]
                 self._lim.bezier_bound(ac, ac.space, ord_s, (0.0, 1.0))
 
+            if not math.isfinite(gfu.vec.Norm()):
+                logging.warning('TFM Picard produced a non-finite solution.')
+                return False
+
             # Match INS convergence testing: evaluate each local-error component
             # independently and exclude pressure.
             converged = True
@@ -924,7 +939,8 @@ class TwoFluidModel(Model):
                 solution_norm = mean(gfu.components[i], self.mesh)
                 tolerance = (self.abs_nonlinear_tolerance
                              + self.rel_nonlinear_tolerance * solution_norm)
-                if err >= tolerance:
+                if not (math.isfinite(err) and math.isfinite(tolerance)
+                        and err < tolerance):
                     converged = False
                     break
 

@@ -4,11 +4,62 @@ import re
 
 import ngsolve as ngs
 import pytest
+from netgen.geom2d import unit_square
 
 from opencmp.config_functions import ConfigParser
 from opencmp.config_functions.boundary_conditions import BCFunctions
 from opencmp.models.tfm import TwoFluidModel
 import opencmp.models.tfm as tfm_module
+
+
+def _injection_test_model() -> TwoFluidModel:
+    model = TwoFluidModel.__new__(TwoFluidModel)
+    model.mesh = ngs.Mesh(unit_square.GenerateMesh(maxh=0.4))
+    model.fes = ngs.FESpace([
+        ngs.HDiv(model.mesh, order=1, dgjumps=True),
+        ngs.HDiv(model.mesh, order=1, dgjumps=True),
+        ngs.L2(model.mesh, order=0, dgjumps=True),
+        ngs.L2(model.mesh, order=0, dgjumps=True),
+    ], dgjumps=True)
+    model.model_components = {'u_c': 0, 'u_d': 1, 'p': 2, 'alpha_c': 3}
+    model.UIter = ngs.GridFunction(model.fes)
+    model.UIter.components[3].Set(0.8)
+    model.n = ngs.specialcf.normal(model.mesh.dim)
+    model.IM = ngs.Id(model.mesh.dim)
+    model.penalty_interior = 10.0
+    model.rho_c = [1000.0]
+    model.rho_d = [1.0]
+    model.nu_c = [0.0]
+    model.nu_d = [0.0]
+    model.dp = [0.003]
+    model.BC = {}
+    model.dirichlet_names = {}
+    model.f = {}
+    model.diffusion_switch = False
+    model.canonical_form = 'B-TFM'
+    model.gravity = ngs.CoefficientFunction((0.0, 0.0))
+    model.drag_switch = False
+    model.VM_switch = False
+    model.Disp_switch = False
+    model.Lift_switch = False
+    model.mean_zero_pressure = False
+    model.injection_switch = True
+    model.inj_mass_flowrate = 0.3
+    model.injection_region = '.*'
+    model.inj_velocity = 2.0
+    return model
+
+
+def _boundary_trace_integral(mesh, expression) -> float:
+    """Integrate the adjacent volume trace of an L2 field on the boundary."""
+    space = ngs.L2(mesh, order=0)
+    test = space.TestFunction()
+    one = ngs.GridFunction(space)
+    one.Set(1.0)
+    form = ngs.LinearForm(space)
+    form += expression * test * ngs.ds(skeleton=True, bonus_intorder=10)
+    form.Assemble()
+    return ngs.InnerProduct(form.vec, one.vec)
 
 
 def _tfm_from_config(tmp_path: Path, tfm: dict[str, str], other=None) -> TwoFluidModel:
@@ -187,3 +238,85 @@ def test_ime_closures_are_finite_and_zero_without_a_driver() -> None:
             magnitude_squared = ngs.Integrate(closure * closure, model.mesh)
             assert math.isfinite(magnitude_squared)
             assert magnitude_squared == pytest.approx(0.0, abs=1e-24)
+
+
+def test_injection_sources_use_consistent_equation_scaling_and_phase() -> None:
+    model = _injection_test_model()
+    dt = ngs.Parameter(2e-3)
+    U, V = model.fes.TrialFunction(), model.fes.TestFunction()
+
+    a = ngs.BilinearForm(model.fes)
+    a += model.construct_bilinear_time_ODE(U, V, dt, 0)[0]
+    L = ngs.LinearForm(model.fes)
+    L += model.construct_linear(V, None, dt, 0)[0]
+    a.Assemble()
+    L.Assemble()
+
+    probes = []
+    for component in range(4):
+        probe = ngs.GridFunction(model.fes)
+        if component < 2:
+            probe.components[component].Set(ngs.CoefficientFunction((0.0, 1.0)))
+        else:
+            probe.components[component].Set(1.0)
+        probes.append(probe)
+
+    continuous_momentum = ngs.InnerProduct(L.vec, probes[0].vec)
+    dispersed_momentum = ngs.InnerProduct(L.vec, probes[1].vec)
+    mixture_mass = ngs.InnerProduct(L.vec, probes[2].vec)
+    dispersed_mass = ngs.InnerProduct(L.vec, probes[3].vec)
+
+    assert continuous_momentum == pytest.approx(0.0, abs=1e-14)
+    assert dispersed_momentum == pytest.approx(6e-3)
+    assert mixture_mass == pytest.approx(0.3)
+    assert dispersed_mass == pytest.approx(-6e-4)
+
+    injected_velocity = ngs.GridFunction(model.fes)
+    injected_velocity.components[1].Set(ngs.CoefficientFunction((0.0, 2.0)))
+    dilution = ngs.InnerProduct(a.mat * injected_velocity.vec, probes[1].vec)
+    assert dilution == pytest.approx(dispersed_momentum)
+
+
+def test_mixture_equation_includes_discontinuous_volume_fraction_flux() -> None:
+    model = _injection_test_model()
+    model.injection_switch = False
+    model.UIter.components[3].Set(ngs.IfPos(ngs.x - 0.5, 0.8, 0.2))
+    U, V = model.fes.TrialFunction(), model.fes.TestFunction()
+    a = ngs.BilinearForm(model.fes)
+    a += model.construct_bilinear_time_ODE(U, V, ngs.Parameter(2e-3), 0)[0]
+    a.Assemble()
+
+    state = ngs.GridFunction(model.fes)
+    state.components[0].Set(ngs.CoefficientFunction((1.0, 0.0)))
+    constant_q = ngs.GridFunction(model.fes)
+    constant_q.components[2].Set(1.0)
+
+    weak_mixture_flux = ngs.InnerProduct(a.mat * state.vec, constant_q.vec)
+    physical_boundary_flux = _boundary_trace_integral(
+        model.mesh, model.UIter.components[3] * state.components[0] * model.n)
+
+    assert physical_boundary_flux > 0.1
+    assert weak_mixture_flux == pytest.approx(physical_boundary_flux, abs=1e-12)
+
+
+def test_picard_rejects_nonfinite_solution() -> None:
+    model = _injection_test_model()
+    model.IC = ngs.GridFunction(model.fes)
+    model.IC.components[3].Set(0.8)
+    model.nonlinear_max_iters = 1
+    model.relax_factors = [1.0] * 4
+    model.slope_limiter = False
+    model.apply_dirichlet_bcs_to = lambda *_args: None
+
+    def nonfinite_solve(_a, _L, _preconditioner, gfu):
+        gfu.vec.FV().NumPy()[:] = float('nan')
+
+    model.linear_solve = nonfinite_solve
+
+    class Form:
+        def Assemble(self):
+            pass
+
+    gfu = ngs.GridFunction(model.fes)
+    gfu.vec.data = model.IC.vec
+    assert not model.solve_single_step([Form()], [Form()], [None], gfu)
